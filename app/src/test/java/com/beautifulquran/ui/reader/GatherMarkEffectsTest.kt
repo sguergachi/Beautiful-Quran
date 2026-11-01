@@ -146,4 +146,44 @@ class GatherMarkEffectsTest {
         assertEquals(1f, easeOutBack(1f), 0.001f)
         assertTrue(easeOutBack(0.7f) > 1f)
     }
+
+    @Test
+    fun `nothing paints until the finger lands or the verse is gathered`() {
+        assertNull(gatherMarkFrameState(paint = 0f, presence = 0f, press = 0f, pop = 1f))
+    }
+
+    @Test
+    fun `a press lays only a bead of ink, pressed in`() {
+        val held = gatherMarkFrameState(paint = 0f, presence = 0f, press = 1f, pop = 1f)!!
+        assertEquals(ANTICIPATION, held.paint, 0.001f)
+        assertEquals(1f, held.alpha, 0.001f)
+        assertTrue(held.scale < 1f)
+        // Halfway into the press, halfway to the bead.
+        val landing = gatherMarkFrameState(paint = 0f, presence = 0f, press = 0.5f, pop = 1f)!!
+        assertEquals(ANTICIPATION / 2f, landing.paint, 0.001f)
+    }
+
+    @Test
+    fun `release carries on from the press without a jump`() {
+        // rememberGatherMarkInk seeds paint and pop from the press at release.
+        val press = 0.8f
+        val held = gatherMarkFrameState(paint = 0f, presence = 0f, press = press, pop = 1f)!!
+        val released = gatherMarkFrameState(
+            paint = ANTICIPATION * press,
+            presence = 1f,
+            press = 0f,
+            pop = 1f - PRESS_SQUASH * press,
+        )!!
+        assertEquals(held.paint, released.paint, 0.001f)
+        assertEquals(held.scale, released.scale, 0.001f)
+    }
+
+    @Test
+    fun `pressing a gathered mark lifts its ink before it goes`() {
+        val resting = gatherMarkFrameState(paint = 1f, presence = 1f, press = 0f, pop = 1f)!!
+        val pressed = gatherMarkFrameState(paint = 1f, presence = 1f, press = 1f, pop = 1f)!!
+        assertEquals(1f, resting.alpha, 0.001f)
+        assertEquals(1f - PRESS_LIFT, pressed.alpha, 0.001f)
+        assertEquals(1f, pressed.paint, 0.001f)
+    }
 }

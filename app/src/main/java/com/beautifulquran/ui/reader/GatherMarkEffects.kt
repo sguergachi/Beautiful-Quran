@@ -4,6 +4,19 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -72,47 +85,141 @@ internal fun markFrame(bounds: Rect, baseline: Float?, minRy: Float): MarkFrame 
 }
 
 /**
+ * The tap on `﴿N﴾` is one small gesture in three beats, the way a pen meets
+ * paper:
+ *
+ * 1. **Press.** The finger goes down and the pen touches: the effect shows its
+ *    first [ANTICIPATION] of ink — a bead of the crown, the loop's first
+ *    stroke, the first pearl — pressed in slightly ([PRESS_SQUASH]).
+ * 2. **Release.** The verse is gathered and the effect completes from exactly
+ *    where it was, springing up past full size and settling ([pop]).
+ * 3. **Cancel.** A press that turns into a scroll draws its bead back off.
+ *
+ * Pressing an already gathered mark lifts its ink a little ([PRESS_LIFT])
+ * before the release takes it off the page.
+ */
+internal const val ANTICIPATION = 0.12f
+internal const val PRESS_SQUASH = 0.1f
+internal const val PRESS_LIFT = 0.35f
+
+/**
  * [paint] runs 0→1 as the effect is laid down. [presence] is its opacity: a
- * dropped verse's ink lifts off as a whole instead of un-drawing, so every
- * effect leaves the page the same quiet way.
+ * dropped verse's ink lifts off as a whole instead of un-drawing. [press] is
+ * the finger on the mark; [pop] the release spring's scale.
  */
 @Stable
 internal class GatherMarkInk(
     private val paintAnim: Animatable<Float, *>,
     private val presenceAnim: Animatable<Float, *>,
+    private val pressAnim: Animatable<Float, *>,
+    private val popAnim: Animatable<Float, *>,
 ) {
     val paint: Float get() = paintAnim.value
     val presence: Float get() = presenceAnim.value
+    val press: Float get() = pressAnim.value
+    val pop: Float get() = popAnim.value
 }
+
+/** What one frame of the gesture paints: how far, how strongly, how large. */
+internal data class GatherMarkFrameState(val paint: Float, val alpha: Float, val scale: Float)
+
+/**
+ * Resolves the gesture's animations into one frame, or null when nothing is
+ * on the page. Pure, so the three beats can be held by tests.
+ */
+internal fun gatherMarkFrameState(paint: Float, presence: Float, press: Float, pop: Float): GatherMarkFrameState? {
+    if (presence > 0f) {
+        return GatherMarkFrameState(paint = paint, alpha = presence * (1f - PRESS_LIFT * press), scale = pop)
+    }
+    if (press > 0f) {
+        return GatherMarkFrameState(paint = ANTICIPATION * press, alpha = press, scale = 1f - PRESS_SQUASH * press)
+    }
+    return null
+}
+
+/** The pen touching down: quick, so the press is felt under the finger. */
+private const val PRESS_IN_MS = 90
+
+/** A press that came to nothing draws back a little slower than it came. */
+private const val PRESS_OUT_MS = 160
 
 /** Leaving fade, shared by every effect. */
 private const val GATHER_MARK_LIFT_MS = 220
 
 /**
- * Animates [GatherMarkInk] from [gathered]. A mark that scrolls in already
- * gathered starts fully drawn, so nothing repaints as the list recycles; only
- * a real change of state animates.
+ * Animates [GatherMarkInk] from [gathered] and the finger on the mark
+ * ([pressed], read through a snapshot flow so a press redraws but never
+ * recomposes the verse). A mark that scrolls in already gathered starts fully
+ * drawn, so nothing repaints as the list recycles.
  */
 @Composable
-internal fun rememberGatherMarkInk(gathered: Boolean, paintMs: Int): GatherMarkInk {
+internal fun rememberGatherMarkInk(gathered: Boolean, paintMs: Int, pressed: State<Boolean>): GatherMarkInk {
     val paint = remember { Animatable(if (gathered) 1f else 0f) }
     val presence = remember { Animatable(if (gathered) 1f else 0f) }
+    val press = remember { Animatable(0f) }
+    val pop = remember { Animatable(1f) }
+    LaunchedEffect(pressed) {
+        snapshotFlow { pressed.value }.collectLatest { down ->
+            press.animateTo(
+                if (down) 1f else 0f,
+                tween(durationMillis = if (down) PRESS_IN_MS else PRESS_OUT_MS, easing = FastOutSlowInEasing),
+            )
+        }
+    }
     LaunchedEffect(gathered) {
         if (gathered) {
             if (presence.value < 1f || paint.value < 1f) {
+                // Carry on from the bead the press laid, at the press's size.
+                val from = ANTICIPATION * press.value
+                pop.snapTo(1f - PRESS_SQUASH * press.value)
                 presence.snapTo(1f)
-                paint.snapTo(0f)
-                // Linear time: each effect shapes its own motion (strokes
-                // ease, beads overshoot), so a curve here would double it.
-                paint.animateTo(1f, tween(durationMillis = paintMs, easing = LinearEasing))
+                paint.snapTo(from)
+                coroutineScope {
+                    // Linear time: each effect shapes its own motion (strokes
+                    // ease, beads overshoot), so a curve here would double it.
+                    launch {
+                        paint.animateTo(
+                            1f,
+                            tween(durationMillis = (paintMs * (1f - from)).toInt(), easing = LinearEasing),
+                        )
+                    }
+                    launch {
+                        pop.animateTo(1f, spring(dampingRatio = 0.42f, stiffness = 520f))
+                    }
+                }
             }
         } else if (presence.value > 0f) {
             presence.animateTo(0f, tween(durationMillis = GATHER_MARK_LIFT_MS, easing = FastOutSlowInEasing))
             paint.snapTo(0f)
         }
     }
-    return remember(paint, presence) { GatherMarkInk(paint, presence) }
+    return remember(paint, presence, press, pop) { GatherMarkInk(paint, presence, press, pop) }
 }
+
+/**
+ * Watches for a finger landing on the mark ([hits]) without consuming
+ * anything: the verse's own tap handling still owns the gesture. A press
+ * ends on release, or as soon as it travels past touch slop into a scroll.
+ */
+internal fun Modifier.markPressWatcher(pressed: MutableState<Boolean>, hits: (Offset) -> Boolean): Modifier =
+    pointerInput(Unit) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (!hits(down.position)) return@awaitEachGesture
+            pressed.value = true
+            try {
+                val slop = viewConfiguration.touchSlop
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!change.pressed) break
+                    if ((change.position - down.position).getDistance() > slop) break
+                }
+            } finally {
+                pressed.value = false
+            }
+        }
+    }
 
 /**
  * Paints [effect] round the ornament at [bounds], sitting on the line's
@@ -129,17 +236,21 @@ internal fun DrawScope.drawGatherMark(
     rtl: Boolean,
     seed: Int,
 ) {
-    val presence = ink.presence
-    if (presence <= 0f || bounds.width <= 0f) return
+    if (bounds.width <= 0f) return
+    val state = gatherMarkFrameState(ink.paint, ink.presence, ink.press, ink.pop) ?: return
+    if (state.alpha <= 0f) return
     val frame = markFrame(bounds, baseline, minRy = 9.dp.toPx())
-    val paint = ink.paint
-    when (effect) {
-        GatherMarkEffect.BRUSH_CIRCLE -> drawBrushCircle(frame, paint, color, presence)
-        GatherMarkEffect.INK_DROP -> drawInkDrop(frame, paint, color, presence, seed)
-        GatherMarkEffect.QALAM_SWASH -> drawQalamSwash(frame, paint, color, presence, rtl)
-        GatherMarkEffect.SHAMSA_RAYS -> drawShamsaRays(frame, paint, color, presence, rtl)
-        GatherMarkEffect.PEARL_RING -> drawPearlRing(frame, paint, color, presence, rtl)
-        GatherMarkEffect.TAJ_CROWN -> drawTajCrown(frame, paint, color, presence)
+    val paint = state.paint
+    val presence = state.alpha
+    scale(state.scale, pivot = Offset(frame.cx, frame.cy)) {
+        when (effect) {
+            GatherMarkEffect.BRUSH_CIRCLE -> drawBrushCircle(frame, paint, color, presence)
+            GatherMarkEffect.INK_DROP -> drawInkDrop(frame, paint, color, presence, seed)
+            GatherMarkEffect.QALAM_SWASH -> drawQalamSwash(frame, paint, color, presence, rtl)
+            GatherMarkEffect.SHAMSA_RAYS -> drawShamsaRays(frame, paint, color, presence, rtl)
+            GatherMarkEffect.PEARL_RING -> drawPearlRing(frame, paint, color, presence, rtl)
+            GatherMarkEffect.TAJ_CROWN -> drawTajCrown(frame, paint, color, presence)
+        }
     }
 }
 

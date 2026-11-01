@@ -367,12 +367,25 @@ private fun Modifier.gatheredMarkEffect(
     markRange: IntRange,
     rtl: Boolean,
     seed: Int,
+    /** False when the mark has no tap action: then a press must promise nothing. */
+    tappable: Boolean,
 ): Modifier {
     val effect = LocalGatherMarkEffect.current
-    val ink = rememberGatherMarkInk(gathered, effect.paintMs)
+    val pressed = remember { mutableStateOf(false) }
+    val ink = rememberGatherMarkInk(gathered, effect.paintMs, pressed)
     val color = QuranTheme.ink.body
-    return drawBehind {
-        if (ink.presence <= 0f) return@drawBehind
+    // The same finger-sized disc the tap itself resolves against.
+    val hitRadiusPx = with(LocalDensity.current) { MarkTapMinRadiusDp.dp.toPx() }
+    val watch = if (tappable) {
+        Modifier.markPressWatcher(pressed) { position ->
+            layout()?.markContains(position, markRange, hitRadiusPx) == true
+        }
+    } else {
+        Modifier
+    }
+    return then(watch).drawBehind {
+        // Nothing gathered and no finger down: skip the layout walk.
+        if (ink.presence <= 0f && ink.press <= 0f) return@drawBehind
         val text = layout() ?: return@drawBehind
         val bounds = text.markGlyphBounds(markRange) ?: return@drawBehind
         // The cups close the verse, so their last glyph names the line.
@@ -1968,6 +1981,7 @@ private fun ResponsiveEnglishAyah(
                 markRange = rendered.markRange,
                 rtl = false,
                 seed = ayah.number,
+                tappable = onMarkClick != null,
             )
             .ayahTapTarget(
                 ayah = ayah,
@@ -2227,6 +2241,7 @@ private fun ResponsiveHafsAyah(
                 markRange = rendered.markRange,
                 rtl = true,
                 seed = ayah.number,
+                tappable = onMarkClick != null,
             )
             .ayahTapTarget(
                 ayah = ayah,
@@ -2353,7 +2368,8 @@ private fun ArabicAyahNumberUnit(
 ) {
     val density = LocalDensity.current
     val markEffect = LocalGatherMarkEffect.current
-    val markInk = rememberGatherMarkInk(gathered, markEffect.paintMs)
+    val markPressed = remember { mutableStateOf(false) }
+    val markInk = rememberGatherMarkInk(gathered, markEffect.paintMs, markPressed)
     val markColor = QuranTheme.ink.body
     val arabicLineHeight = with(density) {
         (ArabicWordStyle.fontSize * fontScale * 1.9f).toDp()
@@ -2368,10 +2384,13 @@ private fun ArabicAyahNumberUnit(
             .requiredHeight(maxOf(arabicLineHeight, 56.dp))
             .then(
                 if (onClick != null || onLongClick != null) {
-                    Modifier.quietClickable(
-                        onClick = onClick ?: {},
-                        onLongClick = onLongClick,
-                    )
+                    // The whole unit is the mark's target, so any press on it is the pen.
+                    Modifier
+                        .then(if (onClick != null) Modifier.markPressWatcher(markPressed) { true } else Modifier)
+                        .quietClickable(
+                            onClick = onClick ?: {},
+                            onLongClick = onLongClick,
+                        )
                 } else {
                     Modifier
                 },

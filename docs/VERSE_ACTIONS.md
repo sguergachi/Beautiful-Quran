@@ -210,7 +210,13 @@ interaction):
 | Pearl ring | Fourteen pearls and beads pressed in one after another |
 | Tāj crown | The illuminator's crown: a teardrop rises over the cups, two palmette volutes unfurl and curl in, pearls set at their ends |
 
-Dropping a verse lifts any effect off as a whole in 220 ms. Effects sit on
+The tap is a micro interaction in three beats, shared by every effect:
+**press** — the pen touches: the first 12% of the effect appears under the
+finger in 90 ms, pressed in to 90% size; **release** — the effect completes
+from that bead (380–520 ms) on a springy pop that overshoots and settles;
+**cancel** — a press that slides past touch slop into a scroll draws its bead
+back off. Pressing a gathered mark lifts its ink to 65% before release drops
+it; dropping lifts any effect off as a whole in 220 ms. Effects sit on
 the cups, not the line box: Hafs' cups stand 0.71 of their width tall,
 centred 0.105 widths above the shared baseline (measured on device in
 English and Arabic lines). Ring counts are never six-fold. Code:
