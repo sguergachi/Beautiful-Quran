@@ -411,6 +411,7 @@ export async function pollJobs() {
       if (j.kind === "capture" && j.name === get().name && j.state === "done") loadGeometry();
       if (j.kind === "capture" || j.kind === "render") refreshSpecs();
       if (j.kind.startsWith("emu")) pollEmus(true);
+      if (j.kind === "apk-build" && j.state === "done") refreshApk();
     }
   } catch { /* the server may be restarting: keep polling */ }
   const active = get().jobs.some((j) => j.state === "running" || j.state === "queued");
@@ -458,6 +459,14 @@ export async function deleteExport(name: string, file: ExportFile) {
   }));
 }
 export const cancelJob = (id: string) => api.cancel(id).then(pollJobs, (e) => toast(e.message, "error"));
+export async function refreshApk() {
+  try {
+    const apk_info = await api.apk();
+    const meta = get().meta;
+    if (meta) set({ meta: { ...meta, apk: apk_info.path, apk_exists: apk_info.exists, apk_info } });
+  } catch { /* the next poll heals a missed refresh */ }
+}
+export const buildApk = () => job(api.buildApk(), "Building the release APK");
 export const bootEmulator = (cores: number) => job(api.bootEmu(cores), "Starting an emulator").then(() => pollEmus(true));
 export const prepareEmulator = (serial: string) => job(api.prepareEmu(serial), `Preparing ${serial}`);
 export const stopEmulator = (serial: string) => api.stopEmu(serial).then(() => { toast(`Stopped ${serial}`); pollEmus(true); }, (e) => toast(e.message, "error"));
