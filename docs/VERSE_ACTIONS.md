@@ -214,9 +214,8 @@ Green — at full opacity:
    sunburst stands clear around the finger. The rays catch in turn round it,
    from the top in reading order (anticlockwise in Arabic), each lengthening
    and darkening. It fills in 550 ms — longer than the system long-press, so
-   a held mark's long press swallows the release tap. (The gloss row watches
-   the whole unit but draws on the mark, so the fingertip is moved into the
-   mark's pixels: past the 8 dp side air, then the mark's placement.)
+   a held mark's long press swallows the release tap (silently: the gloss
+   row's long press plays no haptic of its own, the pop has one).
 3. **Pop.** The full ring bursts: rays fly 6 dp out, lengthen, thin and fade
    (420 ms), with the paper toggle haptic. The gather starts 120 ms into the
    flight, so entering the mode (a whole-reader recomposition that stalls the
@@ -235,7 +234,7 @@ Green — at full opacity:
    and the hold carries on from the ring as it stands.
 5. **Cancel.** Slide past touch slop into a scroll and the rays simply draw
    back (180 ms) — a scroll is not a tap, and earns no lesson. The press
-   watcher reports how the finger left (`MarkPress.Released` vs `Cancelled`).
+   watcher reports how the finger left (`MarkPressEvent.Released` vs `Cancelled`).
 
 **Discoverability.** Hidden gestures were the reason the earlier Hold A/B
 (hold → a Share glyph appears) was dropped: a hold on the mark is a power
@@ -246,8 +245,28 @@ lesson above, which shows the gesture rather than describing it.
 The rays sit on the cups, not the line box: Hafs' cups stand 0.71 of their
 width tall, centred 0.105 widths above the shared baseline (measured on
 device in English and Arabic lines). Code: `ui/reader/MarkHoldShamsa.kt`.
-Scroll reader, all three modes. The hold state is remembered even after the
-reader flips to gathering (which nulls the hold), so the pop plays out.
+Scroll reader, all three modes.
+
+**One hold per reader, drawn over the list.** Only one finger can hold a
+mark, so the reader owns a single `MarkHoldHost` (four animations) and paints
+the shamsa in an overlay on the verse list (`markHoldOverlay`), above every
+verse's layers and under the list's paper fades. Drawn inside a verse, it was
+clipped by that verse's offscreen layer (14 dp bleed against a ~54 dp
+sunburst), dimmed by unread-word paper covers, and in the gloss row faded
+and cropped with its mark's alpha. Each mark only installs a watcher
+(`markHoldWatcher`) that, when a finger lands, reports where the cups are,
+their baseline and the fingertip in root pixels — from its own layout
+coordinates, so no padding is hard-coded — and what holding does. The host
+outlives the verse, so the pop plays out after the reader turns to gather.
+
+**The rules are a pure function** (`nextHoldStep`, tested). Presses arrive
+as ordered events on a channel, never conflated: a tap whose down and lift
+land in one frame still gets its lesson. A lift or slide after the pop is
+ignored (the ring is marked popped before anything can suspend), and a press
+during the burst is ignored together with its own lift.
+
+**Screen readers** have no pointer to watch, so every holdable mark also
+carries a "Gather this verse" accessibility action.
 
 Marking another verse while gathering uses the paper toggle haptic: a
 confirm click on, a lighter clock tick off. Same family as Settings checks

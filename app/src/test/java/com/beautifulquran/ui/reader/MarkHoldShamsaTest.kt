@@ -203,4 +203,71 @@ class MarkHoldShamsaTest {
         assertEquals(bright, night.tip)
         assertTrue(night.tip.luminance() > gold.luminance())
     }
+
+    private val target = MarkHoldTarget(
+        bounds = Rect(0f, 0f, 40f, 30f),
+        baseline = 25f,
+        finger = Offset(20f, 15f),
+        rtl = false,
+        onHold = {},
+    )
+
+    /** Runs [events] through the rules from idle, returning each step's action and the final state. */
+    private fun play(vararg events: MarkPressEvent, from: HoldState = HoldState()): Pair<List<HoldAction>, HoldState> {
+        var state = from
+        val actions = events.map { event ->
+            val (next, action) = nextHoldStep(state, event)
+            state = next
+            action
+        }
+        return actions to state
+    }
+
+    @Test
+    fun `a press charges and a lift while charging is a tap that gets the lesson`() {
+        val (actions, state) = play(MarkPressEvent.Down(target), MarkPressEvent.Released)
+        assertEquals(listOf(HoldAction.StartCharge, HoldAction.StartLesson), actions)
+        assertEquals(HoldPhase.Lesson, state.phase)
+    }
+
+    @Test
+    fun `a slide while charging retracts with no lesson`() {
+        val (actions, state) = play(MarkPressEvent.Down(target), MarkPressEvent.Cancelled)
+        assertEquals(listOf(HoldAction.StartCharge, HoldAction.Retract), actions)
+        assertEquals(HoldPhase.Retracting, state.phase)
+    }
+
+    @Test
+    fun `nothing a finger does after the pop takes it back`() {
+        val popped = HoldState(HoldPhase.Popped)
+        // The lift or slide that ends the gesture that popped is ignored.
+        assertEquals(HoldAction.Ignore, nextHoldStep(popped, MarkPressEvent.Released).second)
+        assertEquals(HoldAction.Ignore, nextHoldStep(popped, MarkPressEvent.Cancelled).second)
+        assertEquals(HoldPhase.Popped, nextHoldStep(popped, MarkPressEvent.Cancelled).first.phase)
+    }
+
+    @Test
+    fun `a press during the burst is ignored together with its own lift`() {
+        val (actions, state) = play(
+            MarkPressEvent.Down(target),
+            MarkPressEvent.Released,
+            from = HoldState(HoldPhase.Popped),
+        )
+        assertEquals(listOf(HoldAction.Ignore, HoldAction.Ignore), actions)
+        assertEquals(false, state.ignoringPress)
+        // The next press after that is a fresh one.
+        assertEquals(HoldAction.StartCharge, nextHoldStep(state.copy(phase = HoldPhase.Idle), MarkPressEvent.Down(target)).second)
+    }
+
+    @Test
+    fun `pressing again during a lesson or a retract carries on charging`() {
+        assertEquals(HoldAction.StartCharge, nextHoldStep(HoldState(HoldPhase.Lesson), MarkPressEvent.Down(target)).second)
+        assertEquals(HoldAction.StartCharge, nextHoldStep(HoldState(HoldPhase.Retracting), MarkPressEvent.Down(target)).second)
+    }
+
+    @Test
+    fun `a stray lift with no press in progress does nothing`() {
+        assertEquals(HoldAction.Ignore, nextHoldStep(HoldState(), MarkPressEvent.Released).second)
+        assertEquals(HoldAction.Ignore, nextHoldStep(HoldState(HoldPhase.Lesson), MarkPressEvent.Released).second)
+    }
 }

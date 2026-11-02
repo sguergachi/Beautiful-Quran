@@ -5,7 +5,12 @@ package com.beautifulquran.share
  * gather that verse; [onMarkTap] is what the pop calls.
  *
  * Word long-press stays Root Viewer. Notes stay on the bookmark ribbon.
- * Icon / Reveal / Hold were A/B options and are gone.
+ *
+ * The Icon / Reveal / Hold A/B options (removed in 0eeaef2b5) are still gone.
+ * That Hold put a Share glyph on a held verse — a confirm step behind a
+ * hidden gesture. This hold is different: it is on the mark only (word hold
+ * stays the Root Viewer), the pop *is* the gather, and a tap on the mark
+ * teaches it. See docs/VERSE_ACTIONS.md.
  */
 sealed class ShareUxAction {
     data class EnterShare(val ref: AyahRef) : ShareUxAction()
