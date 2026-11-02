@@ -223,7 +223,15 @@ class QuranRepository(
         }.also { recitersCache = it }
     }
 
-    suspend fun surahContent(surahId: Int): SurahContent = withContext(Dispatchers.IO) {
+    /**
+     * A chapter's verses and words. [throughAyah] stops at that verse — for a
+     * caller that only sets the opening of a chapter (the reader rehearsal)
+     * and should not read all of Al-Baqarah to do it.
+     */
+    suspend fun surahContent(
+        surahId: Int,
+        throughAyah: Int = Int.MAX_VALUE,
+    ): SurahContent = withContext(Dispatchers.IO) {
         val surah = surahs().first { it.id == surahId }
         val runtime = runtimeMushaf?.words(surahId).orEmpty()
         val words = database.db.rawQuery(
@@ -231,10 +239,10 @@ class QuranRepository(
             SELECT w.ayah_number, w.position, w.arabic, m.lemma
             FROM words w
             LEFT JOIN word_morphology m USING (surah_id, ayah_number, position)
-            WHERE w.surah_id = ?
+            WHERE w.surah_id = ? AND w.ayah_number <= ?
             ORDER BY w.ayah_number, w.position
             """.trimIndent(),
-            arrayOf(surahId.toString()),
+            arrayOf(surahId.toString(), throughAyah.toString()),
         ).use { c ->
             val map = HashMap<Int, MutableList<Word>>()
             while (c.moveToNext()) {
@@ -259,8 +267,9 @@ class QuranRepository(
             map
         }
         val ayahs = queryList(
-            "SELECT ayah_number, text_uthmani, translation_en FROM ayahs WHERE surah_id = ? ORDER BY ayah_number",
-            arrayOf(surahId.toString()),
+            "SELECT ayah_number, text_uthmani, translation_en FROM ayahs " +
+                "WHERE surah_id = ? AND ayah_number <= ? ORDER BY ayah_number",
+            arrayOf(surahId.toString(), throughAyah.toString()),
         ) { c ->
             val n = c.getInt(0)
             Ayah(

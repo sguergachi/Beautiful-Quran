@@ -423,11 +423,56 @@ fun englishLeaf(
  * closed up — the source keeps a few, and a book page does not break a
  * sentence in the middle for them.
  */
-private fun englishVerseProse(text: String): String {
-    return text.replace(WHITESPACE_RUN, " ").trim()
+internal fun englishVerseProse(text: String): String {
+    // Same answer as `replace(Regex("\\s+"), " ").trim()`, by hand. The book is
+    // paginated by setting every verse of the Quran, often several times over,
+    // and Android's Matcher.appendReplacement runs a compat-change check on
+    // every call: in a release trace that check and the regex were two thirds
+    // of the whole pagination's CPU, on a background thread that is still
+    // running when the first chapter opens. Most verses have no run to close
+    // up, so they are returned without a copy.
+    //
+    // By hand only for space, tab, LF, CR and FF, where every `\s` agrees.
+    // Whether `\s` also takes VT, NEL, NBSP and the other Unicode spaces
+    // depends on the regex engine (desktop Java says no; ICU, which some
+    // Android releases use, says yes), so a verse holding one of those goes
+    // through the regex itself and keeps exactly the old answer on device.
+    var out: StringBuilder? = null
+    var i = 0
+    while (i < text.length) {
+        val c = text[i]
+        if (spaceDependsOnEngine(c)) return text.replace(WHITESPACE_RUN, " ").trim()
+        if (!isAsciiSpace(c)) {
+            out?.append(c)
+            i++
+            continue
+        }
+        var end = i + 1
+        while (end < text.length && isAsciiSpace(text[end])) end++
+        if (out == null && (end - i > 1 || c != ' ')) {
+            out = StringBuilder(text.length).append(text, 0, i)
+        }
+        out?.append(' ')
+        i = end
+    }
+    return (out?.toString() ?: text).trim()
 }
 
-private val WHITESPACE_RUN = Regex("\\s+")
+private val WHITESPACE_RUN by lazy { Regex("\\s+") }
+
+/** Whitespace to every regex engine's `\s`. */
+private fun isAsciiSpace(c: Char): Boolean =
+    c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\u000C'
+
+/** Whitespace to some engines' `\s` and not others' (the union, to be safe). */
+private fun spaceDependsOnEngine(c: Char): Boolean {
+    if (c < '\u0080') return c == '\u000B'
+    if (c == '\u0085' || c == '\u180E') return true
+    val type = Character.getType(c)
+    return type == Character.SPACE_SEPARATOR.toInt() ||
+        type == Character.LINE_SEPARATOR.toInt() ||
+        type == Character.PARAGRAPH_SEPARATOR.toInt()
+}
 
 /**
  * The word of a verse to start reciting from, given how far into the verse's
