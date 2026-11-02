@@ -104,7 +104,17 @@ fun ShareRibbon(
                 label = "gatherBar",
                 modifier = Modifier.weight(1f),
             ) { state ->
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                // Every state is the controls' height. Crossfade stacks the
+                // outgoing and incoming states top-aligned in a box sized to
+                // the larger; a shorter hint would ride at the top during the
+                // fade and drop to centre when it ended. Same height: the
+                // label only fades.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(BAR_ICON_SIZE),
+                ) {
                     when (state) {
                         GatherBarMiddle.Hint -> GatherHint(
                             ink = ink,
