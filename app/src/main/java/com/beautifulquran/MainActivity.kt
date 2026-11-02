@@ -406,7 +406,7 @@ private const val SETTINGS_LAYER = 2
 private const val REHEARSAL_SURAH_ID = 2
 /** The verses it sets: enough to fill a phone's first screen. */
 private const val REHEARSAL_AYAHS = 3
-/** Untouched this long before it starts: past the end of a fling on Home. */
+/** Settled and untouched this long before it starts: past a fling, past Home's arrival. */
 private const val REHEARSAL_QUIET_MS = 1_500L
 private const val REHEARSAL_POLL_MS = 250L
 private const val STACK_PAGE_DURATION_MS = 460
@@ -1253,6 +1253,10 @@ private fun PaperStackApp(
                     return@LaunchedEffect
                 }
             }
+            // Quiet means Home itself has come to rest too, not only that
+            // nobody touched it: right after the cover the screen has had no
+            // touch at all, yet Home is still settling and drawing.
+            delay(REHEARSAL_QUIET_MS)
             while (!touchQuiet.quietFor(REHEARSAL_QUIET_MS)) delay(REHEARSAL_POLL_MS)
             rehearsing = true
         }
