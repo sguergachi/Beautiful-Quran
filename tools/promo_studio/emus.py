@@ -11,6 +11,7 @@ Audio stays -no-audio: capture taps the emulator's PCM stream, so nothing
 plays through the host speakers. The ordinary test pool keeps its warm snapshot.
 """
 import io
+import json
 import os
 import queue
 import re
@@ -28,6 +29,7 @@ CAPTURE_BASE = 5650
 POOL_PORTS = range(5600, 5608, 2)
 DEFAULT_APK = os.path.join(REPO, "app", "build", "outputs", "apk", "release", "app-release.apk")
 APK_SIDECAR = DEFAULT_APK + ".json"   # what revision a studio-built APK came from
+INSTALL_RECORDS = os.path.join(CACHE, "emu_installs.json")  # what build each emulator was last prepared with
 BOOT_SECONDS = 25            # native capture cold boot, for the progress estimate
 BUILD_SECONDS = 240          # release build, for the progress estimate
 
@@ -52,7 +54,8 @@ def info(serial):
     """What the editor shows for one emulator; never raises."""
     port = port_of(serial)
     d = {"serial": serial, "port": port, "kind": "capture" if port >= CAPTURE_BASE else "pool",
-         "booted": False, "app": False, "cores": None, "size": None, "error": None}
+         "booted": False, "app": False, "cores": None, "size": None, "error": None,
+         "app_version": None, "app_commit": None}
     try:
         d["booted"] = adb(serial, "shell", "getprop", "sys.boot_completed", timeout=5).strip() == "1"
         if d["booted"]:
@@ -60,6 +63,12 @@ def info(serial):
             d["cores"] = int(adb(serial, "shell", "nproc", timeout=5).strip() or 0) or None
             m = re.findall(r"(\d+)x(\d+)", adb(serial, "shell", "wm", "size", timeout=5))
             d["size"] = f"{m[-1][0]}x{m[-1][1]}" if m else None
+            if d["app"]:
+                try:
+                    inst = installed_app(serial)
+                    d["app_version"], d["app_commit"] = inst["version"], inst["commit"]
+                except Exception:
+                    pass                        # the row still lists; the build just reads unknown
     except Exception as e:                      # a wedged emulator still lists
         d["error"] = str(e)
     return d
@@ -69,6 +78,72 @@ def list_all():
     ss = serials()
     with ThreadPoolExecutor(max(1, len(ss))) as ex:
         return sorted(ex.map(info, ss), key=lambda d: d["port"])
+
+
+def parse_dumpsys_version(text):
+    """The installed app's version as `name (code)`, e.g. `0.12 (13)`, or None."""
+    code = re.search(r"versionCode=(\d+)", text)
+    name = re.search(r"versionName=([^\s]+)", text)
+    if not code or not name:
+        return None
+    return f"{name.group(1)} ({code.group(1)})"
+
+
+_APP_CACHE = {}        # serial -> (at, version, boot_id); dumpsys costs ~a second
+_APP_TTL = 120         # installs only happen through prepare, which drops the entry
+
+
+def _read_installs():
+    try:
+        with open(INSTALL_RECORDS) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def record_install(serial, apk=DEFAULT_APK, rep=None):
+    """Remember what build went onto the emulator: the APK's version and
+    commit, and the boot it was installed on (read-only instances lose the
+    app on reboot, so a record from an older boot must not apply). A custom
+    APK has no known revision, so it records a blank the row reads as an
+    unknown commit rather than the default APK's."""
+    try:
+        built = apk_info() if apk == DEFAULT_APK else {}
+        boot = adb(serial, "shell", "cat", "/proc/sys/kernel/random/boot_id", timeout=10).strip() or None
+        recs = _read_installs()
+        recs[serial] = {"version": built.get("version"), "commit": built.get("commit"),
+                        "installed_at": time.time(), "boot_id": boot}
+        os.makedirs(os.path.dirname(INSTALL_RECORDS), exist_ok=True)
+        tmp = INSTALL_RECORDS + f".{os.getpid()}.tmp"
+        with open(tmp, "w") as f:
+            json.dump(recs, f, indent=2)
+        os.replace(tmp, INSTALL_RECORDS)
+    except Exception as e:
+        rep and rep.log(f"could not record the install: {e}")
+    finally:
+        _APP_CACHE.pop(serial, None)
+
+
+def installed_app(serial):
+    """What build the emulator has: the device's own version, plus the commit
+    the studio installed on this boot when that record still matches. A
+    hand-installed app, a reboot, or a version the record does not explain
+    all read as an unknown commit rather than a guessed one."""
+    hit = _APP_CACHE.get(serial)
+    if hit and time.monotonic() - hit[0] < _APP_TTL:
+        version, boot = hit[1], hit[2]
+    else:
+        version = parse_dumpsys_version(adb(serial, "shell", "dumpsys", "package", APP, timeout=10))
+        boot = None
+        if _read_installs().get(serial):
+            boot = adb(serial, "shell", "cat", "/proc/sys/kernel/random/boot_id", timeout=10).strip() or None
+        _APP_CACHE[serial] = (time.monotonic(), version, boot)
+    commit = None
+    rec = _read_installs().get(serial) or {}
+    if rec.get("boot_id") and rec["boot_id"] == boot and rec.get("version") == version:
+        commit = rec.get("commit")
+    return {"version": version, "commit": commit}
 
 
 def _port_free(port):
@@ -88,8 +163,59 @@ def log_path(port):
     return os.path.join(CACHE, f"capture-emu-{port}.log")
 
 
+def emu_log_path(serial):
+    """The emulator's own log for a studio-managed boot (scripts/emu.sh
+    redirects each launch there; a fresh launch truncates it)."""
+    state = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "bq-emu")
+    return os.path.join(state, f"{serial}.log")
+
+
+def readback_errors(log_text):
+    """Screenshot-readback failures in an emulator log. Some boots come up
+    with every readback failing (glReadPixels error 0x506); takes recorded
+    on such a boot die with the video stream reset and, eventually, a
+    segfault — so a boot is only trusted once a probe shot reads clean."""
+    return [l for l in log_text.splitlines() if "glReadPixels" in l and "error" in l]
+
+
+def _capture_readback_healthy(serial, rep=None):
+    """One probe screenshot, then check the emulator's log for readback
+    errors. A poisoned boot still returns pictures, so the log — not the
+    image — is what judges it."""
+    try:
+        adb(serial, "shell", "screencap", "-p", "/sdcard/studio_probe.png", timeout=30)
+    except Exception as e:
+        rep and rep.log(f"readback probe failed: {e}")
+        return False
+    try:
+        with open(emu_log_path(serial), errors="replace") as f:
+            bad = readback_errors(f.read())
+    except OSError as e:
+        rep and rep.log(f"could not read the emulator log: {e}")
+        return True                                    # fail open: never ground takes on tooling
+    if bad:
+        rep and rep.log(f"readback errors on this boot ({len(bad)}): {bad[0].strip()[-160:]}")
+        return False
+    return True
+
+
+def _preserve_poisoned_log(serial):
+    try:
+        dst = os.path.join(CACHE, f"emu-poisoned-{serial}-{int(time.time())}.log")
+        os.makedirs(CACHE, exist_ok=True)
+        shutil.copyfile(emu_log_path(serial), dst)
+        return dst
+    except OSError:
+        return None
+
+
 def boot(port=None, cores=6, rep=None):
-    """Start a capture emulator; returns its serial once Android has booted."""
+    """Start a capture emulator; returns its serial once Android has booted.
+
+    A fresh boot takes one probe screenshot: a boot whose readback path is
+    failing is rebooted once instead of recording a doomed take. An already
+    running emulator is adopted as is — its log belongs to an older boot.
+    """
     port = port or next_port()
     serial = f"emulator-{port}"
     if serial in serials():
@@ -97,6 +223,30 @@ def boot(port=None, cores=6, rep=None):
         return serial
     if not 5650 <= port <= 5688 or port % 2 or not 1 <= cores <= 8:
         raise ValueError("capture ports must be even, 5650-5688; cores must be 1-8")
+    for attempt in (1, 2):
+        _boot_fresh(port, cores, rep)
+        if _capture_readback_healthy(serial, rep):
+            return serial
+        kept = _preserve_poisoned_log(serial)
+        rep and rep.log(f"{serial} failed its readback check (attempt {attempt})"
+                        + (f"; log kept at {kept}" if kept else "")
+                        + ("; rebooting once" if attempt == 1 else ""))
+        try:
+            stop(serial)
+        except Exception as e:
+            rep and rep.log(f"could not stop {serial}: {e}")
+            break                                    # don't reboot onto a stuck emulator
+        t0 = time.monotonic()
+        while serial in serials():
+            if time.monotonic() - t0 > 60:
+                raise RuntimeError(f"{serial} did not stop within a minute of its failed readback check")
+            time.sleep(1)
+    raise RuntimeError(f"{serial} failed its readback check twice; refusing to record on it")
+
+
+def _boot_fresh(port, cores, rep=None):
+    """One cold boot; raises when it fails."""
+    serial = f"emulator-{port}"
     os.makedirs(CACHE, exist_ok=True)
     log = log_path(port)
     rep and rep.stage("boot", f"Starting {serial} ({cores} cores)", 0.02)
@@ -134,6 +284,7 @@ def prepare(serial, apk=DEFAULT_APK, rep=None):
     out = adb(serial, "install", "-r", apk, timeout=600)
     if "Success" not in out:
         raise RuntimeError(f"install failed: {out.strip()[-500:]}")
+    record_install(serial, apk, rep)
     rep and rep.stage("compile", "Compiling the app ahead of time (smooth playback)", 0.35)
     adb(serial, "shell", "cmd", "package", "compile", "-m", "speed", "-f", APP, timeout=600)
     rep and rep.stage("timings", "First launch: downloading recitation timings", 0.6)
@@ -194,7 +345,6 @@ def apk_info():
     is False, and the commit is the newest one older than the file). Dirt is
     scoped to the paths a rebuild reads, so editing the studio itself does
     not mark the APK stale."""
-    import json
     head_full = _git("rev-parse", "HEAD")
     head_short = _git("rev-parse", "--short=9", "HEAD")
     head_msg = _git("log", "-1", "--format=%s", "HEAD")
@@ -264,7 +414,6 @@ def build_apk(rep=None):
     server's environment cannot be assumed to have it. Interesting output
     lines stream to the job log while a time-based estimate fills the bar,
     since Gradle stays quiet for minutes during Kotlin compilation."""
-    import json
     java_home = _find_jdk21()
     if not java_home:
         raise RuntimeError("JDK 21 is required to build the APK, and none was found "

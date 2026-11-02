@@ -122,6 +122,7 @@ export interface Job {
 export interface Emulator {
   serial: string; port: number; kind: "capture" | "pool"; booted: boolean; app: boolean;
   cores: number | null; size: string | null; error: string | null; job: Job | null; ready: boolean;
+  app_version: string | null; app_commit: string | null;
 }
 
 export type Selection =
