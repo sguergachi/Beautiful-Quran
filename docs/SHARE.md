@@ -1,7 +1,7 @@
 # Sharing verses
 
 **Status: PR1 + PR2 shipped (gather + text + full-ink image).** Video remains
-proposed. **Entry UX** is Mark: tap `﴿N﴾` to gather that verse — see
+proposed. **Entry UX** is Mark: hold `﴿N﴾` to gather that verse — see
 [VERSE_ACTIONS.md](VERSE_ACTIONS.md). This file is the design record for
 *gather mode* and the export pipeline: **text**, **image**, and later
 **video that carries the ink**.
@@ -29,8 +29,8 @@ its layout; it grows ordinals in the margin.
 
 - **Enter** via `ShareViewModel.enterShare(surah, ayah)` (verse-first: that
   ayah is already `1`; pauses recitation — the mode owns the tap). A
-  finger-sized disc (40 dp radius) around the painted `﴿N﴾` is the entry, not the empty
-  rest of the line ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)). The idle
+  finger-sized disc (40 dp radius) around the painted `﴿N﴾` is the entry, held
+  until its shamsa fills and pops — not the empty rest of the line ([VERSE_ACTIONS.md](VERSE_ACTIONS.md)). The idle
   player bar does **not** host a Gather control
   ([#519](https://github.com/sguergachi/Beautiful-Quran-/pull/519)).
 - **Pick** after that by tapping anywhere on a verse (word, body, mark,
@@ -50,7 +50,8 @@ its layout; it grows ordinals in the margin.
   in-flight text/image prepare. **Commit** from the gather bar: quote =
   text, image = PNG
   ([ShareRibbon](../app/src/main/java/com/beautifulquran/ui/share/ShareRibbon.kt)).
-  A failed export writes a quiet line in the ribbon's empty middle.
+  A failed export writes a quiet line in the ribbon's middle; the send
+  controls stay at the end.
 
 Idle, only `﴿N﴾` enters gather. While gathering, a tap anywhere on a verse
 adds or drops it; word long-press does not open the Root Viewer, and the
@@ -85,7 +86,7 @@ It carries:
    (Hafs), reference, and a gold **×** to remove (no drag-reorder yet).
 2. Outputs: **Share as text** · **Share as image** (video later).
 3. Quiet error line if load/render fails (Send page, and the gather
-   ribbon's empty middle on the happy path).
+   ribbon's middle on the happy path).
 
 Theme / aspect / reciter toggles and drag-reorder stay deferred.
 

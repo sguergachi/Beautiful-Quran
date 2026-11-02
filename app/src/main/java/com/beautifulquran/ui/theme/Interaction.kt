@@ -35,6 +35,8 @@ fun Modifier.quietClickable(
     role: Role? = null,
     onLongClick: (() -> Unit)? = null,
     interactionSource: MutableInteractionSource? = null,
+    /** Off when the long press only swallows a lift and plays no part of its own. */
+    longClickHaptic: Boolean = true,
     onClick: () -> Unit,
 ): Modifier =
     if (onLongClick == null) {
@@ -52,6 +54,7 @@ fun Modifier.quietClickable(
             enabled = enabled,
             role = role,
             onLongClick = onLongClick,
+            hapticFeedbackEnabled = longClickHaptic,
             onClick = onClick,
         )
     }

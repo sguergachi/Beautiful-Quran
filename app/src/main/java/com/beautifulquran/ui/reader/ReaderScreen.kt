@@ -303,6 +303,8 @@ fun ReaderScreen(
      */
     playbackBarBodyHeight: () -> Dp = { ChapterPlaybackBodyHeight },
 ) {
+    // One hold for the whole reader: only one finger can hold a mark.
+    val markHoldHost = rememberMarkHoldHost()
     LaunchedEffect(surahId) { viewModel.load(surahId) }
     DisposableEffect(onAyahSelectorExpandedChange) {
         onDispose { onAyahSelectorExpandedChange(false) }
@@ -3044,7 +3046,7 @@ fun ReaderScreen(
                     )
                     }
                     }
-                } else LazyColumn(
+                } else CompositionLocalProvider(LocalMarkHoldHost provides markHoldHost) { LazyColumn(
                     state = listState,
                     userScrollEnabled = !chapterAdvancing,
                     contentPadding = PaddingValues(
@@ -3148,7 +3150,10 @@ fun ReaderScreen(
                             bottom = listFadeBottom,
                             // List is already below the top bar — no status-bar inset.
                             topInset = 0.dp,
-                        ),
+                        )
+                        // The hold-to-gather shamsa, over every verse's layers
+                        // and under the list's own paper fades.
+                        .markHoldOverlay(markHoldHost),
                 ) {
                 items(
                     count = readerItems.size,
@@ -3360,11 +3365,23 @@ fun ReaderScreen(
                                 },
                                 gatherOrdinal = gatheredHere,
                                 gathering = gathering,
+                                // Gather is entered by holding ﴿N﴾ (its shamsa fills,
+                                // then pops). Once gathering, a tap on the mark adds
+                                // or drops the verse like a tap anywhere on it; idle,
+                                // a tap only flickers the shamsa — a hint to hold.
                                 onAyahMarkClick = {
-                                    view.paperToggleHaptic(
-                                        turningOn = gatheredHere == null,
-                                    )
-                                    onShareMarkTap(ayah.surahId, ayah.number)
+                                    if (gathering) {
+                                        view.paperToggleHaptic(
+                                            turningOn = gatheredHere == null,
+                                        )
+                                        onShareMarkTap(ayah.surahId, ayah.number)
+                                    }
+                                },
+                                // The hold plays its own haptic at the pop.
+                                onAyahMarkHold = if (gathering) {
+                                    null
+                                } else {
+                                    { onShareMarkTap(ayah.surahId, ayah.number) }
                                 },
                                 onWordClick = if (gathering) {
                                     {
@@ -3523,6 +3540,7 @@ fun ReaderScreen(
                     }
                 }
                 } // LazyColumn
+                } // LocalMarkHoldHost
             } // Column pull viewport (below top bar)
             // Flying next-chapter opening: continuous slide from footer → header.
             if (flying != null) {

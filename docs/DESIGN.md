@@ -901,7 +901,11 @@ Two themes, both "paper":
   fresh-ink glint as Nightfall.
 
 Gold never marks interaction; green never decorates. Green may identify the
-reader's current place because that mark is wayfinding, not ornament.
+reader's current place because that mark is wayfinding, not ornament. The
+one exception to the first rule is the shamsa drawn while holding a verse's
+`﴿N﴾` to gather it: it is that ayah mark's own illumination, so it is gilded
+— deep gold warming to gold on cream, gold kindling to bright gold at night
+(see [VERSE_ACTIONS.md](VERSE_ACTIONS.md)).
 
 **Settings is its own stock of paper.** Settings and the pages behind it
 (Customize, Reciters, Downloads) sit one step off the reading paper — deeper
