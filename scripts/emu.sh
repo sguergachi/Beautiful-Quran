@@ -25,6 +25,8 @@
 #     interpreted and janks badly regardless of GPU.
 #   * Booting refuses when host RAM is short. Swapping emulators are what made
 #     earlier runs crawl at 2-3 fps.
+#   * Every boot sweeps crashed emulators' temp overlays (multi-GB qcow2s a
+#     segfault never reclaims); a full /tmp wedges adb and boots.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -133,6 +135,32 @@ build_gold() {
   BUILDING_GOLD=""
 }
 
+# Crashed emulators leave multi-GB userdata overlays in $TMPDIR/android-$USER,
+# one per dead boot, never reclaimed. Sweep scratch no live process holds and
+# old enough that no booting emulator could still be creating it. Crash
+# reports and netsim state stay. Always succeeds: a failed sweep must never
+# fail the boot that triggered it.
+sweep_stale_temps() {
+  local dir="${TMPDIR:-/tmp}/android-$(id -un)" f age now freed=0 n=0 sz
+  [[ -d "$dir" ]] || return 0
+  command -v fuser >/dev/null || { log "fuser missing; skipping stale-temp sweep"; return 0; }
+  now=$(date +%s)
+  for f in "$dir"/emulator-* "$dir"/runCommand_*; do
+    [[ -e "$f" ]] || continue
+    age=$(( now - $(stat -c %Y "$f" 2>/dev/null || echo "$now") ))
+    (( age > 300 )) || continue
+    fuser -s "$f" 2>/dev/null && continue
+    if [[ -d "$f" ]]; then
+      rmdir "$f" 2>/dev/null && n=$(( n + 1 )) || true   # empty dirs only; fails closed on races
+    else
+      sz=$(du -sb "$f" 2>/dev/null | cut -f1); freed=$(( freed + ${sz:-0} ))
+      rm -f "$f" && n=$(( n + 1 )) || true
+    fi
+  done
+  (( n > 0 )) && log "Swept $n stale emulator temp(s), freeing $(( freed / 1024 / 1024 ))MB"
+  return 0
+}
+
 boot_slot() {
   local serial="$1"
   is_up "$serial" && return 0
@@ -140,6 +168,7 @@ boot_slot() {
   # before any of them has allocated, and together swap the host.
   exec 7> "$STATE/boot.lock"; flock 7
   is_up "$serial" && return 0
+  sweep_stale_temps
   local need=$((RAM + 1024))  # RSS runs ~0.7GB over the guest RAM (GPU buffers)
   if [[ -z "${EMU_FORCE:-}" ]] && (( $(mem_avail_mb) < need )); then
     status >&2
