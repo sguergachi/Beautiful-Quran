@@ -142,9 +142,14 @@ export function Progress({ value, tone = "gold", indeterminate }: { value: numbe
   );
 }
 
+// Glyph ink sits ~1 px above its line box's center, so a box-centered dot
+// reads low next to text; the -translate-y-px is optical alignment. Whole
+// pixels only, so the dot never blurs from a fractional shift.
+// In a row that may wrap, pair the wrapper with the row's leading-5 + mt-1.5:
+// (20 px line − 8 px dot) / 2 lands the dot's box on the first line exactly.
 export function Dot({ tone }: { tone: "green" | "gold" | "faint" | "orange" | "danger" | "blue" }) {
   const c = { green: "bg-green", gold: "bg-gold", faint: "bg-faint", orange: "bg-orange", danger: "bg-danger", blue: "bg-blue" }[tone];
-  return <span className={`inline-block size-2 shrink-0 rounded-full ${c}`} />;
+  return <span className={`inline-block size-2 shrink-0 -translate-y-px rounded-full ${c}`} />;
 }
 
 export function Kbd({ children }: { children: ReactNode }) {

@@ -49,6 +49,24 @@ function statusOf(e: Emulator): { text: string; tone: ReturnType<typeof emulator
   return { text: "Ready to record", tone: "green" };
 }
 
+/** The installed build next to the APK an update would put on: version and
+commit on both sides, so Update app says what it would change. */
+function BuildLine({ emu }: { emu: Emulator }) {
+  const apk = useStore((s) => s.meta?.apk_info);
+  if (!emu.app_version) return null;
+  const same = !!emu.app_commit && !!apk?.exists && !!apk.commit && emu.app_commit === apk.commit;
+  const installed = `v${emu.app_version}${emu.app_commit ? ` @${emu.app_commit}` : " · commit unknown"}`;
+  const latest = apk?.exists && apk.version ? `v${apk.version}${apk.commit ? ` @${apk.commit}` : ""}` : null;
+  return (
+    <p className="mt-1.5 flex items-start gap-1.5 text-[12px] leading-5 text-mute">
+      <span className="mt-1.5"><Dot tone={same ? "green" : "gold"} /></span>
+      <span className="num min-w-0 break-words">
+        {installed} · {latest ? (same ? "up to date" : `latest ${latest}`) : "no APK on disk"}
+      </span>
+    </p>
+  );
+}
+
 function ApkCard() {
   const meta = useStore((s) => s.meta);
   const jobs = useStore((s) => s.jobs);
@@ -93,27 +111,33 @@ function ApkCard() {
 
 export function EmulatorsPanel() {
   const { emus, booting, emusLoaded, meta } = useStore();
-  const [cores, setCores] = useState(() => { try { return localStorage.getItem("promo.emuCores") || "6"; } catch { return "6"; } });
+  // The emulator caps at 6 cores, so 8 is not offered; an old saved 8 falls back to 6.
+  const [cores, setCores] = useState(() => { try { const v = localStorage.getItem("promo.emuCores") || "6"; return v === "4" || v === "6" ? v : "6"; } catch { return "6"; } });
   const pickCores = (v: string) => { setCores(v); try { localStorage.setItem("promo.emuCores", v); } catch { /* private mode */ } };
   return (
-    <Drawer title="Emulators" onClose={() => openPanel(null)} width={460}
-      right={<Button size="sm" variant="primary" onClick={() => bootEmulator(+cores)}>{Icon.plus} Start one</Button>}>
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-panel2 p-2.5">
-        <span className="text-mute">New emulators get</span>
-        <div className="w-28"><Select value={cores} options={[["4", "4 cores"], ["6", "6 cores"], ["8", "8 cores"]]} onChange={pickCores} /></div>
-        <span className="text-[11.5px] text-faint">6 recommended for a single capture</span>
+    <Drawer title="Emulators" onClose={() => openPanel(null)} width={460}>
+      <div className="mb-4 rounded-lg border border-line bg-panel2 p-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-mute">New emulator</span>
+          <div className="w-28"><Select value={cores} options={[["4", "4 cores"], ["6", "6 cores"]]} onChange={pickCores} /></div>
+          <div className="flex-1" />
+          <Button size="sm" variant="primary" onClick={() => bootEmulator(+cores)}>{Icon.plus} Start</Button>
+        </div>
+        <p className="mt-1.5 text-[11.5px] text-faint">6 recommended for a single capture</p>
       </div>
       <ApkCard />
-      {booting.map((j) => <JobRow key={j.id} job={j} />)}
+      {/* A boot shows here only until adb sees it — then its row carries the progress. */}
+      {booting.filter((j) => !emus.some((e) => e.serial === j.serial)).map((j) => <JobRow key={j.id} job={j} />)}
       {emusLoaded && !emus.length && !booting.length && (
         <div className="rounded-lg border border-dashed border-line2 p-6 text-center text-mute">
-          No emulator is running.<br />
-          <Button className="mt-3" variant="primary" onClick={() => bootEmulator(+cores)}>{Icon.plus} Start an emulator</Button>
+          No emulator is running.
         </div>
       )}
       <div className="space-y-3">
         {emus.map((e) => {
           const st = statusOf(e);
+          const apk = meta?.apk_info;
+          const current = !!e.app_commit && !!apk?.exists && !!apk.commit && e.app_commit === apk.commit;
           return (
             <div key={e.serial} className="flex gap-3 rounded-lg border border-line bg-panel2 p-3">
               {e.booted ? <LiveScreen serial={e.serial} width={70} every={e.job ? 1000 : 2500} /> : <div className="h-[155px] w-[70px] rounded-md border border-line bg-black" />}
@@ -123,11 +147,13 @@ export function EmulatorsPanel() {
                   <span className="rounded bg-raised px-1.5 text-[10.5px] text-mute">{e.kind === "pool" ? "test pool" : "capture"}</span>
                 </div>
                 <p className="mt-0.5 text-[11.5px] text-faint">{[e.cores && `${e.cores} cores`, e.size].filter(Boolean).join(" · ")}{e.kind === "pool" && " · fewer cores: ~44 fps takes"}</p>
-                <p className="mt-2 flex items-start gap-1.5 text-[12.5px]"><span className="mt-1"><Dot tone={st.tone} /></span><span className={`min-w-0 ${st.tone === "orange" ? "text-ink" : "text-mute"}`}>{st.text}</span></p>
+                <p className="mt-2 flex items-start gap-1.5 text-[12.5px] leading-5"><span className="mt-1.5"><Dot tone={st.tone} /></span><span className={`min-w-0 ${st.tone === "orange" ? "text-ink" : "text-mute"}`}>{st.text}</span></p>
+                {e.kind === "capture" && e.app && <BuildLine emu={e} />}
                 {e.job && <div className="mt-2"><Progress value={e.job.progress} indeterminate={e.job.state === "queued"} /></div>}
                 {e.kind === "capture" && <div className="mt-3 flex flex-wrap gap-1.5">
                   {e.booted && !e.app && !e.job && <Button size="sm" variant="primary" disabled={!meta?.apk_exists} onClick={() => prepareEmulator(e.serial)}>Prepare app</Button>}
-                  {e.booted && e.app && !e.job && <Button size="sm" variant="ghost" onClick={() => prepareEmulator(e.serial)} title="Reinstall the current APK">Update app</Button>}
+                  {e.booted && e.app && !e.job && <Button size="sm" variant={current ? "ghost" : "primary"} onClick={() => prepareEmulator(e.serial)}
+                    title={apk?.exists && apk.version ? `Install v${apk.version}${apk.commit ? ` @${apk.commit}` : ""}` : "Reinstall the current APK"}>Update app</Button>}
                   {e.job && <Button size="sm" variant="ghost" onClick={() => cancelJob(e.job!.id)}>Cancel {e.job.title.toLowerCase()}</Button>}
                   {!e.job && <Button size="sm" variant="ghost" onClick={() => { if (confirm(`Stop ${e.serial}?`)) stopEmulator(e.serial); }}>Stop</Button>}
                 </div>}

@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import threading
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from http.server import ThreadingHTTPServer
 
 import numpy as np
@@ -646,6 +646,147 @@ class ApkTests(unittest.TestCase):
                     patch("subprocess.Popen", self._fake_build(apk, code=1, lines=("> Task :app:kotlin", ":app: FAILED", "e: boom.kt"))):
                 with self.assertRaisesRegex(RuntimeError, "FAILED"):
                     server.emus.build_apk()
+
+
+class InstallTests(unittest.TestCase):
+    """Each emulator row names its installed build next to the latest APK."""
+
+    DUMPSYS = ("Packages:\n  Package [com.beautifulquran] (deadbeef):\n"
+               "    versionCode=13 minSdk=26 targetSdk=35\n    versionName=0.12\n")
+
+    def setUp(self):
+        server.emus._APP_CACHE.clear()
+        self.addCleanup(server.emus._APP_CACHE.clear)
+
+    def _adb(self, dumpsys=DUMPSYS, boot="boot-1", fail=()):
+        def fake(serial, *a, **k):
+            if a in fail:
+                raise subprocess.TimeoutExpired("adb", 10)
+            return {("shell", "getprop", "sys.boot_completed"): "1",
+                    ("shell", "pm", "path", server.emus.APP): "package:/data/app/base.apk",
+                    ("shell", "nproc"): "6",
+                    ("shell", "wm", "size"): "Physical size: 1440x3200",
+                    ("shell", "dumpsys", "package", server.emus.APP): dumpsys,
+                    ("shell", "cat", "/proc/sys/kernel/random/boot_id"): boot}[a]
+        return fake
+
+    def test_dumpsys_version_parses_name_and_code(self):
+        self.assertEqual(server.emus.parse_dumpsys_version(self.DUMPSYS), "0.12 (13)")
+        self.assertIsNone(server.emus.parse_dumpsys_version("no such package"))
+
+    def test_installed_app_matches_record_on_same_boot(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            recs = str(Path(d, "emu_installs.json"))
+            Path(recs).write_text(json.dumps({"emulator-5650": {"version": "0.12 (13)", "commit": "a" * 9,
+                                                                "installed_at": 1.0, "boot_id": "boot-1"}}))
+            with patch.object(server.emus, "INSTALL_RECORDS", recs), \
+                    patch.object(server.emus, "adb", self._adb()):
+                inst = server.emus.installed_app("emulator-5650")
+        self.assertEqual(inst, {"version": "0.12 (13)", "commit": "a" * 9})
+
+    def test_installed_app_forgets_commit_after_reboot_or_hand_install(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            recs = str(Path(d, "emu_installs.json"))
+            Path(recs).write_text(json.dumps({"emulator-5650": {"version": "0.12 (13)", "commit": "a" * 9,
+                                                                "installed_at": 1.0, "boot_id": "boot-1"}}))
+            with patch.object(server.emus, "INSTALL_RECORDS", recs):
+                with patch.object(server.emus, "adb", self._adb(boot="boot-2")):
+                    self.assertEqual(server.emus.installed_app("emulator-5650"),
+                                     {"version": "0.12 (13)", "commit": None})
+                server.emus._APP_CACHE.clear()
+                with patch.object(server.emus, "adb", self._adb(dumpsys=self.DUMPSYS.replace("0.12", "0.11"))):
+                    self.assertEqual(server.emus.installed_app("emulator-5650"),
+                                     {"version": "0.11 (13)", "commit": None})
+
+    def test_record_install_writes_version_commit_and_boot(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            recs = str(Path(d, "emu_installs.json"))
+            with patch.object(server.emus, "INSTALL_RECORDS", recs), \
+                    patch.object(server.emus, "apk_info", lambda: {"version": "0.12 (13)", "commit": "b" * 9}), \
+                    patch.object(server.emus, "adb", self._adb()):
+                server.emus.record_install("emulator-5650")
+            written = json.loads(Path(recs).read_text())["emulator-5650"]
+        self.assertEqual((written["version"], written["commit"], written["boot_id"]), ("0.12 (13)", "b" * 9, "boot-1"))
+
+    def test_record_install_leaves_custom_apk_revision_blank(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            recs = str(Path(d, "emu_installs.json"))
+            with patch.object(server.emus, "INSTALL_RECORDS", recs), \
+                    patch.object(server.emus, "adb", self._adb()):
+                server.emus.record_install("emulator-5650", apk="/tmp/other.apk")
+            written = json.loads(Path(recs).read_text())["emulator-5650"]
+        self.assertEqual((written["version"], written["commit"]), (None, None))
+
+    def test_info_lists_build_and_survives_dumpsys_failure(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            recs = str(Path(d, "emu_installs.json"))
+            Path(recs).write_text(json.dumps({"emulator-5650": {"version": "0.12 (13)", "commit": "a" * 9,
+                                                                "installed_at": 1.0, "boot_id": "boot-1"}}))
+            with patch.object(server.emus, "INSTALL_RECORDS", recs), \
+                    patch.object(server.emus, "adb", self._adb()):
+                d = server.emus.info("emulator-5650")
+        self.assertEqual((d["app"], d["app_version"], d["app_commit"], d["error"]),
+                         (True, "0.12 (13)", "a" * 9, None))
+        server.emus._APP_CACHE.clear()
+        with patch.object(server.emus, "adb", self._adb(fail={("shell", "dumpsys", "package", server.emus.APP)})):
+            d = server.emus.info("emulator-5650")
+        self.assertEqual((d["app"], d["app_version"], d["app_commit"], d["error"]), (True, None, None, None))
+
+
+class BootReadbackTests(unittest.TestCase):
+    """A fresh boot proves its readback path before any take records on it."""
+
+    POISONED = ("INFO | Boot completed in 22837 ms\n"
+                "emu-37-2-release/gles_v2_imp.cpp:glReadPixels:3299 error 0x506\n")
+
+    class Rep:
+        def __init__(self): self.logs = []
+        def stage(self, *a): pass
+        def progress(self, *a): pass
+        def log(self, msg): self.logs.append(msg)
+
+    def test_readback_errors_flags_failing_reads_only(self):
+        self.assertEqual(len(server.emus.readback_errors(self.POISONED)), 1)
+        self.assertEqual(server.emus.readback_errors("INFO | Boot completed in 20023 ms\n"), [])
+        self.assertEqual(server.emus.readback_errors(
+            "emu-37-2-release/gles_v2_imp.cpp:glDeleteTextures:1403 error null ctx\n"), [])
+
+    def _boot(self, healthy, running=()):
+        rep = self.Rep()
+        with patch.object(server.emus, "serials", lambda: list(running)), \
+                patch.object(server.emus, "_boot_fresh", Mock(return_value="emulator-5650")) as fresh, \
+                patch.object(server.emus, "_capture_readback_healthy", Mock(side_effect=healthy)) as check, \
+                patch.object(server.emus, "stop", Mock()) as stop:
+            try:
+                result = server.emus.boot(5650, 6, rep)
+            except RuntimeError as e:
+                result = e
+        return result, rep, fresh, check, stop
+
+    def test_boot_adopts_running_emulator_without_check(self):
+        result, _, fresh, check, _ = self._boot([], running=["emulator-5650"])
+        self.assertEqual(result, "emulator-5650")
+        fresh.assert_not_called()
+        check.assert_not_called()
+
+    def test_boot_returns_clean_first_try(self):
+        result, _, fresh, check, stop = self._boot([True])
+        self.assertEqual(result, "emulator-5650")
+        self.assertEqual((fresh.call_count, check.call_count), (1, 1))
+        stop.assert_not_called()
+
+    def test_boot_reboots_once_on_poison(self):
+        result, rep, fresh, _, stop = self._boot([False, True])
+        self.assertEqual(result, "emulator-5650")
+        self.assertEqual(fresh.call_count, 2)
+        stop.assert_called_once_with("emulator-5650")
+        self.assertTrue(any("rebooting once" in m for m in rep.logs))
+
+    def test_boot_refuses_twice_poisoned(self):
+        result, _, fresh, _, _ = self._boot([False, False])
+        self.assertIsInstance(result, RuntimeError)
+        self.assertIn("twice", str(result))
+        self.assertEqual(fresh.call_count, 2)
 
 
 if __name__ == "__main__": unittest.main()
