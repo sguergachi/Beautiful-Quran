@@ -14,6 +14,36 @@ import org.junit.Test
 class InkEngineTest {
 
     @Test
+    fun `a word waiting at the floor in a reciting verse stays unlit through a seek`() {
+        // Back mid-verse empties the active word for a moment and the stream
+        // wait dims the verse. Words ahead of the voice were never above the
+        // floor, so they must not take the recess cover from full ink: that
+        // lit the whole verse for a second before it dissolved.
+        val ahead = WordLitMemory()
+        ahead.update(State.Upcoming, verseHasActiveWord = true)
+        ahead.update(State.Upcoming, verseHasActiveWord = false)
+        assertFalse(ahead.lit)
+
+        // A word that was read is lit, and stays lit while the active word is
+        // empty, so it dissolves from its ink instead of snapping to the floor.
+        val read = WordLitMemory()
+        read.update(State.Upcoming, verseHasActiveWord = true)
+        read.update(State.Recited, verseHasActiveWord = true)
+        read.update(State.Upcoming, verseHasActiveWord = false)
+        assertTrue(read.lit)
+
+        // Once the verse is reciting again, a reset word waits at the floor.
+        read.update(State.Upcoming, verseHasActiveWord = true)
+        assertFalse(read.lit)
+
+        // The page at rest shows full ink: it is lit until playback gives it a floor.
+        val rest = WordLitMemory()
+        rest.update(State.Plain, verseHasActiveWord = false)
+        rest.update(State.Upcoming, verseHasActiveWord = false)
+        assertTrue(rest.lit)
+    }
+
+    @Test
     fun `turning off visual holds cannot disable an acoustic hold`() {
         val original = InkEngine.tuning
         try {
