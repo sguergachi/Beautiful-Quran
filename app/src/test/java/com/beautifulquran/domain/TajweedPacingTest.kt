@@ -88,6 +88,65 @@ class TajweedPacingTest {
         assertEquals(1f, settling.at(0.9f), 0f)
     }
 
+    // Reader's shipped tuning (InkEngine.Tuning): the opening snap lives here.
+    private val shipped = Hold(cruiseCap = 1.4185f, waqfShare = .5932f, creep = .3f)
+    private val shippedFeather = 1.1092f
+
+    @Test
+    fun `a connected opening fades in over the word instead of snapping half inked`() {
+        // 3:7 Alafasy: زَيۡغٞ's tanwīn hides into ف, so فَيَتَّبِعُونَ holds its
+        // opening letter. The word lasts 1.92 s; centring the hold used to
+        // throw the edge ~30 % across it in ~100 ms and then park.
+        val letters = curveOf("فَيَتَّبِعُونَ", hold = shipped, prevArabic = "زَيۡغٞ")
+        val wash = letters.forWash(shippedFeather)
+        val wordMs = 1920f
+        val first100 = wash.at(100f / wordMs)
+        assertTrue("the opening must not snap: ${first100} in the first 100 ms", first100 <= 100f / wordMs * 1.1f)
+        // About an unpaced word's plain linear rate while ramping (was ~3x).
+        for (step in 1..30) {
+            val t = step / 100f
+            assertTrue("ramp outran the plain sweep at $t", wash.at(t) <= t * 1.1f)
+        }
+        // From 30 % on, the hold, the cruise and the settle are untouched.
+        val unramped = { t: Float ->
+            val x = letters.at(t)
+            if (x <= 0f || x >= 1f) x else (x + shippedFeather / 2f) / (1f + shippedFeather)
+        }
+        // (The lambda is affine only between interior points: stop before the last glide.)
+        for (step in 30..85) {
+            val t = step / 100f
+            assertEquals(unramped(t), wash.at(t), 1e-5f)
+        }
+        // Paper ink reads the letter curve, which never had the lead-in.
+        assertEquals(letters.at(.05f), wash.atLetters(.05f), 0f)
+    }
+
+    @Test
+    fun `every paced wash opens gently and stays monotone`() {
+        val cases = listOf(
+            curveOf(dallin, hold = shipped),
+            curveOf("ٱلۡمُسۡرِفِينَ", hold = shipped.copy(isAyahFinal = true)),
+            curveOf("فَيَتَّبِعُونَ", hold = shipped, prevArabic = "زَيۡغٞ"),
+            curveOf("أَوۡلِيَآءَ", hold = shipped),
+            curveOf("هَـٰٓؤُلَآءِ", hold = shipped),
+        )
+        for (letters in cases) for (feather in listOf(0f, .4f, shippedFeather, 1.6f)) {
+            val wash = letters.forWash(feather)
+            var last = 0f
+            for (step in 0..1000) {
+                val t = step / 1000f
+                val p = wash.at(t)
+                assertTrue("not monotone at $t", p >= last - 1e-6f)
+                last = p
+            }
+            // Whatever the ramp's slope, it rejoins the curve by 30 % of the word.
+            val slope = wash.at(.02f) / .02f
+            assertTrue("opening slope $slope is a snap", slope <= maxOf(1f, wash.at(.3f) / .3f) + 1e-3f)
+            assertEquals(0f, wash.at(0f), 0f)
+            assertEquals(1f, wash.at(1f), 0f)
+        }
+    }
+
     @Test
     fun `liquid ink holds the closing nun in its own letter slot`() {
         val letters = curveOf("ٱلۡمُسۡرِفِينَ", hold = Hold(isAyahFinal = true,
