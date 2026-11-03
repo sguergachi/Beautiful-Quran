@@ -14,6 +14,24 @@ import org.junit.Test
 class InkEngineTest {
 
     @Test
+    fun `a read word releases from its flip frame and an unread one never does`() {
+        // Without the paper ink a read word turning unread owns its fade, so
+        // the verse's dimming a frame later cannot drop it to the floor and
+        // throw it back to full ink (the flash on back in Royal Green).
+        val read = InkCoverRelease(wasRead = true)
+        assertTrue(read.releasing(upcoming = true)) // decided in the flip frame itself
+        read.commit(upcoming = true, read = false)
+        assertTrue(read.releasing(upcoming = true)) // and held while it waits
+        read.commit(upcoming = false, read = true)
+        assertFalse(read.releasing(upcoming = false)) // reading it again ends the release
+
+        val ahead = InkCoverRelease(wasRead = false)
+        assertFalse(ahead.releasing(upcoming = true))
+        ahead.commit(upcoming = true, read = false)
+        assertFalse(ahead.releasing(upcoming = true))
+    }
+
+    @Test
     fun `a word waiting at the floor in a reciting verse stays unlit through a seek`() {
         // Back mid-verse empties the active word for a moment and the stream
         // wait dims the verse. Words ahead of the voice were never above the

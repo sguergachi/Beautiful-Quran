@@ -539,8 +539,12 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
   word's letter sweep idles at 1.0, so the sweep cannot say it. When back
   restarts a verse, the stream wait dims it while the active word is empty, and
   without that memory its unread words took the recess from full ink — the
-  whole verse lit for a moment and dissolved. Layered gloss already makes the
-  same handoff through its draw-phase word-alpha tween.
+  whole verse lit for a moment and dissolved. Without the paper ink (Nightfall,
+  Royal Green), a read word turning unread releases its own cover to the floor
+  over `INK_DEPARTURE_MS` (`InkCoverRelease`), the counterpart of Paper's
+  departure clock: otherwise back dropped the inked words to the floor, threw
+  them back to full ink as the verse's handoff began, then faded them. Layered
+  gloss already makes the same handoff through its draw-phase word-alpha tween.
 - **Mushaf progression is page-local.** The leaf carrying the voice begins
   beneath the Upcoming paper cover; its active word uses the same motion pack
   as the scrolling reader, completed ayahs retain full ink, and later ayahs use
