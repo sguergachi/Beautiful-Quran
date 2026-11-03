@@ -882,6 +882,67 @@ private fun Modifier.shapedActiveWordInView(
  * one shaped ayah; they never own animation clocks, entry masks, gates, or
  * release policy.
  */
+/**
+ * Whether a word has shown ink above the unread floor. A never-read word sits
+ * at the floor in a verse that has an active word; a word that was read, then
+ * reset, was lit and dissolves instead. The letter sweep cannot tell them
+ * apart: both idle at 1.0 once not active. While the verse has an active word,
+ * an Upcoming word is at the floor, so that is when lit clears — the
+ * seek that empties the active word for a moment keeps what was lit.
+ */
+internal class WordLitMemory {
+    var lit = false
+        private set
+
+    fun update(state: InkEngine.State, verseHasActiveWord: Boolean) {
+        when {
+            state != InkEngine.State.Upcoming -> lit = true
+            verseHasActiveWord -> lit = false
+        }
+    }
+}
+
+/**
+ * A read word becoming unread without the paper ink (Nightfall, Royal Green,
+ * or Paper with the paper ink off). Paper dissolves that word through its own
+ * departure clock; without it the word's cover had no clock but the verse's.
+ * On back, the stream wait dims the verse a frame after the word turns
+ * unread: the word snapped to the floor, jumped back to full ink as the
+ * verse's soft handoff began from zero, then faded — a flash on the inked
+ * words. The release decides in composition, so the flip frame stays full.
+ */
+internal class InkCoverRelease(private var wasRead: Boolean) {
+    private var releasing = false
+
+    fun releasing(upcoming: Boolean): Boolean = upcoming && (wasRead || releasing)
+
+    fun commit(upcoming: Boolean, read: Boolean) {
+        releasing = releasing(upcoming)
+        wasRead = read
+    }
+}
+
+/** Remaining full-ink share of a releasing word (1 → 0 over [InkEngine.INK_DEPARTURE_MS]); null when not releasing. */
+@Composable
+internal fun rememberInkCoverRelease(enabled: Boolean, state: InkEngine.State): State<Float>? {
+    if (!enabled) return null
+    val upcoming = state == InkEngine.State.Upcoming
+    val read = state == InkEngine.State.Active || state == InkEngine.State.Recited
+    val history = remember { InkCoverRelease(read) }
+    val releasing = history.releasing(upcoming)
+    SideEffect { history.commit(upcoming, read) }
+    val remaining = animateFloatAsState(
+        targetValue = if (upcoming) 0f else 1f,
+        animationSpec = if (upcoming) {
+            tween(InkEngine.INK_DEPARTURE_MS, easing = FastOutSlowInEasing)
+        } else {
+            snap()
+        },
+        label = "inkCoverRelease",
+    )
+    return remaining.takeIf { releasing }
+}
+
 internal class InkMotion(
     val ink: InkEngine.Word,
     private val lyricInk: State<Float>,
@@ -913,6 +974,10 @@ internal class InkMotion(
     private val anticipateNextWord: Boolean = true,
     /** Last visible deposit dissolving after this word becomes unread again. */
     val paperDeparture: PaperInkDeparture? = null,
+    /** Never shown above the unread floor since the verse last had an active word (see [WordLitMemory]). */
+    val unlit: Boolean = false,
+    /** Without the paper ink: a read word's cover easing back to the floor once it is unread ([rememberInkCoverRelease]). */
+    val coverRelease: State<Float>? = null,
 ) {
     val isActive: Boolean get() = ink.state == InkEngine.State.Active
 
@@ -1302,6 +1367,8 @@ internal fun rememberInkMotions(
                 InkEngine.tarjiEligible(words[index].arabic, index == words.lastIndex)
             }
         ) verse?.let { InkEngine.tarjiTrace(it.surahId, it.number, words[index].position) } else null
+        val litMemory = remember { WordLitMemory() }
+        SideEffect { litMemory.update(ink.state, activeWord != null) }
         val sweep = rememberMediaLetterSweep(
             active = isActive && activeWord?.isRepeat != true,
             retain = InkEngine.retainWordSweep(words[index].position, ink.state, activeWord),
@@ -1356,6 +1423,11 @@ internal fun rememberInkMotions(
             anticipateNextWord = !sequentialSweeps,
             paperDeparture = rememberPaperInkDeparture(
                 enabled = glintInk == null && InkEngine.tuning.paperInk && PaperInk.supported,
+                state = ink.state,
+            ),
+            unlit = !litMemory.lit,
+            coverRelease = rememberInkCoverRelease(
+                enabled = !(glintInk == null && InkEngine.tuning.paperInk && PaperInk.supported),
                 state = ink.state,
             ),
         )
@@ -1964,10 +2036,17 @@ internal fun buildShapedBlooms(
     // cover strength — ayah handoff does not change unread ink; only the
     // active word starts its bloom.
     motions.forEachIndexed { index, motion ->
-        val untouched = motion.ink.state == InkEngine.State.Upcoming &&
-            motion.sweepProgress <= 0f && motion.paperDeparture?.active != true
+        // A word that idles unread reports a full sweep, so its sweep alone
+        // never marks it untouched; [InkMotion.unlit] does. Without it the
+        // active verse's unread words took the recess cover from full ink
+        // when the stream wait dimmed the verse for a seek: the whole verse
+        // lit up for a moment and then dissolved.
+        val release = motion.coverRelease
+        val untouched = motion.ink.state == InkEngine.State.Upcoming && release == null &&
+            (motion.sweepProgress <= 0f || motion.unlit) && motion.paperDeparture?.active != true
         val coverAlpha = maxOf(
-            shapedWordCoverAlpha(
+            // A released word owns its clock; the verse's recess cannot pull it back up.
+            release?.let { upcomingCover * (1f - it.value) } ?: shapedWordCoverAlpha(
                 state = if (motion.paperDeparture?.active == true) InkEngine.State.Plain else motion.ink.state,
                 recess = recess,
                 upcomingCover = upcomingCover,
@@ -3118,8 +3197,9 @@ fun AyahBlock(
     // fades back under Upcoming paper with the chrome. One that has only ever
     // waited keeps that floor from its first frame.
     var hasFullInk by remember(ayah.surahId, ayah.number) { mutableStateOf(!dimmed) }
-    val paperTheme = LocalQuranAccents.current.glintInk == null
-    val softHandoff = paperTheme && dimmed && (hasOwnedInk || hasFullInk)
+    // Every theme: Nightfall and Royal Green once snapped the outgoing shaped
+    // verse to the floor while Paper eased it over [InkEngine.INK_DEPARTURE_MS].
+    val softHandoff = dimmed && (hasOwnedInk || hasFullInk)
     // The verse just recited, dimming as the next begins. It fades at the slow
     // pace of ink leaving, not the chrome's: a verse that only ever waited
     // keeps the chrome pace when play starts.
@@ -3396,9 +3476,9 @@ fun AyahBlock(
                 ResponsiveEnglishAyah(
                     ayah = ayah,
                     motions = motions,
-                    // Shaped English has no per-word alpha layer. On Paper,
-                    // use the same ayah cover that shaped Hafs uses.
-                    recessCover = { if (paperTheme) recessCover.value else 0f },
+                    // Shaped English has no per-word alpha layer: it uses the
+                    // same ayah cover that shaped Hafs uses.
+                    recessCover = { recessCover.value },
                     softHandoff = softHandoff,
                     keepUnreadFloor = hasOwnedInk,
                     markAlpha = { ayahMarkAlpha.value },
