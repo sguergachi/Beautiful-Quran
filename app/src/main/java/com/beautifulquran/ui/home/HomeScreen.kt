@@ -1093,20 +1093,6 @@ fun HomeScreen(
                         },
                 )
             }
-            // The pinning lesson, composed only while it shows: the place row's
-            // bounds change every scroll frame and are read here only then.
-            if (pinTipOpen || pinTipRendered) continueRowRect?.let { row ->
-                PinChapterTip(
-                    visible = pinTipOpen,
-                    target = with(density) {
-                        DpOffset((row.center.x - boxLeft).toDp(), (row.center.y - boxTop).toDp())
-                    },
-                    bodyBelow = pinTipBodyBelow(row.center.y - boxTop, boxHeight),
-                    onDismiss = ::closePinTip,
-                    onRenderedChange = { pinTipRendered = it },
-                    modifier = Modifier.zIndex(3f),
-                )
-            }
             // Dock flights: a live copy of the pill travels between its
             // resting seat and the chapter row — resizing, squaring its
             // corners, settling every inset onto the row, then fading to
@@ -1156,6 +1142,24 @@ fun HomeScreen(
                         )
                     }
                 }
+            }
+            // The pinning lesson is the sheet's topmost layer: composed
+            // last, above the dock flight, the bottom stack, the search
+            // pane and the bookmarks ribbon, so nothing on the sheet can
+            // draw over its vellum, copy or Got it pill. Composed only
+            // while it shows: the place row's bounds change every scroll
+            // frame and are read here only then.
+            if (pinTipOpen || pinTipRendered) continueRowRect?.let { row ->
+                PinChapterTip(
+                    visible = pinTipOpen,
+                    target = with(density) {
+                        DpOffset((row.center.x - boxLeft).toDp(), (row.center.y - boxTop).toDp())
+                    },
+                    bodyBelow = pinTipBodyBelow(row.center.y - boxTop, boxHeight),
+                    onDismiss = ::closePinTip,
+                    onRenderedChange = { pinTipRendered = it },
+                    modifier = Modifier.zIndex(10f),
+                )
             }
         }
     }
