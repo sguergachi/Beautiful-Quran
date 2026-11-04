@@ -18,23 +18,15 @@ import com.beautifulquran.ui.theme.royalGreenOverlayInk
 /**
  * The pinning lesson, written around the live row of the chapter being read:
  * the one a reader is most likely to want kept at the top. The row stays the
- * real target — holding it until it is full pins it — and the lesson's body
- * takes the paper above or below it, whichever half of the sheet is open
- * ([bodyBelow], from [pinTipBodyBelow]). [target] is the row's centre in this
- * sheet's own space.
- *
- * The body sits deep in the vellum along the ray, where the chapters
- * beneath are fully dissolved and the copy is clean — but not most of
- * the way to the sheet's edge, where it read as a detached bottom sheet
- * with its **Got it** pill stranded at the navigation bar. Its copy
- * starts in the chapter column — ribbon lane, number column and gap —
- * so title and instruction line up with the chapter names they refer to.
+ * real target — holding it until it is full pins it. The lesson occupies the
+ * right side, level with the chapter, and the vellum tapers left toward its
+ * number column. [target] is that column's centre in this sheet's own space.
+ * The copy and **Got it** stay together when the row is near a sheet edge.
  */
 @Composable
 internal fun PinChapterTip(
     visible: Boolean,
     target: DpOffset,
-    bodyBelow: Boolean,
     onDismiss: () -> Unit,
     onRenderedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -55,32 +47,23 @@ internal fun PinChapterTip(
                 body = "Press and hold this chapter to pin it.",
                 onDismiss = onDismiss,
                 spotlightCenter = { target },
-                placement = pinTipPlacement(bodyBelow),
+                placement = ContextualTipPlacement(bodyAngleDegrees = 0f),
+                actionCenter = {
+                    // Match the copy lane's vertical clamp, with the action
+                    // below its text rather than at the screen's bottom edge.
+                    val halfLane = minOf(150.dp, maxHeight / 2)
+                    val copyY = target.y.coerceIn(halfLane, maxHeight - halfLane)
+                    DpOffset(maxWidth - 68.dp, copyY + halfLane - 40.dp)
+                },
                 dismissPaperColor = paper,
                 dismissInkColor = ink,
                 onRenderedChange = onRenderedChange,
-                // Chapter column: 28 dp ribbon lane + 26 dp number column
-                // + 4 dp gap, mirroring the chapter rows' name inset.
-                contentPadding = PaddingValues(start = 58.dp, end = 28.dp),
-                guideWidthFraction = 1f,
-                guideHeight = 124.dp,
+                contentPadding = PaddingValues(start = 18.dp, end = 28.dp),
+                guideWidthFraction = 0.62f,
+                guideHeight = 300.dp,
                 mark = { ContextualPulseMark() },
                 modifier = modifier.fillMaxSize(),
             )
         }
     }
 }
-
-/** The lesson sits in whichever half of the sheet the row leaves open. */
-internal fun pinTipBodyBelow(targetY: Float, sheetHeight: Float): Boolean = targetY < sheetHeight / 2f
-
-/**
- * The lesson's ray from the row: body deep in the vellum (0.55 of the way
- * to the sheet's edge, not the shared 0.78 that stranded it at the edge),
- * **Got it** just beyond it (0.74, not 0.94 at the navigation bar).
- */
-internal fun pinTipPlacement(bodyBelow: Boolean) = ContextualTipPlacement(
-    bodyAngleDegrees = if (bodyBelow) 90f else 270f,
-    bodyDistanceFraction = 0.55f,
-    actionDistanceFraction = 0.74f,
-)

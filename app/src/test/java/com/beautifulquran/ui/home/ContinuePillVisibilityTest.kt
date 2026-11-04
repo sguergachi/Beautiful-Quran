@@ -214,27 +214,6 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
-    fun pinLessonTakesTheOpenHalfOfTheSheet() {
-        assertEquals(true, pinTipBodyBelow(targetY = 300f, sheetHeight = 2000f))
-        assertEquals(false, pinTipBodyBelow(targetY = 1500f, sheetHeight = 2000f))
-    }
-
-    @Test
-    fun pinLessonBodyAndDismissalStayOffTheSheetEdge() {
-        // Deep enough in the vellum that the chapters beneath are dissolved,
-        // short of the edge fractions (0.78 / 0.94) that stranded the copy
-        // at the sheet's edge and the pill at the navigation bar.
-        val below = pinTipPlacement(bodyBelow = true)
-        assertEquals(90f, below.bodyAngleDegrees, 0f)
-        assertEquals(0.55f, below.bodyDistanceFraction, 0f)
-        assertEquals(0.74f, below.actionDistanceFraction, 0f)
-        val above = pinTipPlacement(bodyBelow = false)
-        assertEquals(270f, above.bodyAngleDegrees, 0f)
-        assertEquals(below.bodyDistanceFraction, above.bodyDistanceFraction, 0f)
-        assertEquals(below.actionDistanceFraction, above.actionDistanceFraction, 0f)
-    }
-
-    @Test
     fun aQuickReleaseOpensTheChapterAndALongerOneChangesNothing() {
         assertEquals(HoldOutcome.Tap, holdOutcome(80L))
         assertEquals(HoldOutcome.Tap, holdOutcome(HoldTapMaxMs - 1))

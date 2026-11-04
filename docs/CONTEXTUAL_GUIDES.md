@@ -151,7 +151,11 @@ For the existing lessons, the acceptance actions are:
 - Ayah rail: tap the spotlighted collapsed rail, or drag it vertically; the
   guide withdraws as the real scrub wheel blooms.
 - Pin a chapter (Chapters sheet): with nothing pinned, the lesson opens around
-  the fully visible row of the chapter being read. Press and hold that row
+  the fully visible row of the chapter being read. The vellum enters from the
+  right and tapers toward that row's chapter-number column. Copy sits beside
+  the chapter, with **Got it** below the copy; they move together to stay inside
+  the sheet near its top or bottom. The guide stays above all Chapters content.
+  Press and hold that row
   while the guide is up; the row fills evenly, and holding it full pins it
   (haptic tick) and completes the lesson (pinning any row does). Releasing
   early drains the fill and leaves the guide up. **Got it**, Back, scrolling

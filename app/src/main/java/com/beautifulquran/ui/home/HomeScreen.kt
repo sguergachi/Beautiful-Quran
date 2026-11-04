@@ -1153,9 +1153,11 @@ fun HomeScreen(
                 PinChapterTip(
                     visible = pinTipOpen,
                     target = with(density) {
-                        DpOffset((row.center.x - boxLeft).toDp(), (row.center.y - boxTop).toDp())
+                        DpOffset(
+                            (row.left - boxLeft).toDp() + HomeRibbonLane + HomeNumberColumn / 2,
+                            (row.center.y - boxTop).toDp(),
+                        )
                     },
-                    bodyBelow = pinTipBodyBelow(row.center.y - boxTop, boxHeight),
                     onDismiss = ::closePinTip,
                     onRenderedChange = { pinTipRendered = it },
                     modifier = Modifier.zIndex(10f),
