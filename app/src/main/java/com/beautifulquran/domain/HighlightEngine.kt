@@ -43,6 +43,10 @@ object HighlightEngine {
          * fade until the chain completes (playback advances past [highWater]).
          * Equals [position] when not repeating. */
         val repeatStart: Int,
+        /** Karaoke hold of the next timing segment (its start to the one after,
+         * or its own end), or null at ayah end. Lets the ink borrow lead-in
+         * time for a short next word (InkEngine.shortWordLead). */
+        val nextHoldMs: Long? = null,
     )
 
     /**
@@ -105,6 +109,10 @@ object HighlightEngine {
                         isRepeat = seg.position <= maxBefore[i],
                         highWater = maxOf(maxBefore[i], seg.position),
                         repeatStart = repeatStart[i],
+                        nextHoldMs = segments.getOrNull(i + 1)?.let { next ->
+                            ((segments.getOrNull(i + 2)?.startMs ?: next.endMs) - next.startMs)
+                                .coerceAtLeast(0L)
+                        },
                     )
                 }
                 return PreparedTimings(segments, info)

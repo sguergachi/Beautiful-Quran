@@ -190,15 +190,25 @@ object TajweedPacing {
     ) {
         /** Centre the wash's soft edge on each letter hold. The renderer travels
          * across the word plus its feather; endpoints still start unread and
-         * finish fully inked at the original voiced boundary. */
+         * finish fully inked at the original voiced boundary.
+         *
+         * Centring shifts every interior point by half a feather, but the
+         * origin stays at 0 — so the first glide must cross that half feather
+         * on top of its own letter, in a sliver of time. On a wasl-entry hold
+         * (3:7 `زَيۡغٞ فَيَتَّبِعُونَ`) the edge reached ~30 % of a 1.9 s word
+         * in ~100 ms and then parked: the opening snapped half-inked instead
+         * of fading in. [openingRamp] spreads that lead-in over the start of
+         * the word, so a longer word gets a longer opening fade. */
         fun forWash(feather: Float): Curve {
             val edge = feather.coerceAtLeast(0f)
+            val mapped = FloatArray(positions.size) { i ->
+                val x = positions[i]
+                if (x <= 0f || x >= 1f) x else (x + edge / 2f) / (1f + edge)
+            }
+            val (rampTimes, rampPositions) = openingRamp(times, mapped)
             return Curve(
-                times,
-                FloatArray(positions.size) { i ->
-                    val x = positions[i]
-                    if (x <= 0f || x >= 1f) x else (x + edge / 2f) / (1f + edge)
-                },
+                rampTimes,
+                rampPositions,
                 letterCount,
                 hasStrongHold,
                 letterCurve ?: this,
@@ -243,6 +253,74 @@ object TajweedPacing {
             val f = (c - times[i]) / span
             return positions[i] + (positions[i + 1] - positions[i]) * f
         }
+    }
+
+    /**
+     * Letters the reciter actually voices in [arabic] (silent hamzat wasl,
+     * assimilated lām and written-but-silent alifs excluded). Used to read the
+     * reciter's per-letter tempo off a word's own duration.
+     */
+    fun voicedLetters(arabic: String): Int {
+        val events = tokenize(arabic)
+        return events.indices.count { weight(events, it) > 0f }
+    }
+
+    /**
+     * Replace a wash curve's opening with a straight ramp from the origin.
+     *
+     * The ramp's slope is the larger of the plain sweep's rate (1) and
+     * whatever still meets the curve by [OPENING_RAMP_SHARE] of the word, so
+     * it is never slower than an unpaced word and always rejoins the curve
+     * early — holds and the waqf park later in the word are untouched. Where
+     * the curve already opens gently (an opening crawl), it is returned as is.
+     * The result stays monotone: the ramp and the curve agree where they meet.
+     */
+    internal fun openingRamp(times: FloatArray, positions: FloatArray): Pair<FloatArray, FloatArray> {
+        fun at(t: Float): Float {
+            var i = times.size - 1
+            while (i > 0 && times[i] > t) i--
+            if (i >= times.size - 1) return positions.last()
+            val span = times[i + 1] - times[i]
+            if (span <= 0f) return positions[i + 1]
+            return positions[i] + (positions[i + 1] - positions[i]) * (t - times[i]) / span
+        }
+        val limit = OPENING_RAMP_SHARE
+        val slope = maxOf(OPENING_MIN_SLOPE, at(limit) / limit)
+        // First point where the ramp catches the curve. Breakpoints are
+        // sparse (a dozen), so walk segments and solve each line exactly.
+        var meetT = Float.NaN
+        for (i in 0 until times.size - 1) {
+            val t0 = times[i]
+            val t1 = times[i + 1]
+            if (t1 <= t0) continue
+            if (t0 > limit) break
+            val p0 = positions[i]
+            val p1 = positions[i + 1]
+            val curveSlope = (p1 - p0) / (t1 - t0)
+            // Solve p0 + curveSlope (t − t0) = slope t on [t0, t1].
+            val gap0 = p0 - slope * t0
+            if (t0 > 0f && gap0 <= 0f) { meetT = t0; break }
+            val gap1 = p1 - slope * t1
+            if (gap1 <= 0f) {
+                val denom = slope - curveSlope
+                meetT = if (denom > 0f) (t0 + gap0 / denom).coerceIn(t0, t1) else t1
+                break
+            }
+        }
+        if (meetT.isNaN() || meetT <= 0f) return times to positions
+        val outTimes = ArrayList<Float>(times.size + 1)
+        val outPositions = ArrayList<Float>(times.size + 1)
+        outTimes += 0f
+        outPositions += 0f
+        outTimes += meetT
+        outPositions += slope * meetT
+        for (i in times.indices) {
+            if (times[i] > meetT) {
+                outTimes += times[i]
+                outPositions += positions[i]
+            }
+        }
+        return outTimes.toFloatArray() to outPositions.toFloatArray()
     }
 
     /**
@@ -622,6 +700,15 @@ object TajweedPacing {
      * not park. 4:143 `هَـٰٓؤُلَآءِ`.
      */
     private const val OPENING_HOLD_MIN = 0.28f
+    /**
+     * Share of a paced word by which the wash's opening ramp must rejoin the
+     * curve ([openingRamp]). The plain sweep spends about this long bringing
+     * its first letter to half-bloom (half a feather of travel), so the
+     * paced opening now takes a comparable, length-proportional breath.
+     */
+    private const val OPENING_RAMP_SHARE = 0.3f
+    /** The opening ramp is never slower than the plain linear sweep. */
+    private const val OPENING_MIN_SLOPE = 1f
     /** Default junction for long donors; short donors may begin earlier. */
     private const val WASL_EXIT_FRACTION = 0.82f
     /** Floor on the wasl prefix bloom window (matches 1 − [WASL_EXIT_FRACTION]). */

@@ -602,6 +602,88 @@ class InkEngineTest {
     }
 
     @Test
+    fun `a short word blooms at the reciter's letter pace, not the word's`() {
+        // 3:8 Alafasy: بَعۡدَ 579 ms, إِذۡ 503 ms, هَدَيۡتَنَا 1208 ms — an even
+        // ~200-250 ms a letter, yet إِذۡ inked each letter 2.4x faster.
+        assertEquals(754, InkEngine.tempoSweepMs(503, "إِذۡ", paced = false))
+        // Three or more voiced letters: the word's own pace already reads even.
+        assertEquals(579, InkEngine.tempoSweepMs(579, "بَعۡدَ", paced = false))
+        assertEquals(1208, InkEngine.tempoSweepMs(1208, "هَدَيۡتَنَا", paced = false))
+        // Paced holds are laid out in voiced time; they keep the plain sweep.
+        assertEquals(503, InkEngine.tempoSweepMs(503, "إِذۡ", paced = true))
+        assertNull(InkEngine.tempoSweepMs(null, "إِذۡ", paced = false))
+        assertEquals(503, InkEngine.tempoSweepMs(503, null, paced = false))
+        // Never past the ceiling, and at most MAX_TEMPO_STRETCH.
+        assertEquals(InkEngine.tuning.maxSweepMs,
+            InkEngine.tempoSweepMs(InkEngine.tuning.maxSweepMs - 10, "إِذۡ", paced = false))
+        val original = InkEngine.tuning
+        try {
+            InkEngine.tuning = original.copy(tempoSweepLetters = 6f)
+            assertEquals(1006, InkEngine.tempoSweepMs(503, "إِذۡ", paced = false))
+            InkEngine.tuning = original.copy(tempoSweepLetters = 0f)
+            assertEquals(503, InkEngine.tempoSweepMs(503, "إِذۡ", paced = false))
+        } finally {
+            InkEngine.tuning = original
+        }
+    }
+
+    @Test
+    fun `a short word borrows its bloom from the word before, not past its own end`() {
+        // 3:8 Alafasy: بَعۡدَ (579 ms) hands to إِذۡ (503 ms). The tempo floor
+        // asks 754 ms for إِذۡ; up to 35 % of بَعۡدَ is lent instead of trailing.
+        val lead = requireNotNull(InkEngine.shortWordLead(
+            activeSweepMs = 579, activePaced = false, activeRepeat = false,
+            nextArabic = "إِذۡ", nextSweepMs = 503, nextPaced = false, connected = false,
+        ))
+        assertEquals(202, lead.borrowMs)
+        assertEquals(202f / 705f, lead.share, 1e-5f)
+        assertEquals(InkEngine.sweepEasing.transform(lead.share), lead.reach, 1e-6f)
+        assertEquals(0f, lead.at(0f), 0f)
+        assertEquals(lead.reach, lead.at(1f), 1e-6f)
+        // بَعۡدَ finishes early; إِذۡ, led in, ends with its voice (no trailing).
+        assertEquals(377, InkEngine.visualSweepMs(579, "بَعۡدَ", false, ledIn = false, lending = lead))
+        assertEquals(503, InkEngine.visualSweepMs(503, "إِذۡ", false, ledIn = true, lending = null))
+        // Nothing to borrow from: the trailing tempo floor remains the fallback.
+        assertEquals(754, InkEngine.visualSweepMs(503, "إِذۡ", false, ledIn = false, lending = null))
+        // A long predecessor lends exactly what the floor asks.
+        assertEquals(251, InkEngine.shortWordLead(1500, false, false, "إِذۡ", 503, false, false)?.borrowMs)
+    }
+
+    @Test
+    fun `a tap-started chain still carries into the next word`() {
+        // Hani 3:8 played from رَبَّنَا: the tapped word keeps the tap's pinned
+        // activation (WordTapInk.resolve); لَا arrives with the media's own.
+        val tapped = ActiveWordEntry(index = 0, activation = 7L, generation = 12L)
+        val next = ActiveWord(ayah = 8, wordPosition = 2, durationMs = 320,
+            activation = 12L, playbackActivation = 12L, tapStartPosition = 1)
+        assertTrue(carriedFromPrevious(tapped, activeIndex = 1, activation = 12L, word = next))
+        // A seek is a new media generation: start clean.
+        assertFalse(carriedFromPrevious(tapped, 1, 13L,
+            next.copy(activation = 13L, playbackActivation = 13L)))
+        // Without a tap chain, only the shared activation counts.
+        assertFalse(carriedFromPrevious(tapped, 1, 12L, next.copy(tapStartPosition = null)))
+        // Not adjacent.
+        assertFalse(carriedFromPrevious(tapped, 2, 12L, next))
+        // Ordinary playback: same activation.
+        assertTrue(carriedFromPrevious(ActiveWordEntry(0, 12L, generation = 12L), 1, 12L,
+            next.copy(tapStartPosition = null)))
+    }
+
+    @Test
+    fun `no lead where the voice or another carry already owns the timing`() {
+        fun lead(activePaced: Boolean = false, repeat: Boolean = false, next: String = "إِذۡ",
+                 nextPaced: Boolean = false, connected: Boolean = false, active: Int = 579) =
+            InkEngine.shortWordLead(active, activePaced, repeat, next, 503, nextPaced, connected)
+        assertNull(lead(activePaced = true))
+        assertNull(lead(repeat = true))
+        assertNull(lead(nextPaced = true))
+        assertNull(lead(connected = true))
+        assertNull(lead(next = "هَدَيۡتَنَا")) // not short
+        assertNull(lead(active = 100)) // 35 % of 100 ms is below MIN_LEAD_MS
+        assertNull(InkEngine.shortWordLead(579, false, false, "إِذۡ", null, false, false))
+    }
+
+    @Test
     fun `sweep clamps to the tuned floor and ceiling`() {
         val floor = InkEngine.minSweepFloorMs()
         assertEquals(

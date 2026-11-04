@@ -163,6 +163,10 @@ fun InkLabPanel(
                         TuningSlider("Max sweep ms", t.maxSweepMs.toFloat(), 1000f..12000f, integer = true) {
                             InkEngine.tuning = t.copy(maxSweepMs = it.roundToInt())
                         }
+                        // Short words bloom at the reciter's letter pace (0 = off).
+                        TuningSlider("Tempo floor letters", t.tempoSweepLetters, 0f..6f) {
+                            InkEngine.tuning = t.copy(tempoSweepLetters = it)
+                        }
                         TuningSlider("Wash feather", t.washFeather, 0.2f..3f) {
                             InkEngine.tuning = t.copy(washFeather = it)
                         }
@@ -696,6 +700,7 @@ internal fun formatTuningCopy(t: InkEngine.Tuning): String {
         appendLine("    recessMs = ${t.recessMs},")
         appendLine("    minSweepMs = ${t.minSweepMs},")
         appendLine("    maxSweepMs = ${t.maxSweepMs},")
+        appendLine("    tempoSweepLetters = ${f(t.tempoSweepLetters)},")
         appendLine("    repeatSweepMs = ${t.repeatSweepMs},")
         appendLine("    repeatFadeOutMs = ${t.repeatFadeOutMs},")
         appendLine("    repeatInkAlpha = ${f(t.repeatInkAlpha)},")

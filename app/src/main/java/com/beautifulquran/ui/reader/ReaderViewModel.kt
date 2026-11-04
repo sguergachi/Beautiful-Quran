@@ -91,6 +91,8 @@ data class ActiveWord(
     val spokenMs: Long = durationMs,
     /** Next timing owner, including a repeat backtrack; null at ayah end. */
     val nextWordPosition: Int? = null,
+    /** [nextWordPosition]'s karaoke hold at 1x, for a short next word's ink lead-in. */
+    val nextDurationMs: Long? = null,
     val isRepeat: Boolean = false,
     val highWater: Int = wordPosition,
     /** First word of the active repeat chain: while repeating, words
@@ -162,6 +164,7 @@ internal class ActiveWordPollCache {
             durationMs = durationMs,
             spokenMs = (info.endMs - startMs).coerceIn(0L, durationMs),
             nextWordPosition = info.nextPosition,
+            nextDurationMs = info.nextHoldMs,
             isRepeat = info.isRepeat,
             highWater = info.highWater,
             repeatStart = info.repeatStart,

@@ -116,6 +116,8 @@ export function readerHighlightState(
         isRepeat: info.isRepeat,
         highWater: info.highWater,
         repeatStart: info.repeatStart,
+        nextWordPosition: info.nextPosition ?? null,
+        nextDurationMs: info.nextHoldMs ?? null,
         activation: input.activation ?? 0,
       }
     }

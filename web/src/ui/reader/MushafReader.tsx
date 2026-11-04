@@ -1042,7 +1042,8 @@ function MushafLeaf({
                         motion={{ key: `${surahId}:${ayah}:${position}`, timing: owner ? ink.activeWord : null,
                           isAyahFinal: position === lastPositions.get(`${surahId}:${ayah}`),
                           previousArabic: verseWords.get(`${surahId}:${ayah}`)?.find(w => w.position === position - 1)?.arabic,
-                          nextArabic: verseWords.get(`${surahId}:${ayah}`)?.find(w => w.position === position + 1)?.arabic }}
+                          nextArabic: verseWords.get(`${surahId}:${ayah}`)?.find(w => w.position === position + 1)?.arabic,
+                          nextIsAyahFinal: position + 1 === lastPositions.get(`${surahId}:${ayah}`) }}
                         tabIndex={token === firstToken ? 0 : -1}
                         ink={wordInk}
                         sweepMs={owner ? InkEngine.sweepMs(ink.activeWord, ink.speed) : null}
