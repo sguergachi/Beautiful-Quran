@@ -31,10 +31,8 @@ import com.beautifulquran.domain.HighlightSession
 import com.beautifulquran.domain.HighlightTimingContext
 import com.beautifulquran.domain.AudibleSilence
 import com.beautifulquran.domain.firstWordHighlightMs
-import com.beautifulquran.domain.hizbOpeningSeekMs
 import com.beautifulquran.domain.isHizbStop
 import com.beautifulquran.domain.openingWashStartMs
-import com.beautifulquran.domain.silenceSkipAllowed
 import com.beautifulquran.domain.HighlightEngine
 import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.MushafCatalog
@@ -871,29 +869,6 @@ class ReaderViewModel(
         )
     }
 
-    /**
-     * A murattal ۞ opening skips its long pause and lands on the first word's
-     * voice, inside that verse. The wash keeps running. Nothing seeks into
-     * the next verse: that join is the click between verses. Mujawwad waqf
-     * and Muallim pauses stay. A seek already in flight is left to land.
-     */
-    private fun skipMarkedSilence() {
-        if (!player.skipSilenceGaps || player.silenceSkipHeld()) return
-        if (!player.state.value.isPlaying) return
-        val np = player.liveNowPlaying ?: return
-        if (np.surahId != surahId) return
-        val style = _uiState.value.currentReciter?.takeIf { it.id == np.reciterId }?.style
-        if (style == null || !silenceSkipAllowed(style)) return
-        val segments = preparedTimings[np.ayah]?.segments?.takeIf { it.isNotEmpty() } ?: return
-        val opening = hizbOpeningSeekMs(
-            hizbStop = isHizbAyah(np.ayah),
-            positionMs = player.positionMs,
-            segments = segments,
-            silence = audibleSilenceFor(np.reciterId, np.surahId, np.ayah),
-        ) ?: return
-        player.skipSilenceWithinAyah(np.ayah, opening)
-    }
-
     /** First-word highlight gate. Only a ۞ uses the measured voice. */
     private fun firstWordVoiceMs(ayah: Int, reciterId: Int, segments: List<Segment>): Long {
         val stored = segments.firstOrNull()?.startMs ?: return 0L
@@ -920,13 +895,6 @@ class ReaderViewModel(
     }
 
     init {
-        viewModelScope.launch {
-            while (true) {
-                ensureActive()
-                skipMarkedSilence()
-                delay(if (player.state.value.isPlaying) 40L else 250L)
-            }
-        }
         viewModelScope.launch {
             player.state.map { it.positionIntentId }.distinctUntilChanged().collect {
                 wordInk.onPositionIntent(it)
