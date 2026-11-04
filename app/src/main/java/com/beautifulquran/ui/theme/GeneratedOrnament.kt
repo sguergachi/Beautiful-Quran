@@ -730,47 +730,56 @@ fun GeneratedBorderBand(
  * A generated geometric field with filigree tiled at whisper ink. Geometry
  * is built once per size; the cover washes this static tooling in with its
  * own layer alpha, while chapter backdrops arrive fully inked.
+ *
+ * The weave rasterises once into an offscreen layer. Its four tiled paths
+ * run to thousands of points — past the atlas-path cache's size — so drawn
+ * into a parent's display list they re-tessellate on the render thread
+ * every frame that surface is damaged: every frame of a sheet swipe or a
+ * scroll with a chapter header on screen. As a texture, a moving frame
+ * only blits it. (The cover learned this first; see EntranceCover.)
  */
 fun Modifier.generatedFieldWeave(
     field: FieldSpec,
     ink: Color,
     embossLight: Color,
-): Modifier = clipToBounds().drawWithCache {
-    // Tile one cell past every edge so the weave reads continuous at the
-    // bounds, then clip so neighbouring sections never paint over each other
-    // (the Lab's stacked previews depend on this).
-    val fittedWidth = fittedFieldCellWidth(size.width.toDp().value.toDouble(), field.cellWidthDp)
-    val pxPerUnit = fittedWidth.toFloat().dp.toPx() / field.cellW.toFloat()
-    val cellW = (field.cellW * pxPerUnit).toFloat()
-    val cellH = (field.cellH * pxPerUnit).toFloat()
-    val weaves = listOf(Path(), Path())
-    var y = -cellH
-    while (y < size.height + cellH) {
-        var x = -cellW
-        while (x < size.width + cellW) {
-            for (s in field.strokes) {
-                val weave = weaves[if (s.weight == StrokeWeight.Rule) 0 else 1]
-                s.points.forEachIndexed { i, p ->
-                    val px = x + (p.x * pxPerUnit).toFloat()
-                    val py = y + (p.y * pxPerUnit).toFloat()
-                    if (i == 0) weave.moveTo(px, py) else weave.lineTo(px, py)
+): Modifier = clipToBounds()
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithCache {
+        // Tile one cell past every edge so the weave reads continuous at the
+        // bounds, then clip so neighbouring sections never paint over each other
+        // (the Lab's stacked previews depend on this).
+        val fittedWidth = fittedFieldCellWidth(size.width.toDp().value.toDouble(), field.cellWidthDp)
+        val pxPerUnit = fittedWidth.toFloat().dp.toPx() / field.cellW.toFloat()
+        val cellW = (field.cellW * pxPerUnit).toFloat()
+        val cellH = (field.cellH * pxPerUnit).toFloat()
+        val weaves = listOf(Path(), Path())
+        var y = -cellH
+        while (y < size.height + cellH) {
+            var x = -cellW
+            while (x < size.width + cellW) {
+                for (s in field.strokes) {
+                    val weave = weaves[if (s.weight == StrokeWeight.Rule) 0 else 1]
+                    s.points.forEachIndexed { i, p ->
+                        val px = x + (p.x * pxPerUnit).toFloat()
+                        val py = y + (p.y * pxPerUnit).toFloat()
+                        if (i == 0) weave.moveTo(px, py) else weave.lineTo(px, py)
+                    }
+                    if (s.closed) weave.close()
                 }
-                if (s.closed) weave.close()
+                x += cellW
             }
-            x += cellW
+            y += cellH
         }
-        y += cellH
-    }
-    val styles = listOf(Stroke(width = 0.6.dp.toPx()), Stroke(width = 0.33.dp.toPx()))
-    onDrawBehind {
-        for (i in weaves.indices) {
-            translate(-0.6f, -0.6f) {
-                drawPath(weaves[i], embossLight, style = styles[i])
+        val styles = listOf(Stroke(width = 0.6.dp.toPx()), Stroke(width = 0.33.dp.toPx()))
+        onDrawBehind {
+            for (i in weaves.indices) {
+                translate(-0.6f, -0.6f) {
+                    drawPath(weaves[i], embossLight, style = styles[i])
+                }
+                drawPath(weaves[i], ink, style = styles[i])
             }
-            drawPath(weaves[i], ink, style = styles[i])
         }
     }
-}
 
 /**
  * A rosette drawn as line-work in one ink, with no gilt brush and no emboss —
