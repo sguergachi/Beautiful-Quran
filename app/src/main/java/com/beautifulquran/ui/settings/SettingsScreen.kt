@@ -499,6 +499,19 @@ private fun DeveloperSection(
             color = MaterialTheme.colorScheme.primary,
         )
     }
+    // A crash restarts the app, so its trace is the only evidence left.
+    if (remember(context) { com.beautifulquran.CrashTrace.hasTrace(context) }) {
+        Text(
+            text = "Share last crash",
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier
+                .fillMaxWidth()
+                .quietClickable { com.beautifulquran.CrashTrace.share(context) }
+                .padding(vertical = 6.dp),
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Caption("The app stopped unexpectedly. Share what killed it.")
+    }
 
     Spacer(Modifier.height(20.dp))
     Text(

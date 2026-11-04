@@ -85,6 +85,7 @@ class QuranApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        CrashTrace.install(this)
         DevProfiling.install(this)
         val overrides = TimingOverrides(this)
         val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

@@ -297,8 +297,13 @@ class HomeViewModel(
             !settings.isEducationDismissed(EducationMoment.PIN_CHAPTER)
     }
 
-    internal fun onListChapterOpened(chapterId: Int, scrolledDown: Boolean) {
-        pinLesson.openFromList(chapterId, scrolledDown && shouldShowPinTip())
+    /** Where the list was left, so a restart opens on the same chapter. */
+    internal fun chapterListAnchor(): Pair<Int, Int>? = settings.chapterListAnchor()
+
+    internal fun rememberChapterListAnchor(index: Int, offset: Int) =
+        settings.rememberChapterListAnchor(index, offset)
+
+    internal fun onListChapterOpened(chapterId: Int, scrolledDown: Boolean) {        pinLesson.openFromList(chapterId, scrolledDown && shouldShowPinTip())
         _pinTipChapter.value = pinLesson.offeredChapter
     }
 

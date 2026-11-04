@@ -277,6 +277,33 @@ class SettingsRepository(context: Context) {
         return if (well > 0f && measure > 0f) floatArrayOf(well, measure) else null
     }
 
+    /**
+     * Where the chapter list was left, as its first item and its offset.
+     *
+     * Kept beside the settings because it is a place, not a preference: the
+     * list is the app's home, and coming back to it — after a crash restart as
+     * much as a cold launch — should not mean scrolling a hundred chapters
+     * again to find your place.
+     */
+    fun rememberChapterListAnchor(index: Int, offset: Int) {
+        if (prefs.getInt("chapterListIndex", -1) == index &&
+            prefs.getInt("chapterListOffset", -1) == offset
+        ) {
+            return
+        }
+        prefs.edit {
+            putInt("chapterListIndex", index)
+            putInt("chapterListOffset", offset)
+        }
+    }
+
+    /** The remembered first item and offset, if the list has been scrolled. */
+    fun chapterListAnchor(): Pair<Int, Int>? {
+        val index = prefs.getInt("chapterListIndex", 0)
+        val offset = prefs.getInt("chapterListOffset", 0)
+        return if (index > 0) index to offset else null
+    }
+
     fun updateListeningPosition(surah: Int, ayah: Int) {
         val current = _settings.value
         if (current.lastSurah == surah && current.lastAyah == ayah) return

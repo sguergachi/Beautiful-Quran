@@ -122,6 +122,7 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.animation.core.Animatable
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNot
 import kotlinx.coroutines.flow.first
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.currentStateAsState
@@ -282,6 +283,27 @@ fun HomeScreen(
     var searchBounds by remember { mutableStateOf<Rect?>(null) }
     var searchPaneBounds by remember { mutableStateOf<Rect?>(null) }
     val listState = rememberLazyListState()
+    // The list is the app's home: a restart — after a crash as much as a cold
+    // launch — opens on the chapter that was last under the thumb, not the top.
+    LaunchedEffect(listState) {
+        val (index, offset) = viewModel.chapterListAnchor() ?: return@LaunchedEffect
+        if (listState.firstVisibleItemIndex != 0 || listState.firstVisibleItemScrollOffset != 0) {
+            return@LaunchedEffect
+        }
+        snapshotFlow { listState.layoutInfo.totalItemsCount }.first { it > 0 }
+        listState.scrollToItem(index.coerceIn(0, listState.layoutInfo.totalItemsCount - 1), offset)
+    }
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            Triple(
+                listState.isScrollInProgress,
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+            )
+        }
+            .filterNot { (scrolling, _, _) -> scrolling }
+            .collect { (_, index, offset) -> viewModel.rememberChapterListAnchor(index, offset) }
+    }
     val searchPaneVisible = searchFocused && uiState.query.isEmpty()
     val density = LocalDensity.current
     val imeBottom = WindowInsets.ime.getBottom(density).toFloat()
