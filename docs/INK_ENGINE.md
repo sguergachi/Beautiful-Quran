@@ -713,23 +713,47 @@ Alafasy, November 2026.
   and parked. The opening is now a straight ramp from the origin, no slower than
   the plain sweep, that rejoins the curve by 30 % of the word. Longer words get
   a longer opening fade. Details in docs/TAJWEED_PACING.md, "Opening ramp".
-- **Short words bloom at the reciter's letter pace** (`InkEngine.tempoSweepMs`).
-  Each letter blooms over a fixed share of its word's sweep, the feather. So a
-  letter's fade time was proportional to its *word's* length, not the voice's.
-  In 3:8 `بَعۡدَ إِذۡ هَدَيۡتَنَا` (579 / 503 / 1208 ms, an even ~200–250 ms a
-  letter), `إِذۡ` inked each letter in ~310 ms against `هَدَيۡتَنَا`'s ~740 ms, and
-  read as a dart. The Arabic wash is now floored at
-  `Tuning.tempoSweepLetters` (3) × its own duration ÷ voiced letters
-  (`TajweedPacing.voicedLetters`), at most `MAX_TEMPO_STRETCH` (2×) and
-  `maxSweepMs`. Words of three or more voiced letters are untouched. The
-  stretched wash finishes as a residual after the next word takes over (above).
-  The stretch is visual only. Clocks that must meet the voice keep the voiced
-  `sweepMs`: the wasl carry-in window (`rememberWaslProgress`; on web,
-  `voicedClock` in `useWordWash`) and Paper's next-word lead-in
-  (`InkMotion.paperAhead` scales by `voicedStretch`). Tajweed-paced words and
-  English are not stretched: paced holds are laid out in voiced time, and
-  English has its own clock. Ink Lab → Sweep → **Tempo floor letters**
-  (0 = off). Mirrored on web (`InkEngine.tempoSweepMs`).
+- **Short words bloom at the reciter's letter pace, on time borrowed from
+  the word before** (`InkEngine.tempoSweepMs` → `shortWordLead` →
+  `visualSweepMs`). Each letter blooms over a fixed share of its word's sweep,
+  the feather. So a letter's fade time was proportional to its *word's*
+  length, not the voice's. In 3:8 `بَعۡدَ إِذۡ هَدَيۡتَنَا` (579 / 503 / 1208 ms, an
+  even ~200–250 ms a letter), `إِذۡ` inked each letter in ~310 ms against
+  `هَدَيۡتَنَا`'s ~740 ms, and read as a dart.
+  - **The target.** A word of fewer than `Tuning.tempoSweepLetters` (3)
+    voiced letters (`TajweedPacing.voicedLetters`) wants a wash of 3 × its
+    own duration ÷ voiced letters, at most `MAX_TEMPO_STRETCH` (2×).
+  - **Where the time comes from.** A first cut stretched the short word's
+    wash past its own end. Its fade was graceful but trailed the voice; the
+    user heard it slightly out of sync. So the extra time is now *borrowed*
+    from the end of the previous word (`ShortWordLead`):
+    - the previous word's wash finishes `borrowMs` early, so it doesn't
+      linger on its last letter;
+    - the short word starts washing during that tail, on its own eased
+      curve, through the same `WaslPrefix` hand-off as a wasl carry-in;
+    - the short word then continues from the reached edge (`reach`) and
+      finishes when the reciter does.
+  - **How much is borrowed.** Whatever the target asks, capped at
+    `MAX_LEAD_SHARE` (35 %) of the previous word. 3:8: `بَعۡدَ` lends 202 ms
+    (579 → 377 ms visual); `إِذۡ` starts 202 ms early and still ends at its
+    503 ms boundary. The next word's hold comes from
+    `HighlightEngine.ActiveInfo.nextHoldMs` → `ActiveWord.nextDurationMs`.
+  - **No lead** when the previous word is a repeat, either word is
+    tajweed-paced (holds are laid out in voiced time), the pair is a wasl
+    connection (that carry-in already pre-inks the opening), the word was
+    tap-seeded, or the borrow is under `MIN_LEAD_MS`. A short word with
+    nothing to borrow from — a verse's first word — falls back to the
+    trailing stretch.
+  - **Visual only.** The wasl carry-in window and the lead window read the
+    voiced `sweepMs`. Paper's next-word lead-in (`InkMotion.paperAhead`)
+    scales by `voicedStretch`, which is below 1 for a lending word.
+  - **The glimmer** (`glintProgress`) rides the word's own clock
+    (`LetterSweep.ownProgress`), not the carried-in edge. It blooms with the
+    word instead of snapping over pre-inked letters at handoff; this also
+    applies to wasl-carried words.
+  - English is never stretched or led. Ink Lab → Sweep → **Tempo floor
+    letters** (0 = off). Mirrored on web (`useWordWash`: `shortWordLead`,
+    `WordMotionRegistry.led`).
 
 Wasl still uses `waslWashProgress` / `waslContinuationStart` /
 `continuedSweepProgress`, the same captured feather, and the reached handoff

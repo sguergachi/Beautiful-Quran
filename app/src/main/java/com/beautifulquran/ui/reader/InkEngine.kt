@@ -587,6 +587,79 @@ object InkEngine {
     /** One-letter words would otherwise trail for three letters' time. */
     const val MAX_TEMPO_STRETCH = 2f
 
+    /**
+     * How a short next word borrows its extra bloom time from the end of the
+     * active word, instead of trailing past its own end (out of sync with the
+     * voice): the active word's wash finishes [borrowMs] early and the short
+     * word starts washing then, on its own eased curve, so by the handoff it
+     * has reached [reach] and it finishes when the reciter does.
+     *
+     * [share] is [borrowMs] over the short word's whole visual sweep.
+     */
+    data class ShortWordLead(val borrowMs: Int, val share: Float, val reach: Float) {
+        /** Lead-in progress of the short word at [u] (0..1 across the borrowed tail). */
+        fun at(u: Float): Float = sweepEasing.transform(u.coerceIn(0f, 1f) * share)
+    }
+
+    /** The active word gives up at most this share of its own sweep. */
+    const val MAX_LEAD_SHARE = 0.35f
+    /** Below this a lead-in is imperceptible; don't reshape anything. */
+    const val MIN_LEAD_MS = 40
+
+    /** The next word's sweep as [sweepMs] would give it, from [ActiveWord.nextDurationMs]. */
+    fun nextSweepMs(activeWord: ActiveWord?, playbackSpeed: Float): Int? {
+        val next = activeWord?.nextDurationMs ?: return null
+        val raw = (next / playbackSpeed).toInt().coerceAtLeast(0)
+        return raw.coerceIn(minSweepFloorMs(), tuning.maxSweepMs)
+    }
+
+    /**
+     * The lead a short next word takes from the active one ([ShortWordLead]),
+     * or null: no short adjacent next word, a repeat or paced active word
+     * (its holds are laid out in voiced time), a paced next word, a wasl
+     * connection (that carry-in already pre-inks the opening), or too little
+     * to borrow.
+     */
+    fun shortWordLead(
+        activeSweepMs: Int?,
+        activePaced: Boolean,
+        activeRepeat: Boolean,
+        nextArabic: String?,
+        nextSweepMs: Int?,
+        nextPaced: Boolean,
+        connected: Boolean,
+    ): ShortWordLead? {
+        if (activeSweepMs == null || nextSweepMs == null || nextArabic == null) return null
+        if (activePaced || activeRepeat || nextPaced || connected) return null
+        val visual = tempoSweepMs(nextSweepMs, nextArabic, paced = false) ?: return null
+        val want = visual - nextSweepMs
+        val borrow = minOf(want, (activeSweepMs * MAX_LEAD_SHARE).toInt())
+        if (borrow < MIN_LEAD_MS) return null
+        val share = borrow.toFloat() / (nextSweepMs + borrow)
+        return ShortWordLead(borrow, share, sweepEasing.transform(share))
+    }
+
+    /**
+     * The active Arabic word's visual wash: its voiced [sweepMs] if a lead-in
+     * already gave it its bloom time ([ledIn]), else the trailing
+     * [tempoSweepMs] fallback (nothing before it to borrow from); shortened by
+     * whatever it lends to a short next word ([lending]).
+     */
+    fun visualSweepMs(
+        sweepMs: Int?,
+        arabic: String?,
+        paced: Boolean,
+        ledIn: Boolean,
+        lending: ShortWordLead?,
+    ): Int? {
+        val base = (if (ledIn) sweepMs else tempoSweepMs(sweepMs, arabic, paced)) ?: return null
+        return lending?.let { (base - it.borrowMs).coerceAtLeast(minSweepFloorMs()) } ?: base
+    }
+
+    /** Whether [arabic] would be tajweed-paced as the active word (gate only). */
+    fun paces(arabic: String, isAyahFinal: Boolean, prevArabic: String?): Boolean =
+        letterPacing(arabic, 1f, isAyahFinal, prevArabic) != null
+
     fun sweepMs(activeWord: ActiveWord?, playbackSpeed: Float): Int? {
         val word = activeWord ?: return null
         val raw = (word.durationMs / playbackSpeed).toInt().coerceAtLeast(0)

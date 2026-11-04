@@ -107,4 +107,7 @@ export interface ActiveWord {
    * same word stays Active (tap the current word to play it from the start).
    */
   activation?: number
+  /** Next timing owner and its karaoke hold at 1x (short-word ink lead-in). */
+  nextWordPosition?: number | null
+  nextDurationMs?: number | null
 }

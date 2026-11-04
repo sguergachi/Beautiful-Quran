@@ -259,7 +259,7 @@ function AyahBlockInner({
                 sweepMs={isActive ? activeSweepMs : null}
                   motion={{ key: `${ayah.surahId}:${ayah.number}:${w.position}`, timing: isActive ? activeWord : null,
                     isAyahFinal: index === words.length - 1, previousArabic: words[index - 1]?.arabic,
-                    nextArabic: words[index + 1]?.arabic }}
+                    nextArabic: words[index + 1]?.arabic, nextIsAyahFinal: index + 1 === words.length - 1 }}
                 activation={isActive ? (activeWord?.activation ?? 0) : 0}
                 searchFlash={searchFocusActive && searchTargets.has(w.position)}
                 searchRecessed={searchTargetAyah && !searchTargets.has(w.position)}
@@ -302,7 +302,7 @@ function AyahBlockInner({
                   sweepMs={isActive ? activeSweepMs : null}
                   motion={{ key: `${ayah.surahId}:${ayah.number}:${w.position}`, timing: isActive ? activeWord : null,
                     isAyahFinal: index === words.length - 1, previousArabic: words[index - 1]?.arabic,
-                    nextArabic: words[index + 1]?.arabic }}
+                    nextArabic: words[index + 1]?.arabic, nextIsAyahFinal: index + 1 === words.length - 1 }}
                   activation={isActive ? (activeWord?.activation ?? 0) : 0}
                   showGloss={!englishOnly && showWordGloss}
                   showTransliteration={showTransliteration}

@@ -111,7 +111,10 @@ internal fun rememberMediaLetterSweep(
             continuedSweepProgress(e.pacing?.atLetters(raw.value) ?: raw.value, e.letterRevealStart)
         }
     }
-    return remember { LetterSweep(progress, feather, curve, raw, letters) }
+    val own = remember {
+        derivedStateOf { entry.value.pacing?.at(raw.value) ?: raw.value }
+    }
+    return remember { LetterSweep(progress, feather, curve, raw, letters, own) }
 }
 
 /** Re-says have independent occurrence windows; only the cosmetic tint dissolve uses wall time. */

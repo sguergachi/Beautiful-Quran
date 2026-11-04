@@ -1,4 +1,5 @@
 import { tajweedCurve, voicedLetters, type PacingCurve } from '../../domain/tajweedPacing'
+import { cubicBezierEase } from '../theme/Fade'
 /**
  * Visual word-ink policy — port of Android `ui/reader/InkEngine.kt`.
  * Pure decision functions; no DOM.
@@ -200,6 +201,70 @@ export function tempoSweepMs(
   if (voiced <= 0 || voiced >= letters) return sweep
   const stretch = Math.min(letters / voiced, MAX_TEMPO_STRETCH)
   return Math.min(tuning.maxSweepMs, Math.max(sweep, Math.trunc(sweep * stretch)))
+}
+
+/** Android `InkEngine.ShortWordLead`: a short next word borrows its bloom
+ * time from the end of the active word instead of trailing past its own end. */
+export interface ShortWordLead {
+  borrowMs: number
+  share: number
+  reach: number
+}
+export const MAX_LEAD_SHARE = 0.35
+export const MIN_LEAD_MS = 40
+const sweepEase = (x: number) =>
+  cubicBezierEase(x, tuning.sweepEaseX1, tuning.sweepEaseY1, tuning.sweepEaseX2, tuning.sweepEaseY2)
+/** Lead-in progress of the short word at [u] (0..1 across the borrowed tail). */
+export function leadAt(lead: ShortWordLead, u: number): number {
+  return sweepEase(Math.min(1, Math.max(0, u)) * lead.share)
+}
+/** Android `InkEngine.nextSweepMs`. */
+export function nextSweepMs(activeWord: ActiveWord | null | undefined, playbackSpeed: number): number | null {
+  const next = activeWord?.nextDurationMs
+  if (next == null) return null
+  const raw = Math.max(0, Math.trunc(next / playbackSpeed))
+  return Math.min(tuning.maxSweepMs, Math.max(minSweepFloorMs(), raw))
+}
+/** Android `InkEngine.shortWordLead`. */
+export function shortWordLead(
+  activeSweepMs: number | null,
+  activePaced: boolean,
+  activeRepeat: boolean,
+  nextArabic: string | null | undefined,
+  nextSweep: number | null,
+  nextPaced: boolean,
+  connected: boolean,
+): ShortWordLead | null {
+  if (activeSweepMs == null || nextSweep == null || nextArabic == null) return null
+  if (activePaced || activeRepeat || nextPaced || connected) return null
+  const visual = tempoSweepMs(nextSweep, nextArabic, false)
+  if (visual == null) return null
+  const borrow = Math.min(visual - nextSweep, Math.trunc(activeSweepMs * MAX_LEAD_SHARE))
+  if (borrow < MIN_LEAD_MS) return null
+  const share = borrow / (nextSweep + borrow)
+  return { borrowMs: borrow, share, reach: sweepEase(share) }
+}
+/** Android `InkEngine.visualSweepMs`. */
+export function visualSweepMs(
+  sweep: number | null,
+  arabic: string | null | undefined,
+  paced: boolean,
+  ledIn: boolean,
+  lending: ShortWordLead | null,
+): number | null {
+  const base = ledIn ? sweep : tempoSweepMs(sweep, arabic, paced)
+  if (base == null) return null
+  return lending ? Math.max(minSweepFloorMs(), base - lending.borrowMs) : base
+}
+/** Android `InkEngine.paces`: the tajweed gate alone. */
+export function paces(arabic: string, isAyahFinal: boolean, prevArabic?: string): boolean {
+  const t = getTuning()
+  if (!t.tajweedPacing) return false
+  return tajweedCurve(arabic, 1, {
+    madd: t.holdMadd, ghunnah: t.holdGhunnah, waqf: t.holdWaqf, connect: t.holdConnect,
+    isAyahFinal, cruiseCap: t.cruiseCap, waqfShare: t.waqfShare, waqfLengthScale: t.waqfLengthScale,
+    creep: t.holdCreep,
+  }, prevArabic) != null
 }
 
 /** Android InkEngine.pacing: capture the tuned curve once at Active entry. */

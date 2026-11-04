@@ -100,16 +100,53 @@ internal fun rememberAyahInkPack(
         playbackSpeed = playbackSpeed,
         verse = ayah,
     )
+    // A short next word borrows its bloom time from this word's tail rather
+    // than trailing past its own end (InkEngine.shortWordLead).
+    val leadNext = ayah.words.getOrNull(activeIndex + 1)
+    val outgoingLead = remember(activeIndex, activation, activeWord?.startMs, activeWord?.reciterId, activeWord?.fromTap, playbackSpeed) {
+        leadNext?.takeIf {
+            activeIndex >= 0 && activeWord?.fromTap != true &&
+                activeWord?.nextWordPosition == it.position
+        }?.let { next ->
+            InkEngine.shortWordLead(
+                activeSweepMs = sweepMs,
+                activePaced = pacing != null,
+                activeRepeat = activeWord?.isRepeat == true,
+                nextArabic = next.arabic,
+                nextSweepMs = InkEngine.nextSweepMs(activeWord, playbackSpeed),
+                nextPaced = InkEngine.paces(
+                    next.arabic,
+                    isAyahFinal = next.position == ayah.words.lastOrNull()?.position,
+                    prevArabic = ayah.words[activeIndex].arabic,
+                ),
+                connected = outgoingConnection != null,
+            )
+        }
+    }
+    val leadWindow = rememberShortWordLead(
+        lead = outgoingLead,
+        sweepMs = sweepMs,
+        activation = activation,
+        activeWord = activeWord,
+        playbackSpeed = playbackSpeed,
+        verse = ayah,
+    )
     val previousActive = remember { ActiveWordEntry(activeIndex, activation) }
     val carriedIncoming = remember(activeIndex, activation) {
         previousActive.index == activeIndex - 1 &&
             previousActive.activation == activation
     }
     val incomingHandoff = if (carriedIncoming) previousActive.outgoingHandoff else 0f
+    // Captured at entry: the SideEffect below overwrites the entry with this
+    // word's own outgoing lead after the first frame.
+    val incomingLeadReach = remember(activeIndex, activation) {
+        if (carriedIncoming && incomingConnection == null) previousActive.outgoingLeadReach else 0f
+    }
     SideEffect {
         previousActive.index = activeIndex
         previousActive.activation = activation
         previousActive.outgoingHandoff = outgoingProgress.atHandoff
+        previousActive.outgoingLeadReach = outgoingLead?.reach ?: 0f
     }
     val waslMainFeather = if (pacing != null) {
         InkEngine.pacedFeather()
@@ -125,7 +162,8 @@ internal fun rememberAyahInkPack(
             ),
         )
     } else {
-        0f
+        // A short word led in during its predecessor's tail continues from there.
+        incomingLeadReach
     }
     val fullWaslWindow = remember { mutableStateOf(1f) }
     val waslPrefixes = ayah.words.indices.map { index ->
@@ -147,18 +185,35 @@ internal fun rememberAyahInkPack(
                     feather = waslMainFeather,
                     letterEndProgress = outgoingConnection.prefixFraction,
                 )
+            index == activeIndex && incomingLeadReach > 0f ->
+                WaslPrefix(
+                    windowProgress = fullWaslWindow,
+                    endProgress = incomingLeadReach,
+                    feather = waslMainFeather,
+                    letterEndProgress = incomingLeadReach,
+                )
+            index == activeIndex + 1 && outgoingLead != null ->
+                WaslPrefix(
+                    windowProgress = leadWindow,
+                    endProgress = outgoingLead.reach,
+                    feather = InkEngine.tuning.washFeather,
+                    letterEndProgress = outgoingLead.reach,
+                )
             else -> null
         }
     }
     val motions = rememberInkMotions(
         words = ayah.words,
         inks = inks,
-        // Short words bloom at the reciter's letter pace (InkEngine.tempoSweepMs);
-        // wasl and Paper's lead-in stay on the voiced sweepMs.
-        activeSweepMs = InkEngine.tempoSweepMs(
+        // Short words bloom at the reciter's letter pace, borrowing from the
+        // word before (InkEngine.visualSweepMs); wasl and Paper's lead-in stay
+        // on the voiced sweepMs.
+        activeSweepMs = InkEngine.visualSweepMs(
             sweepMs,
             ayah.words.getOrNull(activeIndex)?.arabic,
             paced = pacing != null,
+            ledIn = incomingLeadReach > 0f,
+            lending = outgoingLead,
         ),
         activeVoicedSweepMs = sweepMs,
         activeRepeatDwellMs = repeatDwellMs,

@@ -628,6 +628,42 @@ class InkEngineTest {
     }
 
     @Test
+    fun `a short word borrows its bloom from the word before, not past its own end`() {
+        // 3:8 Alafasy: بَعۡدَ (579 ms) hands to إِذۡ (503 ms). The tempo floor
+        // asks 754 ms for إِذۡ; up to 35 % of بَعۡدَ is lent instead of trailing.
+        val lead = requireNotNull(InkEngine.shortWordLead(
+            activeSweepMs = 579, activePaced = false, activeRepeat = false,
+            nextArabic = "إِذۡ", nextSweepMs = 503, nextPaced = false, connected = false,
+        ))
+        assertEquals(202, lead.borrowMs)
+        assertEquals(202f / 705f, lead.share, 1e-5f)
+        assertEquals(InkEngine.sweepEasing.transform(lead.share), lead.reach, 1e-6f)
+        assertEquals(0f, lead.at(0f), 0f)
+        assertEquals(lead.reach, lead.at(1f), 1e-6f)
+        // بَعۡدَ finishes early; إِذۡ, led in, ends with its voice (no trailing).
+        assertEquals(377, InkEngine.visualSweepMs(579, "بَعۡدَ", false, ledIn = false, lending = lead))
+        assertEquals(503, InkEngine.visualSweepMs(503, "إِذۡ", false, ledIn = true, lending = null))
+        // Nothing to borrow from: the trailing tempo floor remains the fallback.
+        assertEquals(754, InkEngine.visualSweepMs(503, "إِذۡ", false, ledIn = false, lending = null))
+        // A long predecessor lends exactly what the floor asks.
+        assertEquals(251, InkEngine.shortWordLead(1500, false, false, "إِذۡ", 503, false, false)?.borrowMs)
+    }
+
+    @Test
+    fun `no lead where the voice or another carry already owns the timing`() {
+        fun lead(activePaced: Boolean = false, repeat: Boolean = false, next: String = "إِذۡ",
+                 nextPaced: Boolean = false, connected: Boolean = false, active: Int = 579) =
+            InkEngine.shortWordLead(active, activePaced, repeat, next, 503, nextPaced, connected)
+        assertNull(lead(activePaced = true))
+        assertNull(lead(repeat = true))
+        assertNull(lead(nextPaced = true))
+        assertNull(lead(connected = true))
+        assertNull(lead(next = "هَدَيۡتَنَا")) // not short
+        assertNull(lead(active = 100)) // 35 % of 100 ms is below MIN_LEAD_MS
+        assertNull(InkEngine.shortWordLead(579, false, false, "إِذۡ", null, false, false))
+    }
+
+    @Test
     fun `sweep clamps to the tuned floor and ceiling`() {
         val floor = InkEngine.minSweepFloorMs()
         assertEquals(

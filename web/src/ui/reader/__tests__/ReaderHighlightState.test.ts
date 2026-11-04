@@ -32,6 +32,9 @@ describe('ReaderHighlightState', () => {
       highWater: 2,
       repeatStart: 1,
       activation: 0,
+      // The final segment: no next word to lead into.
+      nextWordPosition: null,
+      nextDurationMs: null,
     })
   })
 
