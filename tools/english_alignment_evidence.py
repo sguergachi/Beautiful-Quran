@@ -38,6 +38,11 @@ class QuranEvidence:
         self.cancelled = cancelled
         self.headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
         self.last_call = 0.0
+        self.connect()
+
+    def connect(self):
+        """Open a fresh MCP session; safe to call again after a stale-session 404."""
+        self.headers.pop("Mcp-Session-Id", None)
         self.rpc("initialize", {"protocolVersion": "2025-03-26", "capabilities": {},
                                 "clientInfo": {"name": "beautiful-quran-chapter-review", "version": "1"}})
         self.grounding = self.call("fetch_grounding_rules", {})
@@ -64,6 +69,13 @@ class QuranEvidence:
                     raw = response.read().decode("utf-8")
                 break
             except urllib.error.HTTPError as error:
+                if error.code == 404:
+                    # A stale or expired session comes back as 404; reopen and retry once.
+                    error.close()
+                    self.connect()
+                    request = urllib.request.Request(self.endpoint, json.dumps({"jsonrpc": "2.0", "id": identifier,
+                        "method": method, "params": params}).encode(), self.headers)
+                    continue
                 if error.code not in {429, 503}:
                     raise
                 delay = retry_delay('', error.headers.get('Retry-After'))
