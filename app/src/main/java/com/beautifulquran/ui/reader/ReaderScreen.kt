@@ -3600,6 +3600,7 @@ fun ReaderScreen(
             }
             // Page-boundary marks for the expanded selector wheel.
             val railPageStarts = remember(content.surah.id) { pageStartByAyah(content.ayahs) }
+            val railHizbAyahs = remember(content.surah.id) { hizbAyahs(content.ayahs) }
             if (!mushafMode && editingAnnotationAyah == 0) {
                 AyahSelectorRail(
                     ayahCount = content.surah.ayahCount,
@@ -3609,6 +3610,7 @@ fun ReaderScreen(
                     placeAyah = parkedPlaceAyah,
                     bookmarkedAyahs = bookmarkedAyahs,
                     pageStarts = railPageStarts,
+                    hizbAyahs = railHizbAyahs,
                     chromeAlpha = { topBarAlpha.value },
                     interactive = !recitingActive,
                     onJumpToAyah = { ayah ->

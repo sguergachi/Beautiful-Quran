@@ -1562,7 +1562,11 @@ vanish entirely while reciting.
 
 The wheel also carries mushaf wayfinding in the faintest ink: where a new page
 opens, a tiny diamond and the page number trail the tick's ayah number, fading
-with focus and edge distance like every other mark on the rail.
+with focus and edge distance like every other mark on the rail. A verse that
+carries a rubʿ al-ḥizb mark (۞) carries a small eight-pointed star — the ۞
+drawn as its two overlapping squares — between its number and any page mark
+on the same verse, in slightly stronger ink so the quarter divisions stay
+findable while scrubbing.
 
 - **Unified with the verse.** The ribbon is composed inside `AyahBlock`, so its
   height *is* the block's height (Arabic, gloss, and translation together). It

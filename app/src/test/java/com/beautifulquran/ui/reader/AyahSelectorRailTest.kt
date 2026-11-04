@@ -80,10 +80,21 @@ class AyahSelectorRailTest {
         assertEquals(mapOf(2 to 5, 5 to 6), pageStartByAyah(ayahs))
     }
 
-    private fun ayah(number: Int, page: Int) = Ayah(
+    @Test
+    fun hizbAyahs_marksVersesCarryingTheRubMark() {
+        val ayahs = listOf(
+            ayah(1, page = 0, text = "بِسْمِ ٱللَّهِ"),
+            ayah(2, page = 0, text = "۞وَإِذِ ٱبْتَلَىٰٓ"),
+            ayah(3, page = 0, text = ""),
+            ayah(4, page = 0, text = "قَوْلٞ مَّعْرُوفٞ ۞"),
+        )
+        assertEquals(setOf(2, 4), hizbAyahs(ayahs))
+    }
+
+    private fun ayah(number: Int, page: Int, text: String = "") = Ayah(
         surahId = 1,
         number = number,
-        text = "",
+        text = text,
         translation = "",
         page = page,
         words = emptyList(),

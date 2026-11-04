@@ -37,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
@@ -56,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.model.Ayah
+import com.beautifulquran.domain.isHizbStop
 import com.beautifulquran.ui.theme.BookTextPaintFlags
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
@@ -156,6 +159,17 @@ internal fun pageStartByAyah(ayahs: List<Ayah>): Map<Int, Int> = buildMap {
     }
 }
 
+/**
+ * Ayah numbers that carry a rubʿ al-ḥizb mark (۞) — the same marker the
+ * playback silence-skip reads. The expanded wheel marks these with a small
+ * eight-pointed star trailing the ayah number.
+ */
+internal fun hizbAyahs(ayahs: List<Ayah>): Set<Int> = buildSet {
+    for (ayah in ayahs) {
+        if (isHizbStop(ayah.text)) add(ayah.number)
+    }
+}
+
 private suspend fun settleDialWheel(
     start: Float,
     velocity: Float,
@@ -207,6 +221,10 @@ internal fun AyahSelectorRail(
     /** Ayah number → mushaf page where a new page opens — a faded diamond and
      *  page number trailing the tick's label on the expanded wheel. */
     pageStarts: Map<Int, Int> = emptyMap(),
+    /** Ayah numbers carrying a rubʿ al-ḥizb mark (۞) — a faded eight-pointed
+     *  star trailing the tick's label on the expanded wheel, before any
+     *  page diamond and number on the same verse. */
+    hizbAyahs: Set<Int> = emptySet(),
     chromeAlpha: () -> Float,
     /** Plain boolean for the touch-target gate, so composition never reads the
      * animated [chromeAlpha] (which would recompose the rail on every fade
@@ -588,19 +606,45 @@ internal fun AyahSelectorRail(
                             numberPaint,
                         )
                     }
-                    // Mushaf page boundary: a tiny diamond and the page number
-                    // trail the ayah number in the faintest ink — optional
-                    // wayfinding metadata, quiet beside the tick's own label.
-                    // Distances stay in from-edge units so mirroring just works.
+                    // Wayfinding marks trail the ayah number in the faintest
+                    // ink, in from-edge units so mirroring just works: first
+                    // the rubʿ al-ḥizb star, then the mushaf page diamond.
+                    var trailX = wheelX + length + 6.dp.toPx() +
+                        numberPaint.measureText(ayah.toString())
+                    if (ayah in hizbAyahs) {
+                        // The ۞ itself: two overlapping squares, one at 45°.
+                        val starHalf = 3.5.dp.toPx()
+                        val starCenter = trailX + 5.dp.toPx() + starHalf
+                        val cx = textAnchor(starCenter)
+                        val squareHalf = starHalf * 0.7071f
+                        val star = Path().apply {
+                            moveTo(cx - squareHalf, y - squareHalf)
+                            lineTo(cx + squareHalf, y - squareHalf)
+                            lineTo(cx + squareHalf, y + squareHalf)
+                            lineTo(cx - squareHalf, y + squareHalf)
+                            close()
+                            moveTo(cx, y - starHalf)
+                            lineTo(cx + starHalf, y)
+                            lineTo(cx, y + starHalf)
+                            lineTo(cx - starHalf, y)
+                            close()
+                        }
+                        drawPath(
+                            path = star,
+                            color = onSurface.copy(
+                                alpha = (0.3f + 0.35f * focus) * arrival * edgeFade,
+                            ),
+                            style = Stroke(width = 1.dp.toPx()),
+                        )
+                        trailX = starCenter + starHalf
+                    }
                     val pageStart = pageStarts[ayah]
                     if (pageStart != null) {
                         val pageInk = onSurface.copy(
                             alpha = (0.14f + 0.2f * focus) * arrival * edgeFade,
                         )
-                        val numberWidth = numberPaint.measureText(ayah.toString())
                         val markHalf = 2.dp.toPx()
-                        val markCenter = wheelX + length + 6.dp.toPx() +
-                            numberWidth + 6.dp.toPx() + markHalf
+                        val markCenter = trailX + 6.dp.toPx() + markHalf
                         withTransform({
                             rotate(45f, Offset(textAnchor(markCenter), y))
                         }) {
