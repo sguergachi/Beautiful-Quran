@@ -168,6 +168,10 @@ class HomeViewModel(
     private val expandedSurahIds = MutableStateFlow<Set<Int>>(emptySet())
     private val wordSearchLoading = MutableStateFlow(false)
     private var searchWarmup: Job? = null
+    private val pinLesson = PinChapterLesson()
+    private val _pinTipChapter = MutableStateFlow<Int?>(null)
+    /** The qualifying visit's chapter, published only after returning to Chapters. */
+    val pinTipChapter: StateFlow<Int?> = _pinTipChapter
 
     val uiState: StateFlow<HomeUiState> =
         combine(
@@ -293,7 +297,23 @@ class HomeViewModel(
             !settings.isEducationDismissed(EducationMoment.PIN_CHAPTER)
     }
 
-    fun dismissPinTip() = settings.dismissEducation(EducationMoment.PIN_CHAPTER)
+    internal fun onListChapterOpened(chapterId: Int, scrolledDown: Boolean) {
+        pinLesson.openFromList(chapterId, scrolledDown && shouldShowPinTip())
+        _pinTipChapter.value = pinLesson.offeredChapter
+    }
+
+    internal fun observePinTipVisit(chapterId: Int, reading: Boolean, onChapters: Boolean, nowMs: Long) {
+        pinLesson.observe(chapterId, reading, onChapters, nowMs)
+        _pinTipChapter.value = pinLesson.offeredChapter
+    }
+
+    internal fun pausePinTipReading(nowMs: Long) = pinLesson.pauseReading(nowMs)
+
+    fun dismissPinTip() {
+        settings.dismissEducation(EducationMoment.PIN_CHAPTER)
+        pinLesson.dismiss()
+        _pinTipChapter.value = null
+    }
 
     fun togglePlayPause() = player.togglePlayPause()
 

@@ -21,7 +21,7 @@ import com.beautifulquran.ui.theme.royalGreenOverlayInk
  * real target — holding it until it is full pins it. The lesson occupies the
  * right side, level with the chapter, and the vellum tapers left toward its
  * number column. [target] is that column's centre in this sheet's own space.
- * The copy and **Got it** stay together when the row is near a sheet edge.
+ * The copy follows the chapter; **Got it** stays at the bottom of the guide.
  */
 @Composable
 internal fun PinChapterTip(
@@ -49,11 +49,7 @@ internal fun PinChapterTip(
                 spotlightCenter = { target },
                 placement = ContextualTipPlacement(bodyAngleDegrees = 0f),
                 actionCenter = {
-                    // Match the copy lane's vertical clamp, with the action
-                    // below its text rather than at the screen's bottom edge.
-                    val halfLane = minOf(150.dp, maxHeight / 2)
-                    val copyY = target.y.coerceIn(halfLane, maxHeight - halfLane)
-                    DpOffset(maxWidth - 68.dp, copyY + halfLane - 40.dp)
+                    DpOffset(maxWidth - 68.dp, maxHeight - 72.dp)
                 },
                 dismissPaperColor = paper,
                 dismissInkColor = ink,

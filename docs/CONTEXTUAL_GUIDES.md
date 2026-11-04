@@ -43,7 +43,8 @@ A guide has four parts:
 - The existing feature target, measured in root space.
 - A royal-green progressive-vellum field placed in unused paper opposite it.
 - Short title and instruction copy describing one concrete gesture.
-- A paper-cutout **Got it** action for explicit dismissal.
+- A paper-cutout **Got it** action at the bottom of the teaching side for
+  explicit dismissal, independent of the target and copy height.
 
 `ContextualTipPlacement` expresses the body as an angle and distance from the
 spotlight. The same vector drives typography, pigment, taper, blur, and the
@@ -150,12 +151,21 @@ For the existing lessons, the acceptance actions are:
   inline note editor opens focused. A short tap does not unbookmark it.
 - Ayah rail: tap the spotlighted collapsed rail, or drag it vertically; the
   guide withdraws as the real scrub wheel blooms.
-- Pin a chapter (Chapters sheet): with nothing pinned, the lesson opens around
-  the fully visible row of the chapter being read. The vellum enters from the
-  right and tapers toward that row's chapter-number column. Copy sits beside
-  the chapter, with **Got it** below the copy; they move together to stay inside
-  the sheet near its top or bottom. The guide stays above all Chapters content.
-  Press and hold that row
+- Pin a chapter (Chapters sheet): manually scroll down the unfiltered chapter
+  list and tap chapter **80–114**. Read that chapter for **more than three
+  minutes**, then close the reader and return to Chapters. Only foreground time
+  with that chapter prepared and the reader unobscured counts; loading,
+  Settings, overlays and background time do not. Reading may resume within the
+  same visit, but separate short visits are not added together. Search results,
+  automatic list repositioning, Continue, bookmarks and voice opens do not
+  start a qualifying visit. A different chapter invalidates it. The visit is
+  held in memory, not across process restarts; developer replay rearms the
+  persisted dismissal but does not bypass this sequence.
+  After return settles, with nothing pinned and that chapter's row fully in
+  view, the lesson opens. Its vellum enters from the right with a pointed,
+  softly feathered taper toward the chapter-number column. Copy sits beside
+  the chapter; **Got it** stays at the bottom right. The guide stays above all
+  Chapters content. Press and hold that row
   while the guide is up; the row fills evenly, and holding it full pins it
   (haptic tick) and completes the lesson (pinning any row does). Releasing
   early drains the fill and leaves the guide up. **Got it**, Back, scrolling

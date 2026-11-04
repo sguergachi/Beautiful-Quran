@@ -535,7 +535,9 @@ and ruby ribbon remain present beneath the translucent veil. Low-amplitude,
 domain-warped pigment pooling, fibre absorption, and paper tooth continue from
 the body through the transition, becoming most legible in the translucent wash,
 with no visible slices, bands, scallops, or drawn contour. The ribbon remains
-fully exposed on its own side. Parchment type settles partly into that feather: “Add a note —
+fully exposed on its own side. The target-facing reservoir has sloping
+shoulders and a more pointed apex, while the diffusion veil stays soft.
+Parchment type settles partly into that feather: “Add a note —
 Press and hold this ribbon,” while a compact area preserved from the spill
 uses the reader theme's own paper color as its dismissal button at the
 thumb-reachable bottom of the teaching side. An independent soft pigment
@@ -1760,7 +1762,11 @@ in the list keeps their place. Stored as `Settings.pinnedSurahIds`. The web
 mirrors it (`docs/WEB.md` §6.3) in the same Continue green, `--green-wash`.
 
 Press-and-hold is taught by a contextual guide (`PinChapterTip`, behind the
-developer guide gate like every lesson). It never opens during a scroll,
+developer guide gate like every lesson). It is offered only after manually
+scrolling down to chapter 80 or later, opening it, reading for more than three
+foreground minutes, and returning to Chapters. The copy enters from the right
+toward the chapter's number column; **Got it** stays at the bottom right.
+It never opens during a scroll,
 and leaving Chapters by any route while it is up puts it away, so it can
 never hold the stack or Back from behind the reader. See
 [CONTEXTUAL_GUIDES.md](CONTEXTUAL_GUIDES.md).

@@ -100,6 +100,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import android.os.Build
+import android.os.SystemClock
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.input.key.type
@@ -123,6 +124,12 @@ import androidx.compose.animation.core.Animatable
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import com.beautifulquran.R
 import com.beautifulquran.data.model.Surah
@@ -231,6 +238,9 @@ fun HomeScreen(
     coverSheetVisible: Boolean = true,
     /** A reader turn has committed, so its parked place should be revealed on return. */
     readerVisitActive: Boolean = false,
+    /** Actual chapter identity and unobscured, prepared reader visibility. */
+    readingChapterId: Int = 0,
+    readerReadingActive: Boolean = false,
     /** The returning chapter sheet is close enough to prepare its entering ribbon lane. */
     chapterRibbonReady: Boolean = true,
     /** Number of saved verses; zero removes the Home-page ribbon entirely. */
@@ -288,6 +298,17 @@ fun HomeScreen(
     // Search mode: field focused or a query still on the sheet (results stay
     // after the keyboard dismisses). Float stays gone for the whole stretch.
     val searchActive = searchFocused || searching
+    var scrolledDownForPinTip by remember { mutableStateOf(false) }
+    val pinTipScroll = remember(coverSheetVisible, searchActive) {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (coverSheetVisible && !searchActive && source == NestedScrollSource.UserInput && consumed.y < 0f) {
+                    scrolledDownForPinTip = true
+                }
+                return Offset.Zero
+            }
+        }
+    }
     val showFloatingPlayback = shouldShowFloatingPlayback(
         nowPlayingPresent = floatingPlayback != null,
         coverSheetVisible = coverSheetVisible,
@@ -585,8 +606,17 @@ fun HomeScreen(
 
     BackHandler(enabled = searchFocused) { focusManager.clearFocus() }
 
-    // The pinning lesson: offered once, on a settled sheet with nothing
-    // pinned yet, around the fully visible row of the chapter being read.
+    // Only a qualifying long read reached by hand-scrolling the chapter list
+    // can offer pinning. Visibility boundaries account for time without a ticker.
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val readingForPinTip = readerReadingActive && lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    DisposableEffect(readingChapterId, readingForPinTip, chapterRibbonReady) {
+        viewModel.observePinTipVisit(readingChapterId, readingForPinTip, chapterRibbonReady, SystemClock.elapsedRealtime())
+        onDispose {
+            viewModel.pausePinTipReading(SystemClock.elapsedRealtime())
+        }
+    }
+    val pinTipChapter by viewModel.pinTipChapter.collectAsStateWithLifecycle()
     var pinTipOpen by remember { mutableStateOf(false) }
     var pinTipRendered by remember { mutableStateOf(false) }
     fun closePinTip() {
@@ -600,6 +630,7 @@ fun HomeScreen(
     // Never during a scroll: it would open and be put away by that same
     // scroll, spent without being seen.
     val pinTipEligible = coverSheetVisible && chapterRibbonReady && !searchActive &&
+        pinTipChapter != null && pinTipChapter == continueSurahId &&
         uiState.pinned.isEmpty() && continueRowVisible && !docking && !undocking &&
         !transportOnScreen && placeRowMeasured && !listScrolling
     LaunchedEffect(pinTipEligible) {
@@ -616,7 +647,8 @@ fun HomeScreen(
     // Leaving Chapters by any route (a row, the rosette, the ribbon, a swipe)
     // puts the lesson away, so it never holds the stack or Back from behind
     // the reader.
-    LaunchedEffect(coverSheetVisible) {
+    LaunchedEffect(coverSheetVisible, searchActive) {
+        if (!coverSheetVisible || searchActive) scrolledDownForPinTip = false
         if (!coverSheetVisible && pinTipOpen) closePinTip()
     }
     LaunchedEffect(pinTipOpen, pinTipRendered) {
@@ -770,6 +802,8 @@ fun HomeScreen(
                             )
                         },
                         onClick = {
+                            viewModel.onListChapterOpened(surah.id, scrolledDownForPinTip && !searchActive)
+                            scrolledDownForPinTip = false
                             focusManager.clearFocus()
                             // Leaving for the reader puts the lesson away with it.
                             if (pinTipOpen) closePinTip()
@@ -813,6 +847,7 @@ fun HomeScreen(
                     modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .nestedScroll(pinTipScroll)
                     .verticalFadingEdges(
                         color = MaterialTheme.colorScheme.background,
                         // The feather under the search field. It is the list's
