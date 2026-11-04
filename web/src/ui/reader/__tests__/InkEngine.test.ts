@@ -188,3 +188,46 @@ describe('InkEngine', () => {
   })
 
 })
+
+describe('tempo sweep floor (Android InkEngine.tempoSweepMs parity)', () => {
+  beforeEach(() => resetTuning())
+  it('blooms a short word at the reciter letter pace, not the word pace', async () => {
+    const { tempoSweepMs, setTuning } = await import('../InkEngine')
+    // 3:8 Alafasy: بَعۡدَ 579, إِذۡ 503, هَدَيۡتَنَا 1208 ms.
+    expect(tempoSweepMs(503, 'إِذۡ', false)).toBe(754)
+    expect(tempoSweepMs(579, 'بَعۡدَ', false)).toBe(579)
+    expect(tempoSweepMs(1208, 'هَدَيۡتَنَا', false)).toBe(1208)
+    expect(tempoSweepMs(503, 'إِذۡ', true)).toBe(503)
+    expect(tempoSweepMs(null, 'إِذۡ', false)).toBeNull()
+    setTuning({ tempoSweepLetters: 6 })
+    expect(tempoSweepMs(503, 'إِذۡ', false)).toBe(1006)
+    setTuning({ tempoSweepLetters: 0 })
+    expect(tempoSweepMs(503, 'إِذۡ', false)).toBe(503)
+  })
+})
+
+describe('short-word lead (Android InkEngine.shortWordLead parity)', () => {
+  beforeEach(() => resetTuning())
+  it('borrows the short word bloom from the word before', async () => {
+    const { shortWordLead, visualSweepMs, leadAt } = await import('../InkEngine')
+    // 3:8 Alafasy: بَعۡدَ 579 ms hands to إِذۡ 503 ms.
+    const lead = shortWordLead(579, false, false, 'إِذۡ', 503, false, false)!
+    expect(lead.borrowMs).toBe(202)
+    expect(lead.share).toBeCloseTo(202 / 705, 6)
+    expect(leadAt(lead, 0)).toBe(0)
+    expect(leadAt(lead, 1)).toBeCloseTo(lead.reach, 6)
+    expect(visualSweepMs(579, 'بَعۡدَ', false, false, lead)).toBe(377)
+    expect(visualSweepMs(503, 'إِذۡ', false, true, null)).toBe(503)
+    expect(visualSweepMs(503, 'إِذۡ', false, false, null)).toBe(754)
+    expect(shortWordLead(1500, false, false, 'إِذۡ', 503, false, false)?.borrowMs).toBe(251)
+    const none: [number, boolean, boolean, string, number, boolean, boolean][] = [
+      [579, true, false, 'إِذۡ', 503, false, false],
+      [579, false, true, 'إِذۡ', 503, false, false],
+      [579, false, false, 'إِذۡ', 503, true, false],
+      [579, false, false, 'إِذۡ', 503, false, true],
+      [579, false, false, 'هَدَيۡتَنَا', 503, false, false],
+      [100, false, false, 'إِذۡ', 503, false, false],
+    ]
+    for (const args of none) expect(shortWordLead(...args)).toBeNull()
+  })
+})

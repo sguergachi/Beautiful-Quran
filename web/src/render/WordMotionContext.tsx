@@ -8,11 +8,14 @@ export class WordMotionRegistry {
   targets = new Map<string, WashTarget>()
   prefixes = new Map<string, number>()
   progress = new Map<string, number>()
+  /** Prefixes laid by a short-word lead-in (not wasl): that word skips its trailing stretch. */
+  led = new Set<string>()
   private activation: number | undefined
   enter(activation: number): void {
     if (this.activation !== undefined && this.activation !== activation) {
       this.prefixes.clear()
       this.progress.clear()
+      this.led.clear()
     }
     this.activation = activation
   }

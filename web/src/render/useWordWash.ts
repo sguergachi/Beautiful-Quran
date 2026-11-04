@@ -12,6 +12,11 @@ import {
   getTuning,
   InkState,
   pacing,
+  leadAt,
+  nextSweepMs,
+  paces,
+  shortWordLead,
+  visualSweepMs,
   type InkWord,
 } from '../ui/reader/InkEngine'
 import { tarjiSignal } from '../playback/tarjiSignal'
@@ -31,6 +36,8 @@ export interface WordMotion {
   isAyahFinal: boolean
   previousArabic?: string
   nextArabic?: string
+  /** The next word closes its verse (its waqf hold paces it). */
+  nextIsAyahFinal?: boolean
 }
 /** Shared Arabic/English wash lifecycle. Active→Recited keeps the residual;
  * seek/recess/plain cancel it. All entry tuning is latched until completion.
@@ -162,6 +169,8 @@ export function useWordWash({
       ? englishRevealDurationMs(ordinaryDuration, motion?.timing?.spokenMs, tarjiSignal.speed)
       : ordinaryDuration
     const from = !english ? (registry.prefixes.get(key) ?? 0) : 0
+    // A short word led in during its predecessor's tail already has its bloom time.
+    const ledIn = registry.led.delete(key)
     const curve =
       !english && motion?.timing
         ? pacing(
@@ -208,7 +217,26 @@ export function useWordWash({
           Math.min(connected.prefixFraction + 0.25, 0.55)) /
         (1 + tuning.washFeather)
       : 0
-    const mediaWindow = motion?.timing?.startMs != null ? highlightTimeline.window(motion.timing.startMs, duration) : null
+    // A short next word borrows its bloom from this word's tail (Android
+    // InkEngine.shortWordLead); a short word with nothing to borrow from
+    // trails instead (tempoSweepMs). The wasl carry-in stays on voiced time.
+    const timing = motion?.timing
+    const lead =
+      !english && timing && !curve && motion?.nextArabic &&
+      timing.nextWordPosition === word.position + 1
+        ? shortWordLead(
+            duration, false, timing.isRepeat, motion.nextArabic,
+            nextSweepMs(timing, tarjiSignal.speed),
+            paces(motion.nextArabic, motion.nextIsAyahFinal ?? false, word.arabic),
+            connected != null,
+          )
+        : null
+    const visual = english
+      ? duration
+      : (visualSweepMs(duration, word.arabic, curve != null, ledIn, lead) ?? duration)
+    const mediaWindow = motion?.timing?.startMs != null ? highlightTimeline.window(motion.timing.startMs, visual) : null
+    const voicedWindow = visual === duration ? mediaWindow
+      : motion?.timing?.startMs != null ? highlightTimeline.window(motion.timing.startMs, duration) : null
     let elapsed = 0,
       last = performance.now(),
       frame = 0,
@@ -255,8 +283,12 @@ export function useWordWash({
       }
       lastMedia = currentMedia
       const priorIncomplete = english && prior != null && prior < 1
+      const sample = mediaWindow ? highlightTimeline.frame(now) : null
       const clock = priorIncomplete ? 0 : mediaWindow
-        ? mediaWashProgress(mediaWindow, highlightTimeline.frame(now))
+        ? mediaWashProgress(mediaWindow, sample)
+        : Math.min(1, elapsed / visual)
+      const voicedClock = priorIncomplete ? 0 : voicedWindow
+        ? mediaWashProgress(voicedWindow, sample ?? highlightTimeline.frame(now))
         : Math.min(1, elapsed / duration)
       const shaped = curve
         ? curve.at(clock)
@@ -273,11 +305,21 @@ export function useWordWash({
       if (connected && state.current.state === InkState.Active) {
         registry.prefix(
           nextKey,
-          prefixEnd * connectionProgress(clock, start, completion),
+          prefixEnd * connectionProgress(voicedClock, start, completion),
           tuning.washFeather,
         )
       }
-      if (clock >= 1) {
+      const leading = lead != null && state.current.state === InkState.Active
+      if (leading) {
+        const tail = lead.borrowMs / duration
+        const u = (voicedClock - (1 - tail)) / tail
+        if (u > 0) {
+          registry.prefix(nextKey, leadAt(lead, u), tuning.washFeather)
+          registry.led.add(nextKey)
+        }
+      }
+      // A lending word's own wash ends early; keep ticking to lay the lead.
+      if (clock >= 1 && !(leading && voicedClock < 1)) {
         washing.current = false
         stop.current = null
         clear()

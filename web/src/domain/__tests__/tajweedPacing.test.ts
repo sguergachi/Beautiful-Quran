@@ -21,6 +21,19 @@ describe('Android tajweed pacing parity', () => {
     expect(tajweedCurve(dallin, 1, { madd: false })).toBeNull()
     expect(tajweedCurve(dallin, 1, { cruiseCap: 1 })).toBeNull()
   })
+  it('fades a connected opening in instead of snapping it half inked', () => {
+    // 3:7 زَيۡغٞ فَيَتَّبِعُونَ, reader tuning: 1.92 s word, held opening ف.
+    const hold = { cruiseCap: 1.4185, waqfShare: 0.5932, creep: 0.3 }
+    const wash = tajweedCurve('فَيَتَّبِعُونَ', 1, hold, 'زَيۡغٞ')!.forWash(1.1092)
+    expect(wash.at(100 / 1920)).toBeLessThanOrEqual((100 / 1920) * 1.1)
+    for (let t = 0.01; t <= 0.3; t += 0.01)
+      expect(wash.at(t)).toBeLessThanOrEqual(t * 1.1)
+    let last = 0
+    for (let t = 0; t <= 1; t += 0.001) {
+      expect(wash.at(t)).toBeGreaterThanOrEqual(last - 1e-9)
+      last = wash.at(t)
+    }
+  })
   it('centres the faded edge on the held letter and settles at the voiced boundary', () => {
     const c = tajweedCurve('أَوۡلِيَآءَ')!
     for (const feather of [0, 0.4, 1.1092, 2]) {
@@ -116,4 +129,15 @@ it('matches the Android engine numeric curves', () => {
     const curve = tajweedCurve(word, 1, { ghunnah: true, isAyahFinal: true })!
     values.forEach((value, i) => expect(curve.at(i / 10)).toBeCloseTo(value, 6))
   }
+})
+
+describe('voiced letters (Android parity)', () => {
+  it('skips what is written but not said', async () => {
+    const { voicedLetters } = await import('../tajweedPacing')
+    expect(voicedLetters('إِذۡ')).toBe(2)
+    expect(voicedLetters('لَا')).toBe(2)
+    expect(voicedLetters('بَعۡدَ')).toBe(3)
+    expect(voicedLetters('ٱلضَّآلِّينَ')).toBe(5)
+    expect(voicedLetters('قَالُوٓاْ')).toBe(4)
+  })
 })

@@ -147,6 +147,20 @@ held letter. The unread and fully inked endpoints stay 0 and 1, and the
 hold's times stay unchanged. Without this conversion, a late madd such as
 the alif of `أَوۡلِيَآءَ` (4:144) holds at the end of the word instead.
 
+**Opening ramp.** That centring shifts every interior point by half a
+feather while the origin stays at 0, so the curve's first glide had to cross
+the half feather *plus* its own letter in a sliver of time. On a wasl-entry
+hold (3:7 Alafasy `زَيۡغٞ فَيَتَّبِعُونَ`, a 1.92 s word) the edge reached ~30 %
+in ~100 ms and then parked: the opening snapped half-inked instead of fading
+in. Every paced word (madd, waqf) had a milder version of the same steep
+opening. `forWash` therefore replaces the opening with a straight ramp from
+the origin (`openingRamp`): slope = max(plain linear rate, whatever rejoins
+the curve by 30 % of the word). After it rejoins, holds, cruise and the waqf
+park are untouched; a curve that already opens gently (word-initial madd
+crawl) is unchanged. The ramp is in word-time fractions, so longer words get
+a longer opening fade. Paper's liquid ink reads `atLetters` (no half-feather
+lead-in) and is unaffected. Mirrored in `web/src/domain/tajweedPacing.ts`.
+
 If the Ink Lab audition shows the edge visibly missing letters on long words,
 the measured upgrade is:
 

@@ -17,6 +17,10 @@ export interface ActiveInfo {
   highWater: number
   /** First word of the current repeat chain. Equals [position] when not repeating. */
   repeatStart: number
+  /** Next timing owner (repeat backtrack included), or null at ayah end. */
+  nextPosition?: number | null
+  /** Next segment's karaoke hold, or null at ayah end. Android `ActiveInfo.nextHoldMs`. */
+  nextHoldMs?: number | null
 }
 
 export class PreparedTimings {
@@ -46,6 +50,10 @@ export class PreparedTimings {
       isRepeat: seg.position <= maxBefore,
       highWater: Math.max(maxBefore, seg.position),
       repeatStart: this.repeatStartByIndex[idx]!,
+      nextPosition: next ? next.position : null,
+      nextHoldMs: next
+        ? Math.max(0, (this.segments[idx + 2] ? this.segments[idx + 2]!.startMs : next.endMs) - next.startMs)
+        : null,
     }
   }
 

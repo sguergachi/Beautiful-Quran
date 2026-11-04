@@ -33,16 +33,16 @@ export class PacingCurve {
     readonly letterCount: number,
     readonly hasStrongHold: boolean,
   ) {}
+  /** Centre the wash's soft edge on each hold, then ease the opening in
+   * ([openingRamp]) so the half-feather lead-in is not crossed in a sliver of
+   * time — 3:7 فَيَتَّبِعُونَ used to snap ~30 % inked in ~100 ms. */
   forWash(feather: number): PacingCurve {
     const edge = Math.max(0, feather)
-    return new PacingCurve(
-      this.times,
-      this.positions.map((x) =>
-        x <= 0 || x >= 1 ? x : (x + edge / 2) / (1 + edge),
-      ),
-      this.letterCount,
-      this.hasStrongHold,
+    const mapped = this.positions.map((x) =>
+      x <= 0 || x >= 1 ? x : (x + edge / 2) / (1 + edge),
     )
+    const [times, positions] = openingRamp(this.times, mapped)
+    return new PacingCurve(times, positions, this.letterCount, this.hasStrongHold)
   }
   at(t: number): number {
     if (t >= 1) return 1
@@ -57,6 +57,64 @@ export class PacingCurve {
       ((this.positions[i + 1] - this.positions[i]) * (c - this.times[i])) / span
     )
   }
+}
+/** Letters the reciter voices (silent wasl / assimilated lām / silent alif
+ * excluded). Port of Android `TajweedPacing.voicedLetters`. */
+export function voicedLetters(arabic: string): number {
+  const events = tokenize(arabic)
+  return events.filter((_, i) => weight(events, i) > 0).length
+}
+/** Share of a paced word by which the opening ramp rejoins the curve. */
+const OPENING_RAMP_SHARE = 0.3
+/** The opening ramp is never slower than the plain linear sweep. */
+const OPENING_MIN_SLOPE = 1
+/** Mirror of Android `TajweedPacing.openingRamp`: a straight ramp from the
+ * origin at max(plain rate, slope that meets the curve by 30 %), then the
+ * curve unchanged. A gently opening curve is returned as is. */
+export function openingRamp(
+  times: number[],
+  positions: number[],
+): [number[], number[]] {
+  const at = (t: number) => {
+    let i = times.length - 1
+    while (i > 0 && times[i] > t) i--
+    if (i >= times.length - 1) return positions[positions.length - 1]
+    const span = times[i + 1] - times[i]
+    if (span <= 0) return positions[i + 1]
+    return positions[i] + ((positions[i + 1] - positions[i]) * (t - times[i])) / span
+  }
+  const limit = OPENING_RAMP_SHARE
+  const slope = Math.max(OPENING_MIN_SLOPE, at(limit) / limit)
+  let meet = NaN
+  for (let i = 0; i < times.length - 1; i++) {
+    const t0 = times[i],
+      t1 = times[i + 1]
+    if (t1 <= t0) continue
+    if (t0 > limit) break
+    const p0 = positions[i],
+      p1 = positions[i + 1]
+    const curveSlope = (p1 - p0) / (t1 - t0)
+    const gap0 = p0 - slope * t0
+    if (t0 > 0 && gap0 <= 0) {
+      meet = t0
+      break
+    }
+    if (p1 - slope * t1 <= 0) {
+      const denom = slope - curveSlope
+      meet = denom > 0 ? clamp(t0 + gap0 / denom, t0, t1) : t1
+      break
+    }
+  }
+  if (Number.isNaN(meet) || meet <= 0) return [times, positions]
+  const outT = [0, meet]
+  const outP = [0, slope * meet]
+  for (let i = 0; i < times.length; i++) {
+    if (times[i] > meet) {
+      outT.push(times[i])
+      outP.push(positions[i])
+    }
+  }
+  return [outT, outP]
 }
 interface Event {
   base: string

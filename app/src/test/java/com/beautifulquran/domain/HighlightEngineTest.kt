@@ -17,6 +17,21 @@ class HighlightEngineTest {
     )
 
     @Test
+    fun `active info carries the next word's karaoke hold`() {
+        val segs = listOf(
+            Segment(position = 5, startMs = 3648, endMs = 4227),
+            Segment(position = 6, startMs = 4227, endMs = 4700),
+            Segment(position = 7, startMs = 4730, endMs = 5938),
+        )
+        val prepared = HighlightEngine.PreparedTimings.prepare(segs)
+        // 6 holds from its start until 7 starts, gap included.
+        assertEquals(503L, prepared.activeInfo(3700)?.nextHoldMs)
+        // The last word's hold is its own span.
+        assertEquals(1208L, prepared.activeInfo(4300)?.nextHoldMs)
+        assertNull(prepared.activeInfo(5000)?.nextHoldMs)
+    }
+
+    @Test
     fun `empty segments highlight nothing`() {
         assertNull(HighlightEngine.activeWord(emptyList(), 500))
     }
