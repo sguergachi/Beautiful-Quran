@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.util.Log
 import com.beautifulquran.DevProfiling
+import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
@@ -65,7 +66,7 @@ data class PlayerUiState(
 )
 
 /** Only a deliberate seek, automatic repeat, or playlist replacement starts
- * a new ink performance. Source corrections and skipped silence never do. */
+ * a new ink performance. Source corrections never do. */
 internal fun discontinuityRestartsInk(reason: Int): Boolean =
     reason == Player.DISCONTINUITY_REASON_SEEK ||
         reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION ||
@@ -75,10 +76,9 @@ internal fun PlaybackPositionEvents.afterDiscontinuity(
     reason: Int,
     itemChanged: Boolean = false,
     positionMs: Long = 0L,
-    keepInk: Boolean = false,
 ): PlaybackPositionEvents = copy(
     clockId = clockId + 1L,
-    inkId = inkId + if (!keepInk && discontinuityRestartsInk(reason)) 1L else 0L,
+    inkId = inkId + if (discontinuityRestartsInk(reason)) 1L else 0L,
     reason = reason,
     itemChanged = itemChanged,
     positionMs = positionMs,
@@ -96,32 +96,6 @@ internal fun filledEmptyPlaylist(wasEmpty: Boolean, isEmpty: Boolean, reason: In
 
 internal fun PlaybackPositionEvents.afterFirstPlaylist(positionMs: Long): PlaybackPositionEvents =
     afterDiscontinuity(Player.DISCONTINUITY_REASON_REMOVE, itemChanged = true, positionMs = positionMs)
-
-/**
- * Same-verse silence seeks that must not restart the letter wash.
- * Matched by landing position so a word tap or a verse change cannot consume
- * the mark, and a mark cannot keep the ink of a different jump.
- */
-internal class SilenceInk {
-    private val marks = ArrayDeque<Long>()
-
-    fun arm(positionMs: Long) {
-        if (marks.size >= 3) marks.removeFirst()
-        marks.addLast(positionMs)
-    }
-
-    fun clear() {
-        marks.clear()
-    }
-
-    fun claims(positionMs: Long, itemChanged: Boolean): Boolean {
-        if (itemChanged || marks.isEmpty()) return false
-        val index = marks.indexOfFirst { it == positionMs }
-        if (index < 0) return false
-        marks.removeAt(index)
-        return true
-    }
-}
 
 /**
  * UI-process handle on the playback session. Wraps a [MediaController]
@@ -181,18 +155,8 @@ class PlayerController(private val context: Context) {
         skipSilenceGaps = enabled
     }
 
-    /** A seek has been issued and the playhead has not reported the landing yet. */
-    @Volatile
-    private var silenceSkipHoldUntilMs = 0L
-
-    private val silenceInk = SilenceInk()
-
-    internal fun silenceSkipHeld(): Boolean =
-        android.os.SystemClock.elapsedRealtime() < silenceSkipHoldUntilMs
-
-    private fun holdSilenceSkip() {
-        silenceSkipHoldUntilMs = android.os.SystemClock.elapsedRealtime() + 500L
-    }
+    private val openingPositionMs: Long
+        get() = if (skipSilenceGaps) C.TIME_UNSET else 0L
 
     /** Measured quiet the word clock still treats as a sounding word, per reciter. */
     private val silenceByReciter = HashMap<Int, Map<Int, List<AudibleSilence>>>()
@@ -282,10 +246,7 @@ class PlayerController(private val context: Context) {
             newPosition: Player.PositionInfo,
             reason: Int,
         ) {
-            silenceSkipHoldUntilMs = 0L
             val itemChanged = oldPosition.mediaItemIndex != newPosition.mediaItemIndex
-            val keepInk = reason == Player.DISCONTINUITY_REASON_SEEK &&
-                silenceInk.claims(newPosition.positionMs, itemChanged)
             _state.value = _state.value.copy(
                 positionIntentId = _state.value.positionIntentId +
                     if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) 1L else 0L,
@@ -294,12 +255,11 @@ class PlayerController(private val context: Context) {
                     reason = reason,
                     itemChanged = itemChanged,
                     positionMs = newPosition.positionMs,
-                    keepInk = keepInk,
                 ),
             )
             DevProfiling.recordEvent(
                 "controller-discontinuity reason=$reason old=${oldPosition.mediaItem?.mediaId}@${oldPosition.positionMs} " +
-                    "new=${newPosition.mediaItem?.mediaId}@${newPosition.positionMs} keepInk=$keepInk " +
+                    "new=${newPosition.mediaItem?.mediaId}@${newPosition.positionMs} " +
                     "revisions=${_state.value.positionEvents}",
             )
         }
@@ -384,7 +344,7 @@ class PlayerController(private val context: Context) {
         if (endedLoopHandledIndex == idx) return false
         endedLoopHandledIndex = idx
         beginPositionIntent()
-        player.seekTo(idx, 0L)
+        player.seekTo(idx, openingPositionMs)
         player.play()
         return true
     }
@@ -407,7 +367,7 @@ class PlayerController(private val context: Context) {
                 endedLoopHandledIndex = idx
             }
             beginPositionIntent()
-            player.seekTo(firstIdx, 0L)
+            player.seekTo(firstIdx, openingPositionMs)
             player.play()
             return true
         }
@@ -489,11 +449,10 @@ class PlayerController(private val context: Context) {
 
         // Latest load wins: abandon any in-flight connect/play from an earlier
         // chapter so rapid navigation cannot start the superseded surah first.
-        silenceInk.clear()
         val epoch = commands.invalidate()
-        withController(epoch, holdSilenceSkip = true) { c ->
+        withController(epoch, positionIntent = true) { c ->
             val startPos = if (queue.startIndex == 0 && queue.hasBasmalahLeadIn) 0L
-            else startPositionMs
+            else startPositionMs.takeUnless { it == 0L } ?: openingPositionMs
             c.setMediaItems(queue.items, queue.startIndex, startPos)
             // A quiet load must not inherit play intent from the old queue.
             c.playWhenReady = autoplay
@@ -506,17 +465,14 @@ class PlayerController(private val context: Context) {
      * Runs [block] on the main scope with a connected controller, serialised
      * with every other command. [epoch] is the gate snapshot at issue time —
      * if [PlayerCommandGate.invalidate] ran since then, the body is skipped.
-     * [positionIntent] names the requested place before callbacks arrive;
-     * silence skips opt out because they continue the current performance.
+     * [positionIntent] names the requested place before callbacks arrive.
      */
     private fun withController(
         epoch: Long = commands.epoch,
-        holdSilenceSkip: Boolean = false,
-        positionIntent: Boolean = holdSilenceSkip,
+        positionIntent: Boolean = false,
         block: suspend (MediaController) -> Unit,
     ) {
         if (positionIntent) beginPositionIntent()
-        if (holdSilenceSkip) holdSilenceSkip()
         scope.launch {
             commands.runIfCurrent(epoch) {
                 val c = ensureController()
@@ -552,25 +508,19 @@ class PlayerController(private val context: Context) {
         positionMs: Long,
         play: Boolean,
         playIfOutOfRange: Boolean = play,
-        keepInk: Boolean = false,
-    ) = withController(holdSilenceSkip = true, positionIntent = !keepInk) { c ->
-        if (!keepInk) silenceInk.clear()
+    ) = withController(positionIntent = true) { c ->
         val index = playlistIndex(ayah)
         val inRange = index in 0 until c.mediaItemCount
         if (inRange) {
-            val sameItem = c.currentMediaItemIndex == index
-            if (keepInk && sameItem && c.currentPosition != positionMs) {
-                silenceInk.arm(positionMs)
-            }
             c.seekTo(index, positionMs)
         }
         if ((inRange && play) || (!inRange && playIfOutOfRange)) c.play()
     }
 
-    fun seekToAyah(ayah: Int) = seekTo(ayah, 0L, play = false)
+    fun seekToAyah(ayah: Int) = seekTo(ayah, openingPositionMs, play = false)
 
     /** Restart the chapter-opening basmalah clip (no-op when the playlist has none). */
-    fun seekToBasmalah() = withController(holdSilenceSkip = true) { c ->
+    fun seekToBasmalah() = withController(positionIntent = true) { c ->
         if (!basmalahLeadIn || c.mediaItemCount == 0) return@withController
         c.seekTo(0, 0L)
     }
@@ -578,24 +528,20 @@ class PlayerController(private val context: Context) {
     /** Seek to [ayah] in the already-loaded playlist and play — also resumes
      * when the index is out of range (e.g. a stale jump request). When seeking
      * to ayah 1 of a basmalah-preface surah, restarts from the basmalah clip. */
-    fun playLoadedFromAyah(ayah: Int) = withController(holdSilenceSkip = true) { c ->
+    fun playLoadedFromAyah(ayah: Int) = withController(positionIntent = true) { c ->
         val startAtBasmalah = basmalahLeadIn && ayah == 1
         val index = if (startAtBasmalah) 0 else playlistIndex(ayah)
-        if (index in 0 until c.mediaItemCount) c.seekTo(index, 0L)
+        if (index in 0 until c.mediaItemCount) c.seekTo(index, openingPositionMs)
         c.play()
     }
 
     fun seekToWord(ayah: Int, positionMs: Long) = seekTo(ayah, positionMs, play = false)
 
-    /** Seek inside the current verse without restarting the letter wash. */
-    fun skipSilenceWithinAyah(ayah: Int, positionMs: Long) =
-        seekTo(ayah, positionMs, play = false, keepInk = true)
-
     fun seekToWordAndPlay(ayah: Int, positionMs: Long) = seekTo(ayah, positionMs, play = true, playIfOutOfRange = false)
 
-    fun next() = withController(holdSilenceSkip = true) { it.seekToNextMediaItem() }
+    fun next() = withController(positionIntent = true) { it.seekToNextMediaItem() }
 
-    fun previous() = withController(holdSilenceSkip = true) { it.seekToPreviousMediaItem() }
+    fun previous() = withController(positionIntent = true) { it.seekToPreviousMediaItem() }
 
     fun setRepeatMode(mode: Int) = withController { it.repeatMode = mode }
 
@@ -614,7 +560,6 @@ class PlayerController(private val context: Context) {
         clearError()
         beginPositionIntent()
         resetRepeatState()
-        silenceInk.clear()
         basmalahLeadIn = false
         voiceEnergy.release()
         val epoch = commands.invalidate()
@@ -653,7 +598,7 @@ class PlayerController(private val context: Context) {
 
                 if (idx > lastIdx) {
                     beginPositionIntent()
-                    c.seekTo(firstIdx, 0L)
+                    c.seekTo(firstIdx, openingPositionMs)
                     c.play()
                     syncFromController(c, forcePlaying = true)
                     delay(REPEAT_SEEK_SETTLE_MS)
@@ -663,7 +608,7 @@ class PlayerController(private val context: Context) {
                 if (idx == lastIdx && c.currentPosition >= repeatBoundary(c)) {
                     endedLoopHandledIndex = idx
                     beginPositionIntent()
-                    c.seekTo(firstIdx, 0L)
+                    c.seekTo(firstIdx, openingPositionMs)
                     c.play()
                     syncFromController(c, forcePlaying = true)
                     delay(REPEAT_SEEK_SETTLE_MS)

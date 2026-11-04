@@ -3,10 +3,12 @@ package com.beautifulquran.domain
 import com.beautifulquran.data.model.Segment
 
 /**
- * Silence shorter than this is left alone. A seek that close to a word
- * costs more than the quiet it removes.
+ * Keep the stored highlight boundary when the measured voice is this close.
  */
 internal const val SILENCE_SLACK_MS = 40L
+
+/** Preserve the soft attack before a timing mark (Hani 4:148 is 292 ms late). */
+internal const val HIZB_PREROLL_MS = 350L
 
 /** Rubʿ al-ḥizb mark in Uthmani text (۞). */
 internal const val HIZB_MARKER = '\u06DE'
@@ -17,13 +19,13 @@ internal fun silenceSkipAllowed(style: String): Boolean = style == "Murattal"
 internal fun isHizbStop(ayahText: String): Boolean = HIZB_MARKER in ayahText
 
 /**
- * Where a hizb verse's opening should land, or null when this playhead
- * should keep going. Ordinary verses return null: their breath plays through.
- * The landing is the first word's voice, on the file clock.
+ * Default audio entry for a long hizb opening. Ordinary verses return null:
+ * their breath plays through.
+ * Leave some quiet before the voice: a highlight mark is not a sample-accurate
+ * audio edit. Tiny openings play through.
  */
-internal fun hizbOpeningSeekMs(
+internal fun hizbOpeningStartMs(
     hizbStop: Boolean,
-    positionMs: Long,
     segments: List<Segment>,
     silence: List<AudibleSilence>,
 ): Long? {
@@ -31,8 +33,9 @@ internal fun hizbOpeningSeekMs(
     val voice = firstWordHighlightMs(segments, silence)
     val lastEnd = segments.lastOrNull()?.endMs ?: return null
     if (voice >= lastEnd) return null
-    if (positionMs + SILENCE_SLACK_MS >= voice) return null
-    return voice
+    val landing = (voice - HIZB_PREROLL_MS).coerceAtLeast(0L)
+    if (landing < 500L) return null
+    return landing
 }
 
 /**
