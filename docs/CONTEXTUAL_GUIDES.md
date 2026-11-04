@@ -152,13 +152,16 @@ For the existing lessons, the acceptance actions are:
 - Ayah rail: tap the spotlighted collapsed rail, or drag it vertically; the
   guide withdraws as the real scrub wheel blooms.
 - Pin a chapter (Chapters sheet): manually scroll down the unfiltered chapter
-  list and tap chapter **80–114**. Read that chapter for **more than three
-  minutes**, then close the reader and return to Chapters. Only foreground time
-  with that chapter prepared and the reader unobscured counts; loading,
+  list and tap chapter **80–114**. Read within that chapter range for **more than
+  three minutes**, then close the reader and return to Chapters. Only foreground time
+  with the chapter prepared and the reader unobscured counts; loading,
   Settings, overlays and background time do not. Reading may resume within the
   same visit, but separate short visits are not added together. Search results,
   automatic list repositioning, Continue, bookmarks and voice opens do not
-  start a qualifying visit. A different chapter invalidates it. The visit is
+  start a qualifying visit. Continuing or jumping between chapters **80–114**
+  retains the accumulated time. Entering **1–79** resets it; returning to 80–114
+  within the visit starts counting afresh. The guide targets the last chapter
+  read when returning to Chapters. The visit is
   held in memory, not across process restarts; developer replay rearms the
   persisted dismissal but does not bypass this sequence.
   After return settles, with nothing pinned and that chapter's row fully in

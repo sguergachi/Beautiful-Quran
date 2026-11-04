@@ -1763,8 +1763,10 @@ mirrors it (`docs/WEB.md` §6.3) in the same Continue green, `--green-wash`.
 
 Press-and-hold is taught by a contextual guide (`PinChapterTip`, behind the
 developer guide gate like every lesson). It is offered only after manually
-scrolling down to chapter 80 or later, opening it, reading for more than three
-foreground minutes, and returning to Chapters. The copy enters from the right
+scrolling down to chapter 80 or later, opening it, reading across chapters
+80–114 for more than three foreground minutes, and returning to Chapters.
+Moving within that range retains time; entering an earlier chapter resets it.
+The copy enters from the right
 toward the chapter's number column; **Got it** stays at the bottom right.
 It never opens during a scroll,
 and leaving Chapters by any route while it is up puts it away, so it can

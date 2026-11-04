@@ -1,8 +1,8 @@
 package com.beautifulquran.ui.home
 
 /**
- * Offers pinning after a hand-scrolled chapter 80–114 has been read for more
- * than three foreground minutes and the reader returns to Chapters. The caller
+ * Offers pinning after a hand-scrolled opening of chapter 80–114, more than
+ * three foreground minutes across that range, and a return to Chapters. The caller
  * supplies a monotonic clock and reports only visibility/lifecycle boundaries;
  * no timer or playback ticks are needed. A new list opening replaces the visit.
  */
@@ -20,18 +20,20 @@ internal class PinChapterLesson {
         chapter = chapterId.takeIf { scrolledDown && it in 80..114 }
     }
 
-    /** Hidden sheets, background time and other chapters never add reading time. */
+    /** Hidden/background time pauses the clock; chapters below 80 reset it. */
     fun observe(chapterId: Int, reading: Boolean, onChapters: Boolean, nowMs: Long) {
         if (chapter == null) {
             if (reading || chapterId != offeredChapter) offeredChapter = null
             return
         }
-        if (chapterId != chapter) {
+        if (chapterId !in 1..114) {
             clearVisit()
             return
         }
         pauseReading(nowMs)
-        readingSince = if (reading) nowMs else null
+        chapter = chapterId
+        if (chapterId < 80) readMs = 0L
+        readingSince = if (reading && chapterId >= 80) nowMs else null
         if (reading) enteredReader = true
         // Opening starts while Chapters is still visible. Only an actual
         // reader visit can make its subsequent return a teaching moment.

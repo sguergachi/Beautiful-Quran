@@ -94,13 +94,84 @@ class PinChapterLessonTest {
     }
 
     @Test
-    fun changingChapterInvalidatesTheVisitEvenIfTheReaderReturnsLater() {
+    fun continuingToTheNextChapterKeepsTimeAndOffersTheLastChapterRead() {
         val lesson = PinChapterLesson()
         lesson.openFromList(80, true)
         lesson.observe(80, true, false, 0)
-        lesson.observe(81, true, false, 190_000)
-        lesson.observe(80, true, false, 400_000)
-        lesson.observe(80, false, true, 600_000)
+        lesson.observe(81, true, false, 120_000)
+        lesson.observe(81, false, true, 180_001)
+        assertEquals(81, lesson.offeredChapter)
+    }
+
+    @Test
+    fun timeCarriesAcrossForwardJumpsAndBackwardMovesWithin80Through114() {
+        val lesson = PinChapterLesson()
+        lesson.openFromList(80, true)
+        lesson.observe(80, true, false, 0)
+        lesson.observe(114, true, false, 60_000)
+        lesson.observe(90, true, false, 120_000)
+        lesson.observe(80, true, false, 180_000)
+        lesson.observe(80, false, true, 180_001)
+        assertEquals(80, lesson.offeredChapter)
+    }
+
+    @Test
+    fun aggregateTimeMustStillExceedThreeMinutes() {
+        for (duration in listOf(180_000L, 180_001L)) {
+            val lesson = PinChapterLesson()
+            lesson.openFromList(80, true)
+            lesson.observe(80, true, false, 0)
+            lesson.observe(81, true, false, 120_000)
+            lesson.observe(81, false, true, duration)
+            assertEquals(81.takeIf { duration > 180_000L }, lesson.offeredChapter)
+        }
+    }
+
+    @Test
+    fun loadingTheNextChapterAndBackgroundTimeAreNotCounted() {
+        val lesson = PinChapterLesson()
+        lesson.openFromList(80, true)
+        lesson.observe(80, true, false, 0)
+        lesson.observe(81, false, false, 60_000)
+        lesson.observe(81, true, false, 600_000)
+        lesson.pauseReading(660_000)
+        lesson.observe(81, true, false, 900_000)
+        lesson.observe(81, false, true, 960_000)
+        assertNull(lesson.offeredChapter)
+    }
+
+    @Test
+    fun enteringAnyChapterBelow80ResetsAccumulatedTime() {
+        for (earlierChapter in 1..79) {
+            val lesson = PinChapterLesson()
+            lesson.openFromList(80, true)
+            lesson.observe(80, true, false, 0)
+            lesson.observe(earlierChapter, true, false, 190_000)
+            lesson.observe(81, true, false, 400_000)
+            lesson.observe(81, false, true, 460_000)
+            assertNull("Chapter $earlierChapter must reset the clock", lesson.offeredChapter)
+        }
+    }
+
+    @Test
+    fun returningTo80AfterTheResetCanStartAFreshThreeMinutes() {
+        val lesson = PinChapterLesson()
+        lesson.openFromList(80, true)
+        lesson.observe(80, true, false, 0)
+        lesson.observe(79, true, false, 190_000)
+        lesson.observe(80, true, false, 600_000)
+        lesson.observe(81, true, false, 720_000)
+        lesson.observe(81, false, true, 780_001)
+        assertEquals(81, lesson.offeredChapter)
+    }
+
+    @Test
+    fun returningToChaptersFromBelow80DoesNotOfferTheGuide() {
+        val lesson = PinChapterLesson()
+        lesson.openFromList(80, true)
+        lesson.observe(80, true, false, 0)
+        lesson.observe(79, true, false, 190_000)
+        lesson.observe(79, false, true, 600_000)
         assertNull(lesson.offeredChapter)
     }
 
