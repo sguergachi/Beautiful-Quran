@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.ShaderBrush
@@ -156,7 +157,10 @@ private fun ShaderInkSpillField(
 ) {
     val shader = remember { RuntimeShader(VellumFieldShader) }
     val brush = remember(shader) { ShaderBrush(shader) }
-    Canvas(modifier) {
+    // The target pulse keeps requesting frames after the spill settles. Cache
+    // the pigment alone so those frames sample a texture instead of rerunning
+    // the full-screen shader. Progress and tuning still invalidate its pixels.
+    Canvas(modifier.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
         val tuning = ContextualGuideStyle.tuning
         val spotlight = Offset(spotlightCenter.x.toPx(), spotlightCenter.y.toPx())
         val body = Offset(bodyCenter.x.toPx(), bodyCenter.y.toPx())
