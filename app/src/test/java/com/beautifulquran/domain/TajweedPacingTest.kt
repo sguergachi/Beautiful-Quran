@@ -148,6 +148,18 @@ class TajweedPacingTest {
     }
 
     @Test
+    fun `voiced letters skip what is written but not said`() {
+        assertEquals(2, TajweedPacing.voicedLetters("إِذۡ"))
+        assertEquals(2, TajweedPacing.voicedLetters("لَا"))
+        assertEquals(3, TajweedPacing.voicedLetters("بَعۡدَ"))
+        // ٱل before a sun letter: hamzat wasl and the assimilated lām are silent.
+        assertEquals(5, TajweedPacing.voicedLetters(dallin))
+        // The plural-waw alif carries the silent U+0652.
+        assertEquals(4, TajweedPacing.voicedLetters(qalu)) // ق ا ل و; the final alif is silent
+        assertEquals(0, TajweedPacing.voicedLetters(""))
+    }
+
+    @Test
     fun `liquid ink holds the closing nun in its own letter slot`() {
         val letters = curveOf("ٱلۡمُسۡرِفِينَ", hold = Hold(isAyahFinal = true,
             waqfShare = .5932f, waqfLengthScale = 1f, creep = .3f))

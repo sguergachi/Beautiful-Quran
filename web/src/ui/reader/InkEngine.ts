@@ -1,4 +1,4 @@
-import { tajweedCurve, type PacingCurve } from '../../domain/tajweedPacing'
+import { tajweedCurve, voicedLetters, type PacingCurve } from '../../domain/tajweedPacing'
 /**
  * Visual word-ink policy — port of Android `ui/reader/InkEngine.kt`.
  * Pure decision functions; no DOM.
@@ -37,6 +37,8 @@ export interface InkTuning {
   recessMs: number
   minSweepMs: number
   maxSweepMs: number
+  /** Tempo floor for short Arabic words, in voiced letters (0 = off). Android `Tuning.tempoSweepLetters`. */
+  tempoSweepLetters: number
   repeatSweepMs: number
   repeatFadeOutMs: number
   /** Dissolve of the white-gold first-gloss glint (see [glinting]) back to
@@ -71,6 +73,7 @@ export const DEFAULT_TUNING: InkTuning = {
   recessMs: CHROME_RECEDE_MS,
   minSweepMs: 140,
   maxSweepMs: 8_000,
+  tempoSweepLetters: 3,
   repeatSweepMs: 450,
   repeatFadeOutMs: 1_800,
   glintFadeMs: 1_000,
@@ -174,6 +177,29 @@ export function sweepMs(
   const floor = minSweepFloorMs()
   if (raw <= 0) return floor
   return Math.min(tuning.maxSweepMs, Math.max(floor, raw))
+}
+
+/** One-letter words would otherwise trail for three letters' time. */
+export const MAX_TEMPO_STRETCH = 2
+
+/**
+ * Port of Android `InkEngine.tempoSweepMs`: stretch a short Arabic word's
+ * wash so its letters bloom at the reciter's per-letter pace (3:8 إِذۡ, 503 ms,
+ * used to ink each letter ~2.4x faster than هَدَيۡتَنَا). Visual only — the wasl
+ * carry-in stays on the voiced duration; paced words are left alone.
+ */
+export function tempoSweepMs(
+  sweep: number | null,
+  arabic: string | null | undefined,
+  paced: boolean,
+): number | null {
+  if (sweep == null) return null
+  const letters = tuning.tempoSweepLetters
+  if (paced || arabic == null || letters <= 0) return sweep
+  const voiced = voicedLetters(arabic)
+  if (voiced <= 0 || voiced >= letters) return sweep
+  const stretch = Math.min(letters / voiced, MAX_TEMPO_STRETCH)
+  return Math.min(tuning.maxSweepMs, Math.max(sweep, Math.trunc(sweep * stretch)))
 }
 
 /** Android InkEngine.pacing: capture the tuned curve once at Active entry. */

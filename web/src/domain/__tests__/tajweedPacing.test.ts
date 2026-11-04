@@ -130,3 +130,14 @@ it('matches the Android engine numeric curves', () => {
     values.forEach((value, i) => expect(curve.at(i / 10)).toBeCloseTo(value, 6))
   }
 })
+
+describe('voiced letters (Android parity)', () => {
+  it('skips what is written but not said', async () => {
+    const { voicedLetters } = await import('../tajweedPacing')
+    expect(voicedLetters('إِذۡ')).toBe(2)
+    expect(voicedLetters('لَا')).toBe(2)
+    expect(voicedLetters('بَعۡدَ')).toBe(3)
+    expect(voicedLetters('ٱلضَّآلِّينَ')).toBe(5)
+    expect(voicedLetters('قَالُوٓاْ')).toBe(4)
+  })
+})

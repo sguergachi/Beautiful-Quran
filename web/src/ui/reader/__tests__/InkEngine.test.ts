@@ -188,3 +188,20 @@ describe('InkEngine', () => {
   })
 
 })
+
+describe('tempo sweep floor (Android InkEngine.tempoSweepMs parity)', () => {
+  beforeEach(() => resetTuning())
+  it('blooms a short word at the reciter letter pace, not the word pace', async () => {
+    const { tempoSweepMs, setTuning } = await import('../InkEngine')
+    // 3:8 Alafasy: بَعۡدَ 579, إِذۡ 503, هَدَيۡتَنَا 1208 ms.
+    expect(tempoSweepMs(503, 'إِذۡ', false)).toBe(754)
+    expect(tempoSweepMs(579, 'بَعۡدَ', false)).toBe(579)
+    expect(tempoSweepMs(1208, 'هَدَيۡتَنَا', false)).toBe(1208)
+    expect(tempoSweepMs(503, 'إِذۡ', true)).toBe(503)
+    expect(tempoSweepMs(null, 'إِذۡ', false)).toBeNull()
+    setTuning({ tempoSweepLetters: 6 })
+    expect(tempoSweepMs(503, 'إِذۡ', false)).toBe(1006)
+    setTuning({ tempoSweepLetters: 0 })
+    expect(tempoSweepMs(503, 'إِذۡ', false)).toBe(503)
+  })
+})

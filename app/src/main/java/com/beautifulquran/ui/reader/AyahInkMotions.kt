@@ -153,7 +153,14 @@ internal fun rememberAyahInkPack(
     val motions = rememberInkMotions(
         words = ayah.words,
         inks = inks,
-        activeSweepMs = sweepMs,
+        // Short words bloom at the reciter's letter pace (InkEngine.tempoSweepMs);
+        // wasl and Paper's lead-in stay on the voiced sweepMs.
+        activeSweepMs = InkEngine.tempoSweepMs(
+            sweepMs,
+            ayah.words.getOrNull(activeIndex)?.arabic,
+            paced = pacing != null,
+        ),
+        activeVoicedSweepMs = sweepMs,
         activeRepeatDwellMs = repeatDwellMs,
         pacing = pacing,
         activeRevealStart = activeRevealStart,

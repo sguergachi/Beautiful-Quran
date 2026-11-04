@@ -602,6 +602,32 @@ class InkEngineTest {
     }
 
     @Test
+    fun `a short word blooms at the reciter's letter pace, not the word's`() {
+        // 3:8 Alafasy: بَعۡدَ 579 ms, إِذۡ 503 ms, هَدَيۡتَنَا 1208 ms — an even
+        // ~200-250 ms a letter, yet إِذۡ inked each letter 2.4x faster.
+        assertEquals(754, InkEngine.tempoSweepMs(503, "إِذۡ", paced = false))
+        // Three or more voiced letters: the word's own pace already reads even.
+        assertEquals(579, InkEngine.tempoSweepMs(579, "بَعۡدَ", paced = false))
+        assertEquals(1208, InkEngine.tempoSweepMs(1208, "هَدَيۡتَنَا", paced = false))
+        // Paced holds are laid out in voiced time; they keep the plain sweep.
+        assertEquals(503, InkEngine.tempoSweepMs(503, "إِذۡ", paced = true))
+        assertNull(InkEngine.tempoSweepMs(null, "إِذۡ", paced = false))
+        assertEquals(503, InkEngine.tempoSweepMs(503, null, paced = false))
+        // Never past the ceiling, and at most MAX_TEMPO_STRETCH.
+        assertEquals(InkEngine.tuning.maxSweepMs,
+            InkEngine.tempoSweepMs(InkEngine.tuning.maxSweepMs - 10, "إِذۡ", paced = false))
+        val original = InkEngine.tuning
+        try {
+            InkEngine.tuning = original.copy(tempoSweepLetters = 6f)
+            assertEquals(1006, InkEngine.tempoSweepMs(503, "إِذۡ", paced = false))
+            InkEngine.tuning = original.copy(tempoSweepLetters = 0f)
+            assertEquals(503, InkEngine.tempoSweepMs(503, "إِذۡ", paced = false))
+        } finally {
+            InkEngine.tuning = original
+        }
+    }
+
+    @Test
     fun `sweep clamps to the tuned floor and ceiling`() {
         val floor = InkEngine.minSweepFloorMs()
         assertEquals(

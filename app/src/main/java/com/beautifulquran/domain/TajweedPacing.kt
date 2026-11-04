@@ -256,6 +256,16 @@ object TajweedPacing {
     }
 
     /**
+     * Letters the reciter actually voices in [arabic] (silent hamzat wasl,
+     * assimilated lām and written-but-silent alifs excluded). Used to read the
+     * reciter's per-letter tempo off a word's own duration.
+     */
+    fun voicedLetters(arabic: String): Int {
+        val events = tokenize(arabic)
+        return events.indices.count { weight(events, it) > 0f }
+    }
+
+    /**
      * Replace a wash curve's opening with a straight ramp from the origin.
      *
      * The ramp's slope is the larger of the plain sweep's rate (1) and

@@ -58,6 +58,12 @@ export class PacingCurve {
     )
   }
 }
+/** Letters the reciter voices (silent wasl / assimilated lām / silent alif
+ * excluded). Port of Android `TajweedPacing.voicedLetters`. */
+export function voicedLetters(arabic: string): number {
+  const events = tokenize(arabic)
+  return events.filter((_, i) => weight(events, i) > 0).length
+}
 /** Share of a paced word by which the opening ramp rejoins the curve. */
 const OPENING_RAMP_SHARE = 0.3
 /** The opening ramp is never slower than the plain linear sweep. */

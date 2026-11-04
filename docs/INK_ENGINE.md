@@ -701,6 +701,36 @@ shared `HighlightTimeline` through that window. The replaced speech-time
   Repeat completion is observed as a structurally compared Boolean; frame
   progress itself is read in drawing, avoiding frame-driven composition.
 
+**Even pace across Arabic words: two rules.** Both answer the same
+complaint: the wash should keep the reciter's pace from word to word, never
+dash through part of a word. Both were tuned by ear on a Pixel 10 against
+Alafasy, November 2026.
+
+- **Paced words ease their opening in** (`TajweedPacing.Curve.forWash` →
+  `openingRamp`). Centring a tajweed hold inside the soft edge shifted every
+  interior breakpoint forward by half a feather, but kept the origin at 0. A
+  wasl-entry word (3:7 `فَيَتَّبِعُونَ`, 1.92 s) therefore leapt ~30 % in ~100 ms
+  and parked. The opening is now a straight ramp from the origin, no slower than
+  the plain sweep, that rejoins the curve by 30 % of the word. Longer words get
+  a longer opening fade. Details in docs/TAJWEED_PACING.md, "Opening ramp".
+- **Short words bloom at the reciter's letter pace** (`InkEngine.tempoSweepMs`).
+  Each letter blooms over a fixed share of its word's sweep, the feather. So a
+  letter's fade time was proportional to its *word's* length, not the voice's.
+  In 3:8 `بَعۡدَ إِذۡ هَدَيۡتَنَا` (579 / 503 / 1208 ms, an even ~200–250 ms a
+  letter), `إِذۡ` inked each letter in ~310 ms against `هَدَيۡتَنَا`'s ~740 ms, and
+  read as a dart. The Arabic wash is now floored at
+  `Tuning.tempoSweepLetters` (3) × its own duration ÷ voiced letters
+  (`TajweedPacing.voicedLetters`), at most `MAX_TEMPO_STRETCH` (2×) and
+  `maxSweepMs`. Words of three or more voiced letters are untouched. The
+  stretched wash finishes as a residual after the next word takes over (above).
+  The stretch is visual only. Clocks that must meet the voice keep the voiced
+  `sweepMs`: the wasl carry-in window (`rememberWaslProgress`; on web,
+  `voicedClock` in `useWordWash`) and Paper's next-word lead-in
+  (`InkMotion.paperAhead` scales by `voicedStretch`). Tajweed-paced words and
+  English are not stretched: paced holds are laid out in voiced time, and
+  English has its own clock. Ink Lab → Sweep → **Tempo floor letters**
+  (0 = off). Mirrored on web (`InkEngine.tempoSweepMs`).
+
 Wasl still uses `waslWashProgress` / `waslContinuationStart` /
 `continuedSweepProgress`, the same captured feather, and the reached handoff
 edge. Its clock is now the outgoing occurrence's media window. `LetterSweep`

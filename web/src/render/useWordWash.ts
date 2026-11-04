@@ -12,6 +12,7 @@ import {
   getTuning,
   InkState,
   pacing,
+  tempoSweepMs,
   type InkWord,
 } from '../ui/reader/InkEngine'
 import { tarjiSignal } from '../playback/tarjiSignal'
@@ -208,7 +209,12 @@ export function useWordWash({
           Math.min(connected.prefixFraction + 0.25, 0.55)) /
         (1 + tuning.washFeather)
       : 0
-    const mediaWindow = motion?.timing?.startMs != null ? highlightTimeline.window(motion.timing.startMs, duration) : null
+    // Short Arabic words bloom at the reciter's letter pace (Android
+    // InkEngine.tempoSweepMs); the wasl carry-in below stays on voiced time.
+    const visual = english ? duration : (tempoSweepMs(duration, word.arabic, curve != null) ?? duration)
+    const mediaWindow = motion?.timing?.startMs != null ? highlightTimeline.window(motion.timing.startMs, visual) : null
+    const voicedWindow = visual === duration ? mediaWindow
+      : motion?.timing?.startMs != null ? highlightTimeline.window(motion.timing.startMs, duration) : null
     let elapsed = 0,
       last = performance.now(),
       frame = 0,
@@ -255,8 +261,12 @@ export function useWordWash({
       }
       lastMedia = currentMedia
       const priorIncomplete = english && prior != null && prior < 1
+      const sample = mediaWindow ? highlightTimeline.frame(now) : null
       const clock = priorIncomplete ? 0 : mediaWindow
-        ? mediaWashProgress(mediaWindow, highlightTimeline.frame(now))
+        ? mediaWashProgress(mediaWindow, sample)
+        : Math.min(1, elapsed / visual)
+      const voicedClock = priorIncomplete ? 0 : voicedWindow
+        ? mediaWashProgress(voicedWindow, sample ?? highlightTimeline.frame(now))
         : Math.min(1, elapsed / duration)
       const shaped = curve
         ? curve.at(clock)
@@ -273,7 +283,7 @@ export function useWordWash({
       if (connected && state.current.state === InkState.Active) {
         registry.prefix(
           nextKey,
-          prefixEnd * connectionProgress(clock, start, completion),
+          prefixEnd * connectionProgress(voicedClock, start, completion),
           tuning.washFeather,
         )
       }

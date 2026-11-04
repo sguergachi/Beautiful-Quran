@@ -103,6 +103,12 @@ object InkEngine {
         /** Letter-sweep duration clamps around the reciter's actual dwell. */
         val minSweepMs: Int = 140,
         val maxSweepMs: Int = 8_000,
+        /**
+         * Tempo floor for short Arabic words, in voiced letters: a word's wash
+         * runs at least this many of its own letters' worth of the reciter's
+         * time ([tempoSweepMs]). 0 turns it off. See docs/INK_ENGINE.md.
+         */
+        val tempoSweepLetters: Float = 3f,
         /** Repeat sweep fallback when no live active-word timing exists. */
         val repeatSweepMs: Int = 450,
         /** Dissolve of the orange wash once the repeat chain releases. */
@@ -551,6 +557,36 @@ object InkEngine {
      * lifetime no longer flickers Arabic-only paper cover. Long holds are
      * capped by [Tuning.maxSweepMs]. Null when nothing is lit.
      */
+    /**
+     * [sweepMs] stretched so a short Arabic word's letters bloom at the
+     * reciter's pace instead of the word's.
+     *
+     * Each letter blooms over a fixed share of its word's sweep (the feather),
+     * so a two-letter word like إِذۡ (3:8, ~500 ms) inked each letter in ~300 ms
+     * while its six-letter neighbour هَدَيۡتَنَا took ~740 ms — at the same
+     * per-letter speech rate. The sweep is floored at
+     * [Tuning.tempoSweepLetters] × (its own duration ÷ voiced letters), at most
+     * [MAX_TEMPO_STRETCH]×. The wash simply finishes after the next word takes
+     * over; renderers already continue an incomplete wash past handoff.
+     *
+     * Visual only: clocks that must meet the voice — the wasl carry-in
+     * window, Paper's next-word lead-in — keep the unstretched [sweepMs].
+     * Tajweed-paced words keep it too: their holds are laid out in the word's
+     * voiced time.
+     */
+    fun tempoSweepMs(sweepMs: Int?, arabic: String?, paced: Boolean): Int? {
+        val base = sweepMs ?: return null
+        val letters = tuning.tempoSweepLetters
+        if (paced || arabic == null || letters <= 0f) return base
+        val voiced = TajweedPacing.voicedLetters(arabic)
+        if (voiced <= 0 || voiced >= letters) return base
+        val stretch = (letters / voiced).coerceAtMost(MAX_TEMPO_STRETCH)
+        return maxOf(base, (base * stretch).toInt()).coerceAtMost(tuning.maxSweepMs)
+    }
+
+    /** One-letter words would otherwise trail for three letters' time. */
+    const val MAX_TEMPO_STRETCH = 2f
+
     fun sweepMs(activeWord: ActiveWord?, playbackSpeed: Float): Int? {
         val word = activeWord ?: return null
         val raw = (word.durationMs / playbackSpeed).toInt().coerceAtLeast(0)

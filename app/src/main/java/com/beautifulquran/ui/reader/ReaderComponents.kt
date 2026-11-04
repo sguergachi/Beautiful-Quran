@@ -945,6 +945,8 @@ internal fun rememberInkCoverRelease(enabled: Boolean, state: InkEngine.State): 
 
 internal class InkMotion(
     val ink: InkEngine.Word,
+    /** Stretched wash ÷ voiced dwell for the active word ([InkEngine.tempoSweepMs]); 1 otherwise. */
+    private val voicedStretch: Float = 1f,
     private val lyricInk: State<Float>,
     private val sweep: LetterSweep,
     val repeatWash: RepeatWash,
@@ -1001,7 +1003,9 @@ internal class InkMotion(
             if (!anticipateNextWord) return -1f
             val before = previous ?: return -1f
             if (isActive || ink.state != InkEngine.State.Upcoming || !before.isActive) return -1f
-            return (before.plainSweepProgress - 1f).coerceIn(-1f, 0f)
+            // On voice time: a short word's stretched wash still has ink to lay
+            // when the voice moves on, but the next word starts on schedule.
+            return (before.plainSweepProgress * before.voicedStretch - 1f).coerceIn(-1f, 0f)
         }
     val repeat: Boolean get() = ink.repeat
 
@@ -1314,6 +1318,12 @@ internal fun rememberInkMotions(
     activeRepeatDwellMs: Int?,
     pacing: TajweedPacing.Curve? = null,
     /**
+     * The active word's voiced sweep, before [InkEngine.tempoSweepMs] stretched
+     * [activeSweepMs] for a short word. Clocks that must meet the voice (Paper's
+     * next-word lead-in) read progress against this, not the stretched wash.
+     */
+    activeVoicedSweepMs: Int? = activeSweepMs,
+    /**
      * English Scroll's verse clock ([EnglishScrollPerformance]): every word's
      * first-pass progress comes from it. [activeWord] must be the one the same
      * performance returned, or the clock's progress is gated by the wrong word.
@@ -1387,6 +1397,10 @@ internal fun rememberInkMotions(
         )
         motions += InkMotion(
             ink = ink,
+            voicedStretch = if (isActive && activeSweepMs != null && activeVoicedSweepMs != null &&
+                activeVoicedSweepMs > 0) {
+                (activeSweepMs.toFloat() / activeVoicedSweepMs).coerceAtLeast(1f)
+            } else 1f,
             lyricInk = if (animateLyricInk) {
                 animatedInkAlpha(ink.state, tappedPrefix, leavingVerse)
             } else {
@@ -3344,15 +3358,26 @@ fun AyahBlock(
         inks = inks,
         // English without its verse clock yet (a verse's first frame): the plain
         // eased window, holding at a real pause (EnglishRevealTiming).
-        activeSweepMs = if (readingMode == ReadingMode.ENGLISH_ONLY && englishClock == null) {
-            englishRevealDurationMs(sweepMs, activeWord?.spokenMs, playbackSpeed)
-        } else sweepMs,
+        activeSweepMs = when {
+            readingMode == ReadingMode.ENGLISH_ONLY && englishClock == null ->
+                englishRevealDurationMs(sweepMs, activeWord?.spokenMs, playbackSpeed)
+            readingMode == ReadingMode.ENGLISH_ONLY -> sweepMs
+            // Arabic ink: short words bloom at the reciter's letter pace.
+            else -> InkEngine.tempoSweepMs(
+                sweepMs,
+                ayah.words.getOrNull(activeIndex)?.arabic,
+                paced = pacing != null,
+            )
+        },
         activeRepeatDwellMs = if (readingMode == ReadingMode.ENGLISH_ONLY && englishClock == null) {
             englishRevealDurationMs(repeatDwellMs, activeWord?.spokenMs, playbackSpeed)
         } else repeatDwellMs,
         // English has no Arabic letter-pacing paint, but shares every other
         // lifecycle rule and the same low-level shaped bloom primitive.
         pacing = pacing.takeUnless { readingMode == ReadingMode.ENGLISH_ONLY },
+        activeVoicedSweepMs = if (readingMode == ReadingMode.ENGLISH_ONLY && englishClock == null) {
+            englishRevealDurationMs(sweepMs, activeWord?.spokenMs, playbackSpeed)
+        } else sweepMs,
         englishClock = englishClock,
         activeRevealStart = activeRevealStart.takeUnless {
             readingMode == ReadingMode.ENGLISH_ONLY
