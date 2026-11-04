@@ -3572,12 +3572,32 @@ fun ReaderScreen(
                     )
                 }
             }
-            if (ayahSelectorExpanded) {
+            // While the wheel is open the whole page dims under it: the
+            // ticks and numbers reach in over the text, and a local shadow
+            // would fight the glyphs they cross. The dim fades with the
+            // wheel and stops absorbing taps the moment it starts leaving.
+            val railDimAlpha = animateFloatAsState(
+                targetValue = if (ayahSelectorExpanded) 0.5f else 0f,
+                animationSpec = tween(240, easing = FastOutSlowInEasing),
+                label = "railDimAlpha",
+            )
+            if (ayahSelectorExpanded || railDimAlpha.value > 0.01f) {
                 Box(
                     Modifier
                         .matchParentSize()
                         .zIndex(0.5f)
-                        .absorbPointerEvents { ayahSelectorDismissRequests += 1 },
+                        .background(
+                            MaterialTheme.colorScheme.scrim.copy(alpha = railDimAlpha.value),
+                        )
+                        .then(
+                            if (ayahSelectorExpanded) {
+                                Modifier.absorbPointerEvents {
+                                    ayahSelectorDismissRequests += 1
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ),
                 )
             }
             val latestActiveAyahForRail by rememberUpdatedState(activeAyah)

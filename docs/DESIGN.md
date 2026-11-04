@@ -1566,7 +1566,10 @@ with focus and edge distance like every other mark on the rail. A verse that
 carries a rubʿ al-ḥizb mark (۞) carries a small eight-pointed star — the ۞
 drawn as its two overlapping squares — between its number and any page mark
 on the same verse, in slightly stronger ink so the quarter divisions stay
-findable while scrubbing.
+findable while scrubbing. While the wheel is open the whole page dims to
+half ink under it (the theme scrim, fading with the wheel), so the ticks
+and numbers stay readable where they reach in over the text; the top and
+player bars sit outside the dim and stay bright.
 
 - **Unified with the verse.** The ribbon is composed inside `AyahBlock`, so its
   height *is* the block's height (Arabic, gloss, and translation together). It
