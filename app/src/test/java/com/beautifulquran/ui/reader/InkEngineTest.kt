@@ -650,6 +650,26 @@ class InkEngineTest {
     }
 
     @Test
+    fun `a tap-started chain still carries into the next word`() {
+        // Hani 3:8 played from رَبَّنَا: the tapped word keeps the tap's pinned
+        // activation (WordTapInk.resolve); لَا arrives with the media's own.
+        val tapped = ActiveWordEntry(index = 0, activation = 7L, generation = 12L)
+        val next = ActiveWord(ayah = 8, wordPosition = 2, durationMs = 320,
+            activation = 12L, playbackActivation = 12L, tapStartPosition = 1)
+        assertTrue(carriedFromPrevious(tapped, activeIndex = 1, activation = 12L, word = next))
+        // A seek is a new media generation: start clean.
+        assertFalse(carriedFromPrevious(tapped, 1, 13L,
+            next.copy(activation = 13L, playbackActivation = 13L)))
+        // Without a tap chain, only the shared activation counts.
+        assertFalse(carriedFromPrevious(tapped, 1, 12L, next.copy(tapStartPosition = null)))
+        // Not adjacent.
+        assertFalse(carriedFromPrevious(tapped, 2, 12L, next))
+        // Ordinary playback: same activation.
+        assertTrue(carriedFromPrevious(ActiveWordEntry(0, 12L, generation = 12L), 1, 12L,
+            next.copy(tapStartPosition = null)))
+    }
+
+    @Test
     fun `no lead where the voice or another carry already owns the timing`() {
         fun lead(activePaced: Boolean = false, repeat: Boolean = false, next: String = "إِذۡ",
                  nextPaced: Boolean = false, connected: Boolean = false, active: Int = 579) =

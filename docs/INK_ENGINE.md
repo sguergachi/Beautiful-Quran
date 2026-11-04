@@ -747,6 +747,13 @@ Alafasy, November 2026.
   - **Visual only.** The wasl carry-in window and the lead window read the
     voiced `sweepMs`. Paper's next-word lead-in (`InkMotion.paperAhead`)
     scales by `voicedStretch`, which is below 1 for a lending word.
+  - **Tap-started playback.** A carry-in (lead or wasl) continues only across
+    a natural handoff (`carriedFromPrevious`). That normally means the two
+    words share `ActiveWord.activation`, and a seek bumps it. But a word tap
+    pins only the tapped word's activation (`WordTapInk.resolve`). So inside
+    a tap chain, a shared media generation (`playbackActivation`) also counts.
+    Otherwise Hani 3:8 played from `رَبَّنَا` re-started the led-in `لَا` from
+    nothing at handoff: on, off, back on. Web has no tap pinning.
   - **The glimmer** (`glintProgress`) rides the word's own clock
     (`LetterSweep.ownProgress`), not the carried-in edge. It blooms with the
     word instead of snapping over pre-inked letters at handoff; this also

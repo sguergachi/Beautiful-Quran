@@ -748,7 +748,24 @@ internal class ActiveWordEntry(
     var outgoingHandoff: Float = 0f,
     /** [InkEngine.ShortWordLead.reach] the next word was led to, or 0. */
     var outgoingLeadReach: Float = 0f,
+    /** [ActiveWord.playbackActivation]: the media generation, which a seek bumps. */
+    var generation: Long = 0L,
 )
+
+/**
+ * Whether the active word took over from the previous one by playing on, so
+ * a carry-in (wasl, short-word lead) continues instead of starting clean.
+ * Normally both words share [ActiveWord.activation], and a seek bumps it.
+ * A word tap pins only the tapped word's activation (WordTapInk.resolve), so
+ * the word after it differs while the media generation is the same: that is
+ * still a natural handoff. Without this, Hani 3:8 played from رَبَّنَا re-started
+ * the led-in لَا from nothing at handoff — on, off, back on.
+ */
+internal fun carriedFromPrevious(previous: ActiveWordEntry, activeIndex: Int, activation: Long, word: ActiveWord?): Boolean =
+    previous.index == activeIndex - 1 && (
+        previous.activation == activation ||
+            (word?.tapStartPosition != null && previous.generation == word.playbackActivation)
+        )
 
 internal data class WaslProgress(
     val value: State<Float>,
@@ -3369,8 +3386,7 @@ fun AyahBlock(
     )
     val previousActive = remember { ActiveWordEntry(activeIndex, activation) }
     val carriedIncoming = remember(activeIndex, activation) {
-        previousActive.index == activeIndex - 1 &&
-            previousActive.activation == activation
+        carriedFromPrevious(previousActive, activeIndex, activation, activeWord)
     }
     val incomingHandoff = if (carriedIncoming) previousActive.outgoingHandoff else 0f
     // Captured at entry: the SideEffect below overwrites the entry with this
@@ -3381,6 +3397,7 @@ fun AyahBlock(
     SideEffect {
         previousActive.index = activeIndex
         previousActive.activation = activation
+        previousActive.generation = activeWord?.playbackActivation ?: 0L
         previousActive.outgoingHandoff = outgoingProgress.atHandoff
         previousActive.outgoingLeadReach = outgoingLead?.reach ?: 0f
     }

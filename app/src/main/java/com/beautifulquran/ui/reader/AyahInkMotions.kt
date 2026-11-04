@@ -133,8 +133,7 @@ internal fun rememberAyahInkPack(
     )
     val previousActive = remember { ActiveWordEntry(activeIndex, activation) }
     val carriedIncoming = remember(activeIndex, activation) {
-        previousActive.index == activeIndex - 1 &&
-            previousActive.activation == activation
+        carriedFromPrevious(previousActive, activeIndex, activation, activeWord)
     }
     val incomingHandoff = if (carriedIncoming) previousActive.outgoingHandoff else 0f
     // Captured at entry: the SideEffect below overwrites the entry with this
@@ -145,6 +144,7 @@ internal fun rememberAyahInkPack(
     SideEffect {
         previousActive.index = activeIndex
         previousActive.activation = activation
+        previousActive.generation = activeWord?.playbackActivation ?: 0L
         previousActive.outgoingHandoff = outgoingProgress.atHandoff
         previousActive.outgoingLeadReach = outgoingLead?.reach ?: 0f
     }
