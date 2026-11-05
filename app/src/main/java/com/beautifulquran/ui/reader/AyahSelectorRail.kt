@@ -677,7 +677,7 @@ internal fun AyahSelectorRail(
                             canvas.nativeCanvas.drawText(
                                 juzLabel,
                                 textAnchor(trailX + 6.dp.toPx()),
-                                y + numberPaint.textSize * 0.34f,
+                                y + pagePaint.textSize * 0.34f,
                                 pagePaint,
                             )
                         }
@@ -718,7 +718,7 @@ internal fun AyahSelectorRail(
                             canvas.nativeCanvas.drawText(
                                 pageLabel,
                                 textAnchor(trailX + 6.dp.toPx()),
-                                y + numberPaint.textSize * 0.34f,
+                                y + pagePaint.textSize * 0.34f,
                                 pagePaint,
                             )
                         }
