@@ -767,6 +767,7 @@ internal fun MushafPager(
      */
     english: Boolean = false,
     wordByWord: Boolean = false,
+    useAiReviewedAlignment: Boolean = false,
     verseNumberScript: VerseNumberScript = VerseNumberScript.ARABIC,
     pageNumberScript: PageNumberScript = PageNumberScript.BOTH,
     /** The English leaf's well and measure, once it has laid out. */
@@ -802,7 +803,9 @@ internal fun MushafPager(
     // ask and kept. The English leaf's wash, the leaf a carried verse's voice
     // is on, and the lead onto the book's own cut all read the same map — if
     // they disagreed, the page would turn away from ink still running.
-    val alignments = remember(content, wordByWord) { EnglishVerseAlignments(content, wordByWord) }
+    val alignments = remember(content, wordByWord, useAiReviewedAlignment) {
+        EnglishVerseAlignments(content, wordByWord, useAiReviewedAlignment)
+    }
     val alignmentsNow = rememberUpdatedState(alignments)
     val heldPageNow = rememberUpdatedState(heldPage)
     val lastVoiceWord = remember(loadedSurahId) { mutableStateOf<ActiveWord?>(null) }

@@ -1,0 +1,1684 @@
+{
+  "reviewer": "gpt-6.1-sol",
+  "method": "source-grounded model review; structural compiler checks",
+  "date": "2026-10-14",
+  "independent_gold": false,
+  "sources": {
+    "quran.json": "85663826fe698c24b072c07a6da5c79ad7521d16f2f31d9287c8ef0681945c16",
+    "translation.json": "953bccdfaa3b8aeae519d87513848a5736b57cd41519bec3c8ed993069f7eac3",
+    "tafsir.json": "ded68cec592b808c5bcdc4819bfd4c95fea5933d64b97b969098973a06622237",
+    "morphology-9-4.json": "f254a0c114315bf1ab94992fb46fb39b36e9755ffc27fc0a626392c862830ba5",
+    "morphology-9-25.json": "8a0e9013c156d5fca6d63a5af28e383eb7da13893c1f595b9badfcc30c74ab44",
+    "morphology-23-83.json": "24732f8e295ba257182252155525fef55f9ef16ebca7c4c0a08bd5902b7d30a1",
+    "morphology-24-1.json": "ec833a3a2a1ff49664c1b1b7c1b2c2037f91a407e1905cf4fd6deada77b29377",
+    "morphology-24-30.json": "8ae04c2b75dd90ec46fcbcf57da942176d13f18be6ad68c0d6c4353b435f27d0",
+    "morphology-24-31.json": "ba2823bf3ce0333273a8663aa9e1c25d62802adb09686f9c91cf50706d187572",
+    "morphology-24-37.json": "6a84db4ffd91cf308aa6b5d52a6d1f6d63742b9410976a7334da6b5f1a4d3b3f"
+  },
+  "verses": {
+    "9:4": {
+      "printed_tokens": 47,
+      "arabic_slots": 22,
+      "head_changes_from_mapper": 7,
+      "surface_crosswalk": "all normalized surfaces matched in order, verse-number marker excluded",
+      "translation": "https://quran.com/9:4?translations=20",
+      "tafsir": "https://quran.com/9:4/tafsirs/926"
+    },
+    "9:25": {
+      "printed_tokens": 45,
+      "arabic_slots": 23,
+      "head_changes_from_mapper": 16,
+      "surface_crosswalk": "all normalized surfaces matched in order, verse-number marker excluded",
+      "translation": "https://quran.com/9:25?translations=20",
+      "tafsir": "https://quran.com/9:25/tafsirs/926"
+    },
+    "23:83": {
+      "printed_tokens": 19,
+      "arabic_slots": 12,
+      "head_changes_from_mapper": 4,
+      "surface_crosswalk": "all normalized surfaces matched in order, verse-number marker excluded",
+      "translation": "https://quran.com/23:83?translations=20",
+      "tafsir": "https://quran.com/23:83/tafsirs/926"
+    },
+    "24:1": {
+      "printed_tokens": 26,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:1?translations=20",
+      "tafsir": "https://quran.com/24:1/tafsirs/926"
+    },
+    "24:30": {
+      "printed_tokens": 28,
+      "arabic_slots": 15,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:30?translations=20",
+      "tafsir": "https://quran.com/24:30/tafsirs/926"
+    },
+    "24:31": {
+      "printed_tokens": 125,
+      "arabic_slots": 78,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:31?translations=20",
+      "tafsir": "https://quran.com/24:31/tafsirs/926"
+    },
+    "24:37": {
+      "printed_tokens": 35,
+      "arabic_slots": 19,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:37?translations=20",
+      "tafsir": "https://quran.com/24:37/tafsirs/926"
+    },
+    "24:2": {
+      "printed_tokens": 54,
+      "arabic_slots": 26,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:2?translations=20",
+      "tafsir": "https://quran.com/24:2/tafsirs/926"
+    },
+    "24:3": {
+      "printed_tokens": 30,
+      "arabic_slots": 18,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:3?translations=20",
+      "tafsir": "https://quran.com/24:3/tafsirs/926"
+    },
+    "24:4": {
+      "printed_tokens": 33,
+      "arabic_slots": 19,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:4?translations=20",
+      "tafsir": "https://quran.com/24:4/tafsirs/926"
+    },
+    "24:5": {
+      "printed_tokens": 15,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:5?translations=20",
+      "tafsir": "https://quran.com/24:5/tafsirs/926"
+    },
+    "24:6": {
+      "printed_tokens": 35,
+      "arabic_slots": 17,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:6?translations=20",
+      "tafsir": "https://quran.com/24:6/tafsirs/926"
+    },
+    "24:7": {
+      "printed_tokens": 21,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:7?translations=20",
+      "tafsir": "https://quran.com/24:7/tafsirs/926"
+    },
+    "24:8": {
+      "printed_tokens": 22,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:8?translations=20",
+      "tafsir": "https://quran.com/24:8/tafsirs/926"
+    },
+    "24:9": {
+      "printed_tokens": 20,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:9?translations=20",
+      "tafsir": "https://quran.com/24:9/tafsirs/926"
+    },
+    "24:10": {
+      "printed_tokens": 22,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:10?translations=20",
+      "tafsir": "https://quran.com/24:10/tafsirs/926"
+    },
+    "24:11": {
+      "printed_tokens": 54,
+      "arabic_slots": 28,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:11?translations=20",
+      "tafsir": "https://quran.com/24:11/tafsirs/926"
+    },
+    "24:12": {
+      "printed_tokens": 25,
+      "arabic_slots": 12,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:12?translations=20",
+      "tafsir": "https://quran.com/24:12/tafsirs/926"
+    },
+    "24:13": {
+      "printed_tokens": 32,
+      "arabic_slots": 14,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:13?translations=20",
+      "tafsir": "https://quran.com/24:13/tafsirs/926"
+    },
+    "24:14": {
+      "printed_tokens": 39,
+      "arabic_slots": 15,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:14?translations=20",
+      "tafsir": "https://quran.com/24:14/tafsirs/926"
+    },
+    "24:15": {
+      "printed_tokens": 33,
+      "arabic_slots": 16,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:15?translations=20",
+      "tafsir": "https://quran.com/24:15/tafsirs/926"
+    },
+    "24:16": {
+      "printed_tokens": 29,
+      "arabic_slots": 14,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:16?translations=20",
+      "tafsir": "https://quran.com/24:16/tafsirs/926"
+    },
+    "24:17": {
+      "printed_tokens": 17,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:17?translations=20",
+      "tafsir": "https://quran.com/24:17/tafsirs/926"
+    },
+    "24:18": {
+      "printed_tokens": 14,
+      "arabic_slots": 7,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:18?translations=20",
+      "tafsir": "https://quran.com/24:18/tafsirs/926"
+    },
+    "24:19": {
+      "printed_tokens": 35,
+      "arabic_slots": 20,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:19?translations=20",
+      "tafsir": "https://quran.com/24:19/tafsirs/926"
+    },
+    "24:20": {
+      "printed_tokens": 23,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:20?translations=20",
+      "tafsir": "https://quran.com/24:20/tafsirs/926"
+    },
+    "24:21": {
+      "printed_tokens": 59,
+      "arabic_slots": 34,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:21?translations=20",
+      "tafsir": "https://quran.com/24:21/tafsirs/926"
+    },
+    "24:22": {
+      "printed_tokens": 50,
+      "arabic_slots": 26,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:22?translations=20",
+      "tafsir": "https://quran.com/24:22/tafsirs/926"
+    },
+    "24:23": {
+      "printed_tokens": 25,
+      "arabic_slots": 13,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:23?translations=20",
+      "tafsir": "https://quran.com/24:23/tafsirs/926"
+    },
+    "24:24": {
+      "printed_tokens": 23,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:24?translations=20",
+      "tafsir": "https://quran.com/24:24/tafsirs/926"
+    },
+    "24:25": {
+      "printed_tokens": 25,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:25?translations=20",
+      "tafsir": "https://quran.com/24:25/tafsirs/926"
+    },
+    "24:26": {
+      "printed_tokens": 48,
+      "arabic_slots": 16,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:26?translations=20",
+      "tafsir": "https://quran.com/24:26/tafsirs/926"
+    },
+    "24:27": {
+      "printed_tokens": 32,
+      "arabic_slots": 18,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:27?translations=20",
+      "tafsir": "https://quran.com/24:27/tafsirs/926"
+    },
+    "24:28": {
+      "printed_tokens": 43,
+      "arabic_slots": 22,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:28?translations=20",
+      "tafsir": "https://quran.com/24:28/tafsirs/926"
+    },
+    "24:29": {
+      "printed_tokens": 28,
+      "arabic_slots": 17,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:29?translations=20",
+      "tafsir": "https://quran.com/24:29/tafsirs/926"
+    },
+    "24:32": {
+      "printed_tokens": 35,
+      "arabic_slots": 17,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:32?translations=20",
+      "tafsir": "https://quran.com/24:32/tafsirs/926"
+    },
+    "24:33": {
+      "printed_tokens": 104,
+      "arabic_slots": 48,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:33?translations=20",
+      "tafsir": "https://quran.com/24:33/tafsirs/926"
+    },
+    "24:34": {
+      "printed_tokens": 27,
+      "arabic_slots": 13,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:34?translations=20",
+      "tafsir": "https://quran.com/24:34/tafsirs/926"
+    },
+    "24:35": {
+      "printed_tokens": 91,
+      "arabic_slots": 48,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:35?translations=20",
+      "tafsir": "https://quran.com/24:35/tafsirs/926"
+    },
+    "24:36": {
+      "printed_tokens": 29,
+      "arabic_slots": 14,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:36?translations=20",
+      "tafsir": "https://quran.com/24:36/tafsirs/926"
+    },
+    "24:38": {
+      "printed_tokens": 29,
+      "arabic_slots": 14,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:38?translations=20",
+      "tafsir": "https://quran.com/24:38/tafsirs/926"
+    },
+    "24:39": {
+      "printed_tokens": 51,
+      "arabic_slots": 22,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:39?translations=20",
+      "tafsir": "https://quran.com/24:39/tafsirs/926"
+    },
+    "24:40": {
+      "printed_tokens": 55,
+      "arabic_slots": 33,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:40?translations=20",
+      "tafsir": "https://quran.com/24:40/tafsirs/926"
+    },
+    "24:41": {
+      "printed_tokens": 46,
+      "arabic_slots": 21,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:41?translations=20",
+      "tafsir": "https://quran.com/24:41/tafsirs/926"
+    },
+    "24:42": {
+      "printed_tokens": 18,
+      "arabic_slots": 7,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:42?translations=20",
+      "tafsir": "https://quran.com/24:42/tafsirs/926"
+    },
+    "24:43": {
+      "printed_tokens": 68,
+      "arabic_slots": 38,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:43?translations=20",
+      "tafsir": "https://quran.com/24:43/tafsirs/926"
+    },
+    "24:44": {
+      "printed_tokens": 18,
+      "arabic_slots": 10,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:44?translations=20",
+      "tafsir": "https://quran.com/24:44/tafsirs/926"
+    },
+    "24:45": {
+      "printed_tokens": 49,
+      "arabic_slots": 31,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:45?translations=20",
+      "tafsir": "https://quran.com/24:45/tafsirs/926"
+    },
+    "24:46": {
+      "printed_tokens": 17,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:46?translations=20",
+      "tafsir": "https://quran.com/24:46/tafsirs/926"
+    },
+    "24:47": {
+      "printed_tokens": 30,
+      "arabic_slots": 15,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:47?translations=20",
+      "tafsir": "https://quran.com/24:47/tafsirs/926"
+    },
+    "24:48": {
+      "printed_tokens": 27,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:48?translations=20",
+      "tafsir": "https://quran.com/24:48/tafsirs/926"
+    },
+    "24:49": {
+      "printed_tokens": 13,
+      "arabic_slots": 7,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:49?translations=20",
+      "tafsir": "https://quran.com/24:49/tafsirs/926"
+    },
+    "24:50": {
+      "printed_tokens": 32,
+      "arabic_slots": 16,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:50?translations=20",
+      "tafsir": "https://quran.com/24:50/tafsirs/926"
+    },
+    "24:51": {
+      "printed_tokens": 34,
+      "arabic_slots": 18,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:51?translations=20",
+      "tafsir": "https://quran.com/24:51/tafsirs/926"
+    },
+    "24:52": {
+      "printed_tokens": 22,
+      "arabic_slots": 10,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:52?translations=20",
+      "tafsir": "https://quran.com/24:52/tafsirs/926"
+    },
+    "24:53": {
+      "printed_tokens": 38,
+      "arabic_slots": 17,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:53?translations=20",
+      "tafsir": "https://quran.com/24:53/tafsirs/926"
+    },
+    "24:54": {
+      "printed_tokens": 59,
+      "arabic_slots": 23,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:54?translations=20",
+      "tafsir": "https://quran.com/24:54/tafsirs/926"
+    },
+    "24:55": {
+      "printed_tokens": 83,
+      "arabic_slots": 38,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:55?translations=20",
+      "tafsir": "https://quran.com/24:55/tafsirs/926"
+    },
+    "24:56": {
+      "printed_tokens": 15,
+      "arabic_slots": 8,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:56?translations=20",
+      "tafsir": "https://quran.com/24:56/tafsirs/926"
+    },
+    "24:57": {
+      "printed_tokens": 24,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:57?translations=20",
+      "tafsir": "https://quran.com/24:57/tafsirs/926"
+    },
+    "24:58": {
+      "printed_tokens": 97,
+      "arabic_slots": 49,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:58?translations=20",
+      "tafsir": "https://quran.com/24:58/tafsirs/926"
+    },
+    "24:59": {
+      "printed_tokens": 36,
+      "arabic_slots": 19,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:59?translations=20",
+      "tafsir": "https://quran.com/24:59/tafsirs/926"
+    },
+    "24:60": {
+      "printed_tokens": 44,
+      "arabic_slots": 23,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:60?translations=20",
+      "tafsir": "https://quran.com/24:60/tafsirs/926"
+    },
+    "24:61": {
+      "printed_tokens": 140,
+      "arabic_slots": 76,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:61?translations=20",
+      "tafsir": "https://quran.com/24:61/tafsirs/926"
+    },
+    "24:62": {
+      "printed_tokens": 86,
+      "arabic_slots": 39,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:62?translations=20",
+      "tafsir": "https://quran.com/24:62/tafsirs/926"
+    },
+    "24:63": {
+      "printed_tokens": 49,
+      "arabic_slots": 27,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:63?translations=20",
+      "tafsir": "https://quran.com/24:63/tafsirs/926"
+    },
+    "24:64": {
+      "printed_tokens": 47,
+      "arabic_slots": 22,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical hamza decomposition included",
+      "translation": "https://quran.com/24:64?translations=20",
+      "tafsir": "https://quran.com/24:64/tafsirs/926"
+    },
+    "25:1": {
+      "printed_tokens": 20,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:1?translations=20",
+      "tafsir": "https://quran.com/25:1/tafsirs/926"
+    },
+    "25:2": {
+      "printed_tokens": 38,
+      "arabic_slots": 19,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:2?translations=20",
+      "tafsir": "https://quran.com/25:2/tafsirs/926"
+    },
+    "25:3": {
+      "printed_tokens": 34,
+      "arabic_slots": 22,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:3?translations=20",
+      "tafsir": "https://quran.com/25:3/tafsirs/926"
+    },
+    "25:4": {
+      "printed_tokens": 30,
+      "arabic_slots": 16,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:4?translations=20",
+      "tafsir": "https://quran.com/25:4/tafsirs/926"
+    },
+    "25:5": {
+      "printed_tokens": 22,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:5?translations=20",
+      "tafsir": "https://quran.com/25:5/tafsirs/926"
+    },
+    "25:6": {
+      "printed_tokens": 26,
+      "arabic_slots": 12,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:6?translations=20",
+      "tafsir": "https://quran.com/25:6/tafsirs/926"
+    },
+    "25:7": {
+      "printed_tokens": 33,
+      "arabic_slots": 16,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:7?translations=20",
+      "tafsir": "https://quran.com/25:7/tafsirs/926"
+    },
+    "25:8": {
+      "printed_tokens": 35,
+      "arabic_slots": 17,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:8?translations=20",
+      "tafsir": "https://quran.com/25:8/tafsirs/926"
+    },
+    "25:9": {
+      "printed_tokens": 17,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:9?translations=20",
+      "tafsir": "https://quran.com/25:9/tafsirs/926"
+    },
+    "25:10": {
+      "printed_tokens": 27,
+      "arabic_slots": 17,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:10?translations=20",
+      "tafsir": "https://quran.com/25:10/tafsirs/926"
+    },
+    "25:11": {
+      "printed_tokens": 18,
+      "arabic_slots": 8,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:11?translations=20",
+      "tafsir": "https://quran.com/25:11/tafsirs/926"
+    },
+    "25:12": {
+      "printed_tokens": 16,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:12?translations=20",
+      "tafsir": "https://quran.com/25:12/tafsirs/926"
+    },
+    "25:13": {
+      "printed_tokens": 20,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:13?translations=20",
+      "tafsir": "https://quran.com/25:13/tafsirs/926"
+    },
+    "25:14": {
+      "printed_tokens": 17,
+      "arabic_slots": 8,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:14?translations=20",
+      "tafsir": "https://quran.com/25:14/tafsirs/926"
+    },
+    "25:15": {
+      "printed_tokens": 24,
+      "arabic_slots": 13,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:15?translations=20",
+      "tafsir": "https://quran.com/25:15/tafsirs/926"
+    },
+    "25:16": {
+      "printed_tokens": 22,
+      "arabic_slots": 10,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:16?translations=20",
+      "tafsir": "https://quran.com/25:16/tafsirs/926"
+    },
+    "25:17": {
+      "printed_tokens": 32,
+      "arabic_slots": 16,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:17?translations=20",
+      "tafsir": "https://quran.com/25:17/tafsirs/926"
+    },
+    "25:18": {
+      "printed_tokens": 36,
+      "arabic_slots": 21,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:18?translations=20",
+      "tafsir": "https://quran.com/25:18/tafsirs/926"
+    },
+    "25:19": {
+      "printed_tokens": 32,
+      "arabic_slots": 15,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:19?translations=20",
+      "tafsir": "https://quran.com/25:19/tafsirs/926"
+    },
+    "25:20": {
+      "printed_tokens": 45,
+      "arabic_slots": 20,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:20?translations=20",
+      "tafsir": "https://quran.com/25:20/tafsirs/926"
+    },
+    "25:21": {
+      "printed_tokens": 40,
+      "arabic_slots": 19,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:21?translations=20",
+      "tafsir": "https://quran.com/25:21/tafsirs/926"
+    },
+    "25:22": {
+      "printed_tokens": 25,
+      "arabic_slots": 10,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:22?translations=20",
+      "tafsir": "https://quran.com/25:22/tafsirs/926"
+    },
+    "25:23": {
+      "printed_tokens": 16,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:23?translations=20",
+      "tafsir": "https://quran.com/25:23/tafsirs/926"
+    },
+    "25:24": {
+      "printed_tokens": 15,
+      "arabic_slots": 7,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:24?translations=20",
+      "tafsir": "https://quran.com/25:24/tafsirs/926"
+    },
+    "25:25": {
+      "printed_tokens": 23,
+      "arabic_slots": 7,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:25?translations=20",
+      "tafsir": "https://quran.com/25:25/tafsirs/926"
+    },
+    "25:26": {
+      "printed_tokens": 19,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:26?translations=20",
+      "tafsir": "https://quran.com/25:26/tafsirs/926"
+    },
+    "25:27": {
+      "printed_tokens": 26,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:27?translations=20",
+      "tafsir": "https://quran.com/25:27/tafsirs/926"
+    },
+    "25:28": {
+      "printed_tokens": 15,
+      "arabic_slots": 6,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:28?translations=20",
+      "tafsir": "https://quran.com/25:28/tafsirs/926"
+    },
+    "25:29": {
+      "printed_tokens": 21,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:29?translations=20",
+      "tafsir": "https://quran.com/25:29/tafsirs/926"
+    },
+    "25:30": {
+      "printed_tokens": 19,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:30?translations=20",
+      "tafsir": "https://quran.com/25:30/tafsirs/926"
+    },
+    "25:31": {
+      "printed_tokens": 25,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:31?translations=20",
+      "tafsir": "https://quran.com/25:31/tafsirs/926"
+    },
+    "25:32": {
+      "printed_tokens": 32,
+      "arabic_slots": 15,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:32?translations=20",
+      "tafsir": "https://quran.com/25:32/tafsirs/926"
+    },
+    "25:33": {
+      "printed_tokens": 21,
+      "arabic_slots": 8,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:33?translations=20",
+      "tafsir": "https://quran.com/25:33/tafsirs/926"
+    },
+    "25:34": {
+      "printed_tokens": 22,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:34?translations=20",
+      "tafsir": "https://quran.com/25:34/tafsirs/926"
+    },
+    "25:35": {
+      "printed_tokens": 18,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:35?translations=20",
+      "tafsir": "https://quran.com/25:35/tafsirs/926"
+    },
+    "25:36": {
+      "printed_tokens": 22,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:36?translations=20",
+      "tafsir": "https://quran.com/25:36/tafsirs/926"
+    },
+    "25:37": {
+      "printed_tokens": 31,
+      "arabic_slots": 13,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:37?translations=20",
+      "tafsir": "https://quran.com/25:37/tafsirs/926"
+    },
+    "25:38": {
+      "printed_tokens": 17,
+      "arabic_slots": 8,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:38?translations=20",
+      "tafsir": "https://quran.com/25:38/tafsirs/926"
+    },
+    "25:39": {
+      "printed_tokens": 15,
+      "arabic_slots": 7,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:39?translations=20",
+      "tafsir": "https://quran.com/25:39/tafsirs/926"
+    },
+    "25:40": {
+      "printed_tokens": 28,
+      "arabic_slots": 16,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:40?translations=20",
+      "tafsir": "https://quran.com/25:40/tafsirs/926"
+    },
+    "25:41": {
+      "printed_tokens": 26,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:41?translations=20",
+      "tafsir": "https://quran.com/25:41/tafsirs/926"
+    },
+    "25:42": {
+      "printed_tokens": 36,
+      "arabic_slots": 17,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:42?translations=20",
+      "tafsir": "https://quran.com/25:42/tafsirs/926"
+    },
+    "25:43": {
+      "printed_tokens": 20,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:43?translations=20",
+      "tafsir": "https://quran.com/25:43/tafsirs/926"
+    },
+    "25:44": {
+      "printed_tokens": 26,
+      "arabic_slots": 15,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:44?translations=20",
+      "tafsir": "https://quran.com/25:44/tafsirs/926"
+    },
+    "25:45": {
+      "printed_tokens": 30,
+      "arabic_slots": 16,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:45?translations=20",
+      "tafsir": "https://quran.com/25:45/tafsirs/926"
+    },
+    "25:46": {
+      "printed_tokens": 10,
+      "arabic_slots": 5,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:46?translations=20",
+      "tafsir": "https://quran.com/25:46/tafsirs/926"
+    },
+    "25:47": {
+      "printed_tokens": 26,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:47?translations=20",
+      "tafsir": "https://quran.com/25:47/tafsirs/926"
+    },
+    "25:48": {
+      "printed_tokens": 23,
+      "arabic_slots": 13,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:48?translations=20",
+      "tafsir": "https://quran.com/25:48/tafsirs/926"
+    },
+    "25:49": {
+      "printed_tokens": 24,
+      "arabic_slots": 10,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:49?translations=20",
+      "tafsir": "https://quran.com/25:49/tafsirs/926"
+    },
+    "25:50": {
+      "printed_tokens": 21,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:50?translations=20",
+      "tafsir": "https://quran.com/25:50/tafsirs/926"
+    },
+    "25:51": {
+      "printed_tokens": 14,
+      "arabic_slots": 7,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:51?translations=20",
+      "tafsir": "https://quran.com/25:51/tafsirs/926"
+    },
+    "25:52": {
+      "printed_tokens": 16,
+      "arabic_slots": 7,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:52?translations=20",
+      "tafsir": "https://quran.com/25:52/tafsirs/926"
+    },
+    "25:53": {
+      "printed_tokens": 30,
+      "arabic_slots": 15,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:53?translations=20",
+      "tafsir": "https://quran.com/25:53/tafsirs/926"
+    },
+    "25:54": {
+      "printed_tokens": 29,
+      "arabic_slots": 12,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:54?translations=20",
+      "tafsir": "https://quran.com/25:54/tafsirs/926"
+    },
+    "25:55": {
+      "printed_tokens": 27,
+      "arabic_slots": 14,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:55?translations=20",
+      "tafsir": "https://quran.com/25:55/tafsirs/926"
+    },
+    "25:56": {
+      "printed_tokens": 18,
+      "arabic_slots": 5,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:56?translations=20",
+      "tafsir": "https://quran.com/25:56/tafsirs/926"
+    },
+    "25:57": {
+      "printed_tokens": 22,
+      "arabic_slots": 14,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:57?translations=20",
+      "tafsir": "https://quran.com/25:57/tafsirs/926"
+    },
+    "25:58": {
+      "printed_tokens": 29,
+      "arabic_slots": 13,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:58?translations=20",
+      "tafsir": "https://quran.com/25:58/tafsirs/926"
+    },
+    "25:59": {
+      "printed_tokens": 33,
+      "arabic_slots": 17,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:59?translations=20",
+      "tafsir": "https://quran.com/25:59/tafsirs/926"
+    },
+    "25:60": {
+      "printed_tokens": 35,
+      "arabic_slots": 13,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:60?translations=20",
+      "tafsir": "https://quran.com/25:60/tafsirs/926"
+    },
+    "25:61": {
+      "printed_tokens": 20,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:61?translations=20",
+      "tafsir": "https://quran.com/25:61/tafsirs/926"
+    },
+    "25:62": {
+      "printed_tokens": 22,
+      "arabic_slots": 13,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:62?translations=20",
+      "tafsir": "https://quran.com/25:62/tafsirs/926"
+    },
+    "25:63": {
+      "printed_tokens": 27,
+      "arabic_slots": 12,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:63?translations=20",
+      "tafsir": "https://quran.com/25:63/tafsirs/926"
+    },
+    "25:64": {
+      "printed_tokens": 16,
+      "arabic_slots": 5,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:64?translations=20",
+      "tafsir": "https://quran.com/25:64/tafsirs/926"
+    },
+    "25:65": {
+      "printed_tokens": 19,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:65?translations=20",
+      "tafsir": "https://quran.com/25:65/tafsirs/926"
+    },
+    "25:66": {
+      "printed_tokens": 9,
+      "arabic_slots": 4,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:66?translations=20",
+      "tafsir": "https://quran.com/25:66/tafsirs/926"
+    },
+    "25:67": {
+      "printed_tokens": 21,
+      "arabic_slots": 11,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:67?translations=20",
+      "tafsir": "https://quran.com/25:67/tafsirs/926"
+    },
+    "25:68": {
+      "printed_tokens": 40,
+      "arabic_slots": 22,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:68?translations=20",
+      "tafsir": "https://quran.com/25:68/tafsirs/926"
+    },
+    "25:69": {
+      "printed_tokens": 17,
+      "arabic_slots": 8,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:69?translations=20",
+      "tafsir": "https://quran.com/25:69/tafsirs/926"
+    },
+    "25:70": {
+      "printed_tokens": 27,
+      "arabic_slots": 16,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:70?translations=20",
+      "tafsir": "https://quran.com/25:70/tafsirs/926"
+    },
+    "25:71": {
+      "printed_tokens": 15,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:71?translations=20",
+      "tafsir": "https://quran.com/25:71/tafsirs/926"
+    },
+    "25:72": {
+      "printed_tokens": 22,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:72?translations=20",
+      "tafsir": "https://quran.com/25:72/tafsirs/926"
+    },
+    "25:73": {
+      "printed_tokens": 19,
+      "arabic_slots": 10,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:73?translations=20",
+      "tafsir": "https://quran.com/25:73/tafsirs/926"
+    },
+    "25:74": {
+      "printed_tokens": 26,
+      "arabic_slots": 13,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:74?translations=20",
+      "tafsir": "https://quran.com/25:74/tafsirs/926"
+    },
+    "25:75": {
+      "printed_tokens": 23,
+      "arabic_slots": 9,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:75?translations=20",
+      "tafsir": "https://quran.com/25:75/tafsirs/926"
+    },
+    "25:76": {
+      "printed_tokens": 9,
+      "arabic_slots": 5,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:76?translations=20",
+      "tafsir": "https://quran.com/25:76/tafsirs/926"
+    },
+    "25:77": {
+      "printed_tokens": 26,
+      "arabic_slots": 12,
+      "surface_crosswalk": "all normalized surfaces matched in order; canonical decomposition included",
+      "translation": "https://quran.com/25:77?translations=20",
+      "tafsir": "https://quran.com/25:77/tafsirs/926"
+    }
+  },
+  "scope": "Full An-Nur24:1-64 and Al-Furqan25:1-77, plus retained regression verses9:4,9:25,23:83",
+  "arabic_normalization": "NFD canonical decomposition, remove marks/tatweel, unify alef/ya variants; verse-number markers excluded",
+  "crosswalk_note": "Every ordered slot verified. 24:11 slot16 uses canonically equivalent decomposed hamza in the app and precomposed hamza in the fetched surface.",
+  "chapters": {
+    "24": {
+      "name": "An-Nur",
+      "verses": 64,
+      "printed_tokens": 2613,
+      "arabic_slots": 1316,
+      "source_digest": {
+        "surface-checks.json": "25d2da7712eb8ad47fdf32873cc541059fb4663b4ebcb0d81ba12998ad5c9e9a",
+        "morphology-24-64.json": "f744f4731ab61f416180e6d1c983d0d50a22737feb0f5eac4bdd4c7db11a47d1",
+        "morphology-24-64-page-01.json": "ba74aeb8ce659e053690c2f62dd36941a247f606e1dc5c506e2e36413993ba35",
+        "morphology-24-63.json": "e24c24d7fb0150eff42644b6caf86c2707bb2e284954aa56ee162cc1e4f536ee",
+        "morphology-24-63-page-01.json": "04537d5789e34ecca4a1002f97dd70b9c863b7916e949f0c4c773094eb7b8225",
+        "morphology-24-62.json": "41effee5205adce655a7b6f2286b025cf74b62d55c5f9e4a5f97a0e33a7a48ed",
+        "morphology-24-62-page-01.json": "35e9e4c62e20e629776a3c21d9adf000da9f466c9f74da208072333ca87f359c",
+        "morphology-24-61.json": "0fdc27d507d94e1ac38d233abd1cb1eceb3e092a34a3167affd51ffc4f7a06b9",
+        "morphology-24-61-page-01.json": "6f10745feb9043fbc1ccae1e4105a327a5455f00cb7e5a6767ee5def0ea61761",
+        "morphology-24-60.json": "17833a858ee44e5de219fcfa35a1b7e7059c7498a642c5f5e6b3e412f9a862a2",
+        "morphology-24-60-page-01.json": "b771c5b95c4ce39e1606f27af89134645cd76670c2733d250e55aa06a11a5fb0",
+        "morphology-24-59.json": "bc27e21c11b0b8c9fc8cf2c2dffa3bb056a3163888cf22d336ac52ef7d2d6ecd",
+        "morphology-24-59-page-01.json": "a85390468ae4adc168cdacbf939cb1fcc2afdfa7c729204d5750dc430724c1f0",
+        "morphology-24-58.json": "a09685a7f7d55c7cc3623a47b86639986f38d4b7b0b724c34b445fc664637dee",
+        "morphology-24-58-page-01.json": "03d58ba878f4768c886d086dd7fc0da81c17f96e3c09074ea376b741a7b1cbf7",
+        "morphology-24-57.json": "f18f379fc549a710a3a62f66227d25b8f8c0c5ac6c34d48013b6515a158f4c39",
+        "morphology-24-57-page-01.json": "441a7abaae3d9c6b0b59c0a5dae0f66ae5607d3894f4fa266f41ff89728c3c57",
+        "morphology-24-56.json": "a57914100b18f536a50454f062b4f84f91ceb4260032f406e90a5de5dfd965ed",
+        "morphology-24-56-page-01.json": "3f23d8e31f0ae6f2f1b0c7f54ef1e966a458bf2b533acbbc95097715573392cd",
+        "morphology-24-55.json": "a4c775a03328b0c139b195ba5bf173ad4c08f3b36eefa3f88653bfe74ac555cc",
+        "morphology-24-55-page-01.json": "dc3763d530ec4c44669754d38a813cee81530d454c1ca07ba36f887081e867a5",
+        "morphology-24-54.json": "7e26d6f374c75dd55dcf5f4d6896b3f74e6bc3027490ffa21de1a2ed7c667549",
+        "morphology-24-54-page-01.json": "be1c8a5589b71e93ba8913608c1026f11bb4c30b200d96e18e9b143c9c26f0c7",
+        "morphology-24-53.json": "43a8f1476446b6cf63f6f1dc4b50997d4370e3aae5a01007e53c88ce5055e3f1",
+        "morphology-24-53-page-01.json": "6c59f63f05714ae151d8c021c694ee68e97ff9b294a7d468d99fd863ea602043",
+        "morphology-24-52.json": "f3145a9d56cce41ab444ea4c982e80fdf7411a580815afe9eb93d3e6b2dc0ac0",
+        "morphology-24-52-page-01.json": "c1c29d5d579d61e714de93c1c1fa6ecc8a62a97f413de9b3eea792a8cfb939d6",
+        "morphology-24-51.json": "c7952db0dcac3385a7e1f2f74b9aee9faeebba2c0d84a0ce39bdff0e4cb01268",
+        "morphology-24-51-page-01.json": "fc4aacddb7a596629593508ce36df145a73b51db46bbbf5d6d55eb47efddd47b",
+        "morphology-24-50.json": "01ae4b06e053f45a3921136c4d49d62d2334b51a3aa3c77316f347d4fc3b6dd8",
+        "morphology-24-50-page-01.json": "788a1f2d2538d8c0ae5f6aee95c678668786369bc7731f060ff488aa05ab4566",
+        "morphology-24-49.json": "a18c222e20cbc36bb907fc76ffefa892b1cd1f855c0354d82e1df6bb70552a7e",
+        "morphology-24-49-page-01.json": "7a975949cb7d03ec9423f73f41b5c0642d6d6ece963d61f742d362036575511a",
+        "morphology-24-47.json": "705408b27847e8760770e4fdf4957d1b6f375f138d85c90824bfcd05c54e6540",
+        "morphology-24-47-page-01.json": "8833dd3ea9733e256c906c7579aad0517c2a5e4b4e67b60def89c5ea81aba084",
+        "morphology-24-48.json": "d4bacf99cc3c155d41b5b23a69d45c796f1d632faea12bc7c9349b56e356f324",
+        "morphology-24-48-page-01.json": "99f87caf08f68922a64a63a1a2d7246fdfce0b348fb2035a7a30da063a954517",
+        "morphology-24-46.json": "6d5f90ef76598b69a45402b84e7dfc95efe9c85867b8be10547da5731bd0f912",
+        "morphology-24-46-page-01.json": "86ec627a370ab40e2f9d73751f0f24b713dd6349fe839f805b50caa2143184c6",
+        "morphology-24-45.json": "fa2435ef3e4a32fd46688790e2f888d97e38995bde93460a0a8bf47db7414f48",
+        "morphology-24-45-page-01.json": "1780768942e2b54ccee3c18e1b9b57c16764524660582cdb302cfd51a88e0b05",
+        "morphology-24-44.json": "10c9841774c7e7767454d3b037c7e0c9614801dc904289851e53bbb0e32330e2",
+        "morphology-24-44-page-01.json": "de3b21c0ff229b81f5ba4f8d8704468d651a8c61198800638f7fe3f41095c7a2",
+        "morphology-24-43.json": "1790fa76a41a6a937cc03cc37c9a6bb96635fd65f0dfec3ed12de3c5a56e3d46",
+        "morphology-24-43-page-01.json": "b0baa3b15271d496af7cb94546d415ca94342bc145c6c869d17e8cfadc4e1403",
+        "morphology-24-41.json": "9d38540fd64d8a4b4a1ea4100bebe85fad48370424b5f505b6cc9c33296e5075",
+        "morphology-24-41-page-01.json": "516944839a1096617cff8041e3c7e7839c388ea929d9b03a19b06edc6a274b89",
+        "morphology-24-42.json": "2b41916e98f73883e4430025c049dd8165edcd9f1562b67e0ecf0fdeb1d552c3",
+        "morphology-24-42-page-01.json": "d9b04d786b96c5463425b264d0fcda37efc682c1bd905e94ae2a127b153d325b",
+        "morphology-24-40.json": "581e01985a3039c598a750db49a3863997d06505449908d0ba1126181f90016a",
+        "morphology-24-40-page-01.json": "c89ce0782a31bbf88cc133c5702b5772c247be61e8a142e7144d4a00e448a5a7",
+        "morphology-24-39.json": "d697024583736f2cf8548111f1786fbf3937eb35de6ae53f1425a16344f22d11",
+        "morphology-24-39-page-01.json": "b5d2423d5f043f0f846e06084a996ed56a3680cbedc4ad9ba132c0657113a8bc",
+        "morphology-24-37.json": "785fb365b1fe62fb734d56141915771aab4975000fcff12afece6fa7963b9f3b",
+        "morphology-24-37-page-01.json": "6a84db4ffd91cf308aa6b5d52a6d1f6d63742b9410976a7334da6b5f1a4d3b3f",
+        "morphology-24-38.json": "8a8b3ad980b535a7620275013c79ec1186291051de9fe02b0a4d00cf995ae28b",
+        "morphology-24-38-page-01.json": "44a77b107135d7c0debb418a7dc002b187b2079797fc8808f1efde129375b0fd",
+        "morphology-24-35.json": "2d27acb484b52215caf35851e639bb93a0ab22f5a2ed81cefe02a18018ee1b9c",
+        "morphology-24-35-page-01.json": "72e6da79e96a16248da931443e9b16ae04c6b4e1a996e31c002bd95cb1882d53",
+        "morphology-24-36.json": "fc0efb99972c4f1aac6768036f593eb3d6bafd79590347dfadf476b0c009aeb1",
+        "morphology-24-36-page-01.json": "9c912212d567351580104258f7c834aeda7edeca7da1f1bb98fcec5ace097425",
+        "morphology-24-33.json": "077d41f394167e6cdd066d40d16ea61a795cb37b6b056414e02e273b480adda1",
+        "morphology-24-33-page-01.json": "abad8eaa2071250e7ec50cae2b1de82fc747e3e6108b2c66f9878f466cb93607",
+        "morphology-24-34.json": "a8adce8a49449237d1dc42ca68c4d7cfc80284e8126cb90b4dd8d779aa873093",
+        "morphology-24-34-page-01.json": "26cd296437177a2b56673ebb8bf735fe84d987bfff8abe42ffd963dfd70f22ca",
+        "morphology-24-31.json": "d2bd6bac3ae83928f9818db2e04508d8eb8d9c16b087289e9c01f2d4a343c7fb",
+        "morphology-24-31-page-01.json": "ba2823bf3ce0333273a8663aa9e1c25d62802adb09686f9c91cf50706d187572",
+        "morphology-24-32.json": "946ccc9802d489f498de8c8a10552d9bae267e8ad8971fdc89951e21a93b2ad0",
+        "morphology-24-32-page-01.json": "2fa35228493c6ff88ac950c49281fe1782ab2873c25e16df144ccd6abeef9854",
+        "morphology-24-30.json": "44674cc1ba697c9aec3d20c50a920058cf8eecbce58712b2072b995d1e7569c7",
+        "morphology-24-30-page-01.json": "8ae04c2b75dd90ec46fcbcf57da942176d13f18be6ad68c0d6c4353b435f27d0",
+        "morphology-24-29.json": "e8c5257436b32915980cecfb3874d849645459431bfe27d7a9993845c8ac886f",
+        "morphology-24-29-page-01.json": "d068c4494d1d2d0405c07c57aa3010503415e9e6bc8bf26cb8d0ad45f9e114cc",
+        "morphology-24-28.json": "19aa1f7658f349a5ec34f6732bb963c1d26c4ed2822fc5dcb2e27203f3c06d8b",
+        "morphology-24-28-page-01.json": "15cb0b50b11932031ce435daf8b0f93dd58da8bdd07d238693657b0b8484080e",
+        "morphology-24-27.json": "066dc2979e51a0ee8dd9a7a7466f116ead2ddde93306f72cf2576e09d9057a51",
+        "morphology-24-27-page-01.json": "05c86c531a17ce13852507bb8414ff2bf6eb70274c45dfe651a6b7871ad8fc52",
+        "morphology-24-26.json": "9b44dc0787c1c47aa50a7747f322da1a76100179c5c7fb6c2101d1553eb13fad",
+        "morphology-24-26-page-01.json": "ec6ee471fd6a418533af280f3dddf9d86f08630aabecb49e1ad4003e1fb26cf7",
+        "morphology-24-25.json": "7c77665e295199121df431cd496f0b9f475961089307f42a21979ed706319f9e",
+        "morphology-24-25-page-01.json": "82fea5e995f2b3e884581fc8e004db66219c8fd72fead8f03c225436139608a7",
+        "morphology-24-24.json": "09b71911a23bbc24ab491c35756d935c28ab2e72df863ab05308323364e909b1",
+        "morphology-24-24-page-01.json": "e07ecbec3ddbf2e3a128674b062b332efb922a31bc508d9be2bdcba9a2722233",
+        "morphology-24-23.json": "8fbffbce30bb0e1e787e1c128781c8a10222ffe2f5825aac81b2bb2577d68500",
+        "morphology-24-23-page-01.json": "19e9f52bfe06ca8c1638fd39a5f7b82c1d1ec4fe34beb88e3df24039c0d5f0e1",
+        "morphology-24-22.json": "18db82f49e4f20fbd9bccdc3a95ae08058524a6de8ea9db5b308e6b33208a0b8",
+        "morphology-24-22-page-01.json": "76798750c8dcc8ca9cc88fcff7fbd74004f2290eb638f4186be5ec96b6a2d5af",
+        "morphology-24-21.json": "fe914786b127f894007516803cc8866f61af8498084474a9c69e1a27737a599d",
+        "morphology-24-21-page-01.json": "65e3ac49a0b465bf3b2947d19e699e324a279b8f17706a88631679126177d6e8",
+        "morphology-24-20.json": "472d3b0589aec6918c330572a3b024ba1f89026f8c5583abbaa57731196d4e2a",
+        "morphology-24-20-page-01.json": "31f98aaf7cc02f0a90171dfa9014ae420904aff009bbd7444853945f0a6470a4",
+        "morphology-24-19.json": "6a8d5eb721f5092c5f40cd2d51e200280b67fd5dd5056b23b906aaeca6289850",
+        "morphology-24-19-page-01.json": "54a4dded997c3a619cde19d42fd22a014fbf4eab587f47ea5c3b9786dddda6ab",
+        "morphology-24-18.json": "83f6f39f159c6b7e90e41f845aee45843726b6e5ea989d67abd95191e488ebe7",
+        "morphology-24-18-page-01.json": "2868e17eeb0492a73fe14c8404bf834a275ee82460d3bfecc81d59c7df27e07e",
+        "morphology-24-17.json": "05ea7cc7695d49b22f7db4dd8de996c82d5c09891e81cc195fc4b3dc4f3bcb54",
+        "morphology-24-17-page-01.json": "a4adf00ffac9c9ae729b881463b2bb6a2f85bdcf9d1a7ae8df7b2128176bf766",
+        "morphology-24-16.json": "1676abd84e33cdb7c97b848311bb858a2e82207046d490f60d2cc81c0ba97149",
+        "morphology-24-16-page-01.json": "ccbcbcbd72567092bfbca647e98c90c33f1f9abc5e4e0e73b3c80fc923e25980",
+        "morphology-24-15.json": "fd97b4f8eefeece5d33b712cc683ce2b29057736b6ccd36dcecb14413e99de5a",
+        "morphology-24-15-page-01.json": "6f4d27ce461b730a79860515b4fe129c9b7fb9d9ae951ccffd5e04b771d65966",
+        "morphology-24-14.json": "a8e27583dff2075580f367c16b81c5134008f9964899530f0c6a320b1bf73a10",
+        "morphology-24-14-page-01.json": "08bafac99bca8514dded051e52519b299dbfdfc8c549e035fc0a90bb148716fe",
+        "morphology-24-13.json": "6ef7285e8b60550ec45347e4936187a73236df421e7ace9c571c22e25fc47924",
+        "morphology-24-13-page-01.json": "fa1725c0547a72497448d4f905590f63787b9c267d3096a7bd9d023ab1b020b4",
+        "morphology-24-12.json": "329dbeedf7a6d3ca934834b45c6dfd8f6583ecfa9095cf7d1ef6063d934d4db7",
+        "morphology-24-12-page-01.json": "0a26817f0d8e89b4837ce3474d3270395b586c360a51055eb159591e6ac026c6",
+        "morphology-24-11.json": "47ff7603b90c7a618547b7b83928a771f7555b26fcc4db6574d8d266f6613f99",
+        "morphology-24-11-page-01.json": "98ff1c8c62243a12602e84db60d0a036189508719d47de7db62abad9599f8f2a",
+        "morphology-24-10.json": "f5fae4a0076efae33a239617f699afd935446190a3b703df82b4138c949eb461",
+        "morphology-24-10-page-01.json": "0fdfc729623691dfa47187ace4c44c8d79691889923ce698d8182371bcd46e72",
+        "morphology-24-9.json": "ff6e4a44c56b2e1b6d666b82ba43e700f10b42512e2912628d2c484ec3ab8fa7",
+        "morphology-24-9-page-01.json": "a7c40e8936755f816533ac3dd5552f17e4268abe218511b95914491ece4a2edc",
+        "morphology-24-8.json": "aab97e04ff5efae6e0576c9015533fe42422c8f5e6e178e2b4461820b4d39aa7",
+        "morphology-24-8-page-01.json": "d24ac18074eb624a496b348bad72db9e84784e0a2ca236fbd4da39f961952b36",
+        "morphology-24-7.json": "744141e60b7950a06b794143b636598a433f0e8340f8e14c62b7278b8caa14e8",
+        "morphology-24-7-page-01.json": "347423065e6d2ec04aabf5d64f688e419360e0698e642187a154b75dd022f325",
+        "morphology-24-6.json": "3d10564da7f69fdb4874745c1d7054b201077e2ed8e09ab2544c396c8a001818",
+        "morphology-24-6-page-01.json": "a471a98362035eae29c3aa60f33ddcf90654739fc458daa70380a610bba46d71",
+        "morphology-24-5.json": "43c0ec142eda959c44d8c08645f55517976f97f21f24a9eac40fe5c23639d7c4",
+        "morphology-24-5-page-01.json": "672e0867d24c6a475b047b6f3ac32f394dc8abf040a7807b5dfa19512b6a101c",
+        "morphology-24-4.json": "720e1190bba5c00330e30b73ba3575fd03ec17209d204e2061c57d5a8080e8a0",
+        "morphology-24-4-page-01.json": "10448d6b6449bc80afa2f161574a96bef89b07158c235f6bb4b426469daf8647",
+        "morphology-24-3.json": "6e34ba431a78bf7d986762480eade2652eaa2592732667c1b22feb3c76b136d0",
+        "morphology-24-3-page-01.json": "700cb8b3a6ecca625474a3ed9fe0775fb2acea1427e6962cbf1e41a98f6dd96b",
+        "tafsir.json": "7e0382cc6e91d64e1b3abeb016f2467c28d92da901bfe590a65f36904243812c",
+        "tafsir-page-03.json": "cea7826e33a133ec43f2d29fcdbb2e37fecb9c6fad2ff2bf464a43b1c0d4fb74",
+        "morphology-24-2.json": "120a66974ee5ead269257dad2a9e0a74bddae356e2c2c31713a5cbc0c9b80c5c",
+        "morphology-24-2-page-01.json": "a287deebf4032e6260d6f2192016e450fcbe02c2c8f4ede88034841c358e4649",
+        "tafsir-page-02.json": "3c8b9e5f4c8768a58857c5a45d77551c83c0de681d02d9bd4f751d049fd51f8b",
+        "morphology-24-1.json": "3a40ad0719b4301e4ee360279a26d0511ba40deca5e4dd77c2dcc905a230536b",
+        "morphology-24-1-page-01.json": "ec833a3a2a1ff49664c1b1b7c1b2c2037f91a407e1905cf4fd6deada77b29377",
+        "tafsir-page-01.json": "143f201fc8e0bfcbfe6133da8e2891d0ef99c5b29df6fcfba47fcdd3a19a62b5",
+        "quran.json": "9ce795a21803ca0f288ebc2195a976f05c1c840a3c81bc14d0d96e5bb17b243e",
+        "quran-page-01.json": "96f312a70723660b0b2e99e37a8013a09d85c5ad4a3e150b5715d112783d950b",
+        "translation.json": "e2ac41846c8b5f7583b215dbff5ad00009ee9078742d0ebe944108df9deffd13",
+        "translation-page-01.json": "3c76e921cb19912d6391e59e7f180e5148b85480e6fc96ccc5088dc173dcd5c7",
+        "grounding.json": "ae2c3ef66e0c3b14dfde22cdd308f8d446688fda0cc1b36f06393579f2691c87"
+      }
+    },
+    "25": {
+      "name": "Al-Furqan",
+      "verses": 77,
+      "printed_tokens": 1847,
+      "arabic_slots": 893,
+      "source_digest": {
+        "morphology-25-1-page-01.json": "ebf345a8bbdc0806c5d99410a89b6996cbaa3eecda5341f31a957f4034127426",
+        "morphology-25-1.json": "24ac70a774815088df56b8c1141a2bb8e18088726c7f658f3e8971b065868b97",
+        "morphology-25-10-page-01.json": "7a2427167b00e98f7968be98df8ad7a4a304877f1c464c2cbf149b12158d42a1",
+        "morphology-25-10.json": "dd5641cc1584fd1dd9fc2f385b570610c88034aeac13790b614992f7f299dad6",
+        "morphology-25-11-page-01.json": "570eecf2d9866105890af7a386c28850c58b179bc7df12afb604efe5b2804bfa",
+        "morphology-25-11.json": "52cef4afa93f7c6347d5838a6fa4e9ced690c73578898c80f30ba6954af32e15",
+        "morphology-25-12-page-01.json": "1961c0fbf5ee16c9dbf378a6e0031a64dac8a52c28a0eb358f4c181f21ff704e",
+        "morphology-25-12.json": "1851f8c03580dcf107679a735fd5456ded778a3f9c8801aa27ff6751b4a16cde",
+        "morphology-25-13-page-01.json": "73a924b9f0496bf8e8424486032ca98de5300bed45cbe944eae24f99d62b6355",
+        "morphology-25-13.json": "5a3e815f06df0c90ac0022df3b266dcf8c095b6163d9058a22a44d98ee6752d3",
+        "morphology-25-14-page-01.json": "f75a25a3e802708093bcd59f8ce1c8e6341c0fb50e011d7fed57add5911c139c",
+        "morphology-25-14.json": "096ad380f45ee1f99b5ac89485a517607935aac785e7ebefc0df034c72fb0099",
+        "morphology-25-15-page-01.json": "f3315a6e937d95e9a7db5b0355ceb3926ad3d013bd8a79ea1372f98385e8fe75",
+        "morphology-25-15.json": "49a2b41059898119d25d02a26d13294dfc2685caa6839e8589692128300ab1c8",
+        "morphology-25-16-page-01.json": "7dff836f641685e458811bf9d9ba944cf136ddb6a2bdc07aa14772f3ec26ebf7",
+        "morphology-25-16.json": "869f8bcbbb2589e778800e6c89e437e599398465ce20209cb74d9f12257ec8d7",
+        "morphology-25-17-page-01.json": "c3c7c5a998f40bd294c672b8a9dc51ce60946a02ac5752e6b3dfd569418bbea4",
+        "morphology-25-17.json": "0d1a040fd0641db734b61d885e5264c4c131cec43cd582390453f5c57ddd41fc",
+        "morphology-25-18-page-01.json": "95c72b3058e5730390e63aae0976478dfe8a56229e5ce5c47101156826e8393e",
+        "morphology-25-18.json": "6fe6ea59df29e6fdd169183156cc5aa57cce00e21aca61f1e0bc2e41cbba0a57",
+        "morphology-25-19-page-01.json": "3eb9ca0a5b1b45ba9434080bb7081e85598c13645da36cae5154c82bad0c863d",
+        "morphology-25-19.json": "d9ef1125a7cc0eb2b6b93f320a3b119dad33e48f65eb7c86fdca308bfcd52a54",
+        "morphology-25-2-page-01.json": "369dde8cc4cd7f5e521ce88a860d2b78d185ff40cfaeb9afec631c5917c5ec32",
+        "morphology-25-2.json": "bbd8cf9c055a14019e3c8b7a087054ccf201a21af3c2ac210315db6b64cea4ee",
+        "morphology-25-20-page-01.json": "7ff97c717380de73a616883bc503cc2021ae516c25cc596a88dbbeba231fea86",
+        "morphology-25-20.json": "3f61c7dc0ae826744ff00ffd9f95a94981e5cd753ab78a3a3f560d878ca1917f",
+        "morphology-25-21-page-01.json": "5940d0ad1e23e65b88327cd733ccaac62e32cffe7c0f74b5c8dde18537459a60",
+        "morphology-25-21.json": "ca9a6e11b3350eaaaf61e2c5f374fe1a2c2ea3b7c2e381ad01143ddbcf78e4f7",
+        "morphology-25-22-page-01.json": "f08f919c65e22a272af1330a0438bf2da740d165407de4d88f1e0b58453ab51e",
+        "morphology-25-22.json": "5559524248123f8eb0de944e6745479ad7a7c3eba3cdcb0580a7e7ae3dff2747",
+        "morphology-25-23-page-01.json": "fd563f8a8c3d1e759a20550c6954ff439c55d6cb7d3382ce8463e4e7ad9482aa",
+        "morphology-25-23.json": "ff962c18e3797cb11375b25d850e7f731e78d5968b88f3b74ac91c6d2c312b0c",
+        "morphology-25-24-page-01.json": "988890cc0ef585c8913c15b55079add8f100138a4b72b6f676355a5f6ab88467",
+        "morphology-25-24.json": "81ca20db00402b2c5f97252014ec2ef6fa5a6e6bc5f09324c226feb45882446d",
+        "morphology-25-25-page-01.json": "af20b63bf09c1665df04b3dcd58640a62908a705b9caad167fb64a328b4b1a36",
+        "morphology-25-25.json": "414f997d12eb9bd77de70cc548166a751bbf6a7f7cd300b14a00b70bf8034d61",
+        "morphology-25-26-page-01.json": "67d578075b0ef95c5b8b1ea48ec6c956d785732c4d91fa24d60490db803c32c6",
+        "morphology-25-26.json": "db379c78deca81280f2b2ec2aa6525a1879d3a0f9f0f122f0284a31026060e08",
+        "morphology-25-27-page-01.json": "87d13abdee07f4ee365b746be27c67e63c6339b8dd54faed6e07666821e23dab",
+        "morphology-25-27.json": "953075a123d8bc747458eaad711abe02097826abb434e0fea7205816f50071b1",
+        "morphology-25-28-page-01.json": "113437875dd2a9dce7136093a4ce9396fc1ef130fcf6e5bc9094fee3d03955ac",
+        "morphology-25-28.json": "3307645a07b0869c75c50547693bdeebed97be8b6a7b8ea351fec21d0baa9ecc",
+        "morphology-25-29-page-01.json": "4efe47b8893842da5c772c9c141a8617bc19fdc0bcd8cf8996e04f06d118e412",
+        "morphology-25-29.json": "70448740813e9b8fb2505a576f038a5564c4a5dce36a339fe520ba7e16d4e638",
+        "morphology-25-3-page-01.json": "178f08e1b5a11cca2a6278000d808288501eac88b1c652e916e412f22f28ac49",
+        "morphology-25-3.json": "77913af1457ba51643cb9f7c27d2e57cd2380af213b2b4bf7a474731b95edb2d",
+        "morphology-25-30-page-01.json": "a554ffe494865ee5d0fd0bd6bf2c952b1c560472784d2143f676f1bb160370b5",
+        "morphology-25-30.json": "832db3d4cdb2bfb96778a80d70300398a702aebd2032823c51cbfe39ee551f30",
+        "morphology-25-31-page-01.json": "417970b2485610b8aff64cdbb239f6aa9fc971bc95d4f123008f18ffed9a1d96",
+        "morphology-25-31.json": "8855446b365b0a49bba0c499be4a58d6b2ac1697cd9b93c6f7feedb481f6a903",
+        "morphology-25-32-page-01.json": "52f4454ea81cec88127fb52e387811b8ec122348f0c38c31338c3d84f976054e",
+        "morphology-25-32.json": "a152e6cafbe882be73740316b6151e29531e7b2b7f181a6645a58f916cf2820b",
+        "morphology-25-33-page-01.json": "19ce3d538d4413b77080716be64dda798527a21d04e652a00b7d9d75505307e3",
+        "morphology-25-33.json": "4d1070fa7f3f753ceff7ca262e42bcefc9eaf98005a2088cb8a3b230d1f67a27",
+        "morphology-25-34-page-01.json": "0697c63cd6effba4aa36265154aa629ff34aea6d885c6a4120540f7c6333c8e2",
+        "morphology-25-34.json": "6465e635a0e7241ca8b2f8b3890d7b342c7dbc30b1b8dc4db9bb78580eb61ce5",
+        "morphology-25-35-page-01.json": "72077dfcbbc084ed3bd72c8cdc397ae328b8a3e917f6d6d0e83cf88e76d702cf",
+        "morphology-25-35.json": "629ecff268c66b73decf6219fd050e9ae0c3c637a87fd2d5367c48855998c123",
+        "morphology-25-36-page-01.json": "7d0ad291192748e5f52b8091cdfc6f92dc351e68ade5a120d853a68f14c7bec8",
+        "morphology-25-36.json": "ddce65d0e27d7c07ed07e85601faea0dee840b538588b7e45d789f0bfa11a098",
+        "morphology-25-37-page-01.json": "c71fdab00e23f23f12116c655c8c10f776b236622a4d9a5f6c2bbc9a0e343079",
+        "morphology-25-37.json": "3dc7531e489f8b386f0aedbdc04f9351794a484ed103781a3d90f60de69026ad",
+        "morphology-25-38-page-01.json": "e5778e06030c8af82440ecf92a62e533d182001492376b638107e2ecdf038164",
+        "morphology-25-38.json": "993eb448d40bd0a7abf7a3fcd180ff04167b0359aa7557f7f650d99a61ee5c1a",
+        "morphology-25-39-page-01.json": "9a1247e16197a8963403639ad77bb62b00f7879ad1dcf2b3c8c5662e141ce205",
+        "morphology-25-39.json": "d267c0f62b5b53a5bbeef0d0eccadfffe971bd972971d3667657360fc2530295",
+        "morphology-25-4-page-01.json": "9a9fde3ab2eea989361860d42d1e8abfd42a9a216d36f877714c59ae65b5c58d",
+        "morphology-25-4.json": "fd1a33a98c60c7a5daaeb1318e3198dd70ad9f20122342b738d6428012d9bedf",
+        "morphology-25-40-page-01.json": "9b86ff54fd8edda6dc96c03b6add13cf0389368a761b5018f1ef1fb385c5496c",
+        "morphology-25-40.json": "9be1542c186d6730bb173cea6bde1af8a696230a426917dfd450ad449d181831",
+        "morphology-25-41-page-01.json": "76494587e804529b891e0db4d34c211abdebdf0aebc4d6c310a6df47cd10f6c8",
+        "morphology-25-41.json": "e5f9c638e4124be1643d3cbe21354c5d23f88fac842aab80c480ac93376f323e",
+        "morphology-25-42-page-01.json": "2c9196f235065e6dc0aec21df11b555fb21f229576f7eccfbd50d5ee041c8be2",
+        "morphology-25-42.json": "745151d495adf05b601cf218e368246d6b79e4bbc24d4c6dd0dfba31909c58ef",
+        "morphology-25-43-page-01.json": "8f0e0c2aa3473cf12522715eb16dfcec82996514da7745d1b5bd353cd3c233d0",
+        "morphology-25-43.json": "1bbac6be04a953f7eda8c30c1fdfee40c017af2c37bf6a4b36babb3db9abab02",
+        "morphology-25-44-page-01.json": "86f01b67b010f1671dbee6b886203a939feb2c0101732bc18b03dab0b65a1291",
+        "morphology-25-44.json": "1929b87c5cbe59e97078613db4b3286cbf98f28a5e2cc88071a05b676558b0f0",
+        "morphology-25-45-page-01.json": "05f60e119c1a53fa859f2a1ce020715bbbcae4ba93e4c68bd5f37e95dade2c28",
+        "morphology-25-45.json": "3405555705be091ad2bb8dea1176fefcde32d079d96c28bbdd834c640b76b6cd",
+        "morphology-25-46-page-01.json": "40da8c761beaa71b5242964904f2341c126f76133c02bde76987150ba3657ef9",
+        "morphology-25-46.json": "6d3dbd6095f0fe26febd58e8dd4f2da8f5f52f01628311b55210e4166804779c",
+        "morphology-25-47-page-01.json": "8929db8d55a24626ea702d8809f8bf75d0e20f0ca1fe0ed73aa48151d5449db1",
+        "morphology-25-47.json": "41f0b9af189c5d0e80a317754adad13f964207bc6bc6430c8a2f595f2c89e121",
+        "morphology-25-48-page-01.json": "ff0a4904b11b4c03234a66de4c7d1213d65137926a037992870a0343e5e7738d",
+        "morphology-25-48.json": "76a39453568ed240b4c6539fad61669ed906495327af31294f18780ebed3a391",
+        "morphology-25-49-page-01.json": "fa1dce4e1e1490976104cf6d4d43be842da8bf45aa32d4e749202399baedceb4",
+        "morphology-25-49.json": "cd8fea384d495d7b9993e4be4d999e7afef742c80abb1b3e22e8deba912306c9",
+        "morphology-25-5-page-01.json": "a6a45e5823990d7e4cb9c3565ef078f57ac195ba643185cfc97b0d1a7d949f4b",
+        "morphology-25-5.json": "80ae07eb85a723ecab47038b1bc9cbeff372d4da661d1c3da20b32e737fafa67",
+        "morphology-25-50-page-01.json": "2b0bba530832e3c83629f30d529bfae7ce01b028ecfd09bc05ad33a3428a9782",
+        "morphology-25-50.json": "9a807ed7e1b26ad70e752b58d8d62e596085362dfe0385f8d877481f7ad58a59",
+        "morphology-25-51-page-01.json": "c96d9eb3e7fd1af36c736c3a15841291788a105f98123cfe0e9634efd5019f6d",
+        "morphology-25-51.json": "86f0dc7b27bb0cb4a3b8930e201b992910eae0bc6cc7b54fbb8359a12004271d",
+        "morphology-25-52-page-01.json": "cff288ea8721d3b0527b6f5f2e907b8ff61176cd291be30f8bc64710a111fe8f",
+        "morphology-25-52.json": "d14279855654094517095591ec38ec6185d01adc6f6fa6d963420e4c97544c8d",
+        "morphology-25-53-page-01.json": "c2941e6d17fbe00008185a5d3282e46d370a241bd19af85567b92bccbb876ef9",
+        "morphology-25-53.json": "0ebeada30d6e3259c47871522603818c1cd3181b55f2a2b50d9271adc3070e32",
+        "morphology-25-54-page-01.json": "f63ddbd749a65101735304497f2626b206bac41e2aca38d564c414d594992062",
+        "morphology-25-54.json": "dc42bb0c7156318651c92010efe501d5ccec41d67849d557bee32f546831979b",
+        "morphology-25-55-page-01.json": "d3b19fa411258f63ae11a69f48a126de8438624d3ecea2fb0bf2adfa90a18486",
+        "morphology-25-55.json": "80d08939f4cd895cfbdf5ba207a0ebec35ed02353cce5a238219569ddf8708f6",
+        "morphology-25-56-page-01.json": "a7a8a8529c3422af3ba39ec3fc341933b209688076cf4a4df3625a56da447edc",
+        "morphology-25-56.json": "9b66cfc3c123d5f1ccd0691bad37ffa1a437a45f8102d2895617dc2929834cad",
+        "morphology-25-57-page-01.json": "9f87a5dbce566dbe633be47b50cb33df312fde569cdc38536511f96962f0bd7b",
+        "morphology-25-57.json": "774066901293341189b1b1858f0068b8de052844a4f9f25cb1f9bbf6cd6a6c80",
+        "morphology-25-58-page-01.json": "c23057b2bcb612a499e52b868e1b53cfc5037cb57908a3dfb52ae7c059dc5ce5",
+        "morphology-25-58.json": "e91617c563501995061942e0777ef58b8f42d41fdf1ca9413fc9ba0d5f2b541b",
+        "morphology-25-59-page-01.json": "f7fd4d3f2acc6cccd00762acf386466bcc682ee532595243d50561ce06e7c25b",
+        "morphology-25-59.json": "f2b51ec82f47c7799ab7f830f733fe13eb496414a6bf5d570fae081d6ab88d9d",
+        "morphology-25-6-page-01.json": "4f1fd940cdf1b8b0f127984cc0ecf215db3f48d70e4c356e3f9ac38d6f7e72da",
+        "morphology-25-6.json": "a530251309eb97f99a4f24e58515808912665b5a35fd67919823c511f000ee0a",
+        "morphology-25-60-page-01.json": "065c0300b7498e58278b15c3aedc02a869757ac70642d62ad2784bab7ba00354",
+        "morphology-25-60.json": "110b074e22a8998ed2b05ef1f1e974a4103796af3d7985368469566a307dbb9e",
+        "morphology-25-61-page-01.json": "08d05c97972e1d102a6adcb33053b348a92d61e43ca1f7f793adde3fe66c2a75",
+        "morphology-25-61.json": "36ac90e8097769076be208df7567fd95a15ffa02a085f1f2a9df001461f76ea6",
+        "morphology-25-62-page-01.json": "030ddd40c94ed4ddf713d064dc02a6723430cadd11205ab4ed252eeb8a7fc5f7",
+        "morphology-25-62.json": "0976c5b58ccd42887d310d24761728b1e7d54b4f015ab246c05f35b3a89df04d",
+        "morphology-25-63-page-01.json": "0e6d5be02a4ddf7400e2c82843f162e31da004d21a59c5cf45620278200575fb",
+        "morphology-25-63.json": "ec5e5b84add6e8889187c24cd323236464db8b408a221c2e98d5463713acd112",
+        "morphology-25-64-page-01.json": "370aa04c2a5c947272b470f9d711c1576f52d5cf205e7808f0f891e5b19cc0d8",
+        "morphology-25-64.json": "b8a4803ec654ce6b60cdfd860a90c0c5809cf8c54bb251acb57453fea8353e4b",
+        "morphology-25-65-page-01.json": "91b6679ecb626a915168b3704e07eb29d8f1aec05951b121464b7924d76cf2d5",
+        "morphology-25-65.json": "2636b4a01dcb65e64db713a29a351a12fcf4539b5dfeca5abd4f6dd49fe46918",
+        "morphology-25-66-page-01.json": "732113805661741f45bca17e4720531e2a85a4690b79aeef2687cf661e0771f1",
+        "morphology-25-66.json": "3384a3c07177c1ac7eaa13b669b5b99235d8f3c0563166fc9bbcdbd9190774bc",
+        "morphology-25-67-page-01.json": "5c8b356255858d014f88bfd54a0db0dc1738ffc05a38f7c0daced68694243a07",
+        "morphology-25-67.json": "d59d0da668195e605b973fd4e2e8c6390e4a571192aff38e7af19cf8197e0034",
+        "morphology-25-68-page-01.json": "7529bb96082865200e8d02b61cfcd0b9f002391d83f628d956a1a0ed9e12c90b",
+        "morphology-25-68.json": "8d960c9c5b3b6a7d4c8dd8c18390ab9b57e8c9cc23e6dea15c3c5f8ca703a577",
+        "morphology-25-69-page-01.json": "267d3ffdb70f82e6870ace669bfab2a34672c0682762bfe57d5b5f810cc1e67c",
+        "morphology-25-69.json": "3e9f1e5181f2e6c0fd19b737debc79923006c2b1c7c700ab05f911259cf6085c",
+        "morphology-25-7-page-01.json": "29ce86a0593446a521d4de8a7ea04696b5124a91d4cf5653421d2833f4274455",
+        "morphology-25-7.json": "51fbdbb71e948ea654610239f813ac230430c4e2152955b99b43491559f7da51",
+        "morphology-25-70-page-01.json": "ac2f7222d65f13f59d150e8bf7f0b9d60d0375a8d7beb4966ef2dc9db612f05e",
+        "morphology-25-70.json": "c0cacc450138ef7e9b1f8a8cdf70ed758b6870ced43ea53c3f109ac3dfbc2016",
+        "morphology-25-71-page-01.json": "4e5260d085100f1bc07b9e974e0e471d5f8740f3628d89bb7382c3c9f72cccb3",
+        "morphology-25-71.json": "be3c2f17077ff957b7ad4965031e00511d621d138d2ae5dfff7ea8c69b5a2d53",
+        "morphology-25-72-page-01.json": "e1f700ffb9286311c895ca7a7cb6f7abe5387776aa24ce0d46ee41c74540004e",
+        "morphology-25-72.json": "ad469ceaf1e455c63e23485f7bec337a2b7e83a548c97306cd8dd882cbfc7b31",
+        "morphology-25-73-page-01.json": "fc56bf0ba97844cdaaac925413b406c589ba3ea85fa97494cfdbd7dbd6d19787",
+        "morphology-25-73.json": "f6d78433f74d6f3c155c8dc3b17eecd838801587672431d29319c150d07b561d",
+        "morphology-25-74-page-01.json": "36337b267a50dad05d588f4d5223a2008270d533dfc8b1cfd05945d9118ee682",
+        "morphology-25-74.json": "a1fa58933aa5a37fc3a68ba2e84c74ff95200893bf2b2e623f6c87882348137d",
+        "morphology-25-75-page-01.json": "98da03a04ec3bef3fed5562d2b1b9f787b9e988ae28da60af91dad7fd7a71e8f",
+        "morphology-25-75.json": "b24d9c492f50b46b5558d1fbacd7d7997e9b193052cd6dbedc6310120d39eb8e",
+        "morphology-25-76-page-01.json": "8fcbbe6b26d64da3163c366fae94a43f70edee21b0c4eb0329c4ffb66309e08e",
+        "morphology-25-76.json": "4424348783d3c150b87e66858d14774fe4651df384a375ae84d9dc348f03ebae",
+        "morphology-25-77-page-01.json": "eeb2e48969392ce44ba9efff6d4a501b5e28e077e65e53d8a3816da49514b1ea",
+        "morphology-25-77.json": "7bca75b2d2d76aa8e1d41e72d03d37517f63df2e4688e7d7b2aced2bebeac64a",
+        "morphology-25-8-page-01.json": "220be19d4f62d2842f71b0322e6993fbfd1d04c34c254050290ce7e10b2ad10c",
+        "morphology-25-8.json": "f1ee213930a8339c37a56ae4c78de0ff35a3b49970a1498637b02e4c5cf0403e",
+        "morphology-25-9-page-01.json": "116a8862e095f62ced3075aa10b5a1fa957651f0e64b101cf7f2a028e5ad5acd",
+        "morphology-25-9.json": "53da19412b96279671a567c573d18349a3b86121c7cec3e46d15b63345ae1628",
+        "quran.json": "25e68e32867082de9ac4941b4f8ca4a02aadfbcdd9aea1bdad10488cdec4a56c",
+        "surface-checks.json": "483291d6ee30e26e1d428c6cdb04325ab56a5c5ea307c04e8f8cb843c2e9aede",
+        "tafsir.json": "a5b4cdccc599b60d343494e7ddf0b71f456ed3b806d6266ad39c11046c01eed5",
+        "translation.json": "a43d634692a68b439b72ecc8043f00df86cd7b2bf4f16d520106c97552cc3897"
+      }
+    },
+    "64": {
+      "name": "At-Taghabun",
+      "date": "2026-10-26",
+      "printed_tokens": 503,
+      "arabic_slots": 241,
+      "method": "source-grounded draft, deterministic unit-ID separation where needed, fresh critique; cached exact requests reused",
+      "independent_gold": false,
+      "playback_summary_sha256": "7d140c79995d9a08954cee2406f880f181a3fab68a03e59dff2d8192fff3009e",
+      "verse_evidence": {
+        "64:1": {
+          "printed_tokens": 31,
+          "arabic_slots": 17,
+          "package_sha256": "3a2f5d496c3c78699d391b62a182bb5ba6e4d6ba30a030282e669abf6d6bbb59",
+          "citations": [
+            "https://quran.com/64:1?translations=20",
+            "https://quran.com/64:1/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "55c043149bbd6d9d4fc09fe4569dd60f828779c204b4978e2447fae2dc7b59c4",
+            "critique_sha256": "466ae07cc028a24a40e6a03a59eea33ce24919a6855be74831841622b8467f29"
+          }
+        },
+        "64:2": {
+          "printed_tokens": 26,
+          "arabic_slots": 11,
+          "package_sha256": "9f591b671cf210a50a1bd9ea496fd2f6a28d3e49d9bfed3be2e42b3cb4d36a1f",
+          "citations": [
+            "https://quran.com/64:2?translations=20",
+            "https://quran.com/64:2/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "860582d7b5eeb5ff6649ae2f5b672eb529967923483abb745bd26910505bdbef",
+            "critique_sha256": "16d77340cd3ca5d94739f55ce9ae57c8264ff321fe0c36be478142faa7120cd4"
+          }
+        },
+        "64:3": {
+          "printed_tokens": 22,
+          "arabic_slots": 9,
+          "package_sha256": "547487c2e99df7deac08ab824c622f3653e76b3972c704adf279d161d734ee06",
+          "citations": [
+            "https://quran.com/64:3?translations=20",
+            "https://quran.com/64:3/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "8a2ef9139e7daae03f54b56d54d5c397c4c336b473c6241d6741c510a116dab6",
+            "critique_sha256": "a2b844da055bbb0859a5707bf17e81f42297d5fa2cb25ffcb757aa582e03676c"
+          }
+        },
+        "64:4": {
+          "printed_tokens": 27,
+          "arabic_slots": 14,
+          "package_sha256": "359c0a62d8ea71d58956e3551c65f858a1128fab68eb78dd3242115e7fa263bd",
+          "citations": [
+            "https://quran.com/64:4?translations=20",
+            "https://quran.com/64:4/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "2b70f3ac10c116530e16312dc9c7c13c4acd45d5b13c9ff1de12b21be185d5a7",
+            "critique_sha256": "3bb61f362d4b6864512fd849c8f55b300496c315a357602c167e1e25cc110705"
+          }
+        },
+        "64:5": {
+          "printed_tokens": 29,
+          "arabic_slots": 13,
+          "package_sha256": "ba4ac613a62980c3bc93ca9d637e41d29a04e781352eac52bafdebac68aab257",
+          "citations": [
+            "https://quran.com/64:5?translations=20",
+            "https://quran.com/64:5/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "202ffc3701357867986f8c0bb0242370ba88857ea370a66980c5eda1897e45d5",
+            "critique_sha256": "48cb529a57847ae112867fa3b3d0677852049f09c83653ed17b2ca854c818ff8"
+          }
+        },
+        "64:6": {
+          "printed_tokens": 39,
+          "arabic_slots": 16,
+          "package_sha256": "65f571537b0a2393d1239476b115f6f5383d449a7f769c0b56b608a394eb4cd5",
+          "citations": [
+            "https://quran.com/64:6?translations=20",
+            "https://quran.com/64:6/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "e6612b5bcde7f6d33182d4c2e0eda0bef7d8879eddb315c59f4a021cefc2a6e6",
+            "critique_sha256": "3444229d44b3d89d10d2f3086a22a26f5fe25a5e4ddb664b6e3ab61664f87dc9"
+          }
+        },
+        "64:7": {
+          "printed_tokens": 37,
+          "arabic_slots": 18,
+          "package_sha256": "d7f6ea360a3ffaafbfeb38f4cf0268ad74ee48c578e7e9914aa1a3b8db593d5d",
+          "citations": [
+            "https://quran.com/64:7?translations=20",
+            "https://quran.com/64:7/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "7f628f7d07733c3259017188b4fe33bebf652b46df649c2b73583cbec012c9f8",
+            "critique_sha256": "1601016cb8036f074fd2442543fe46452c7a842a0cddae540b912833534e638d"
+          }
+        },
+        "64:8": {
+          "printed_tokens": 23,
+          "arabic_slots": 10,
+          "package_sha256": "f0aa2e5f5f983ce9735795885ef406ba1def6c26287c4744ec2398b0616ce1b1",
+          "citations": [
+            "https://quran.com/64:8?translations=20",
+            "https://quran.com/64:8/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "316d970f51b2fa92d39be987b4403824f2ed67709f810b93186ffc18488e8202",
+            "critique_sha256": "1897092f1b1968a2a0d5053c2c4d2e7143c9f6e09856c39b4688d778827c42d0"
+          }
+        },
+        "64:9": {
+          "printed_tokens": 51,
+          "arabic_slots": 27,
+          "package_sha256": "5e4e2ab396744b24187ca8072ccb4b3b4eba02ab63ca1ce66f2b414247160448",
+          "citations": [
+            "https://quran.com/64:9?translations=20",
+            "https://quran.com/64:9/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "1fa0d42538cefe7c2fd0ea057cdaabf48af26e7d80944c499a1878643f464c15",
+            "critique_sha256": "dae165d98bf6e78568d3366a23a0f0b72567b7b48974065fe27d367d579cd7e4"
+          }
+        },
+        "64:10": {
+          "printed_tokens": 24,
+          "arabic_slots": 11,
+          "package_sha256": "37b38bf78217ae07d62f941ba47fdd023c05c52bbde4705ace462e9b1478a2c1",
+          "citations": [
+            "https://quran.com/64:10?translations=20",
+            "https://quran.com/64:10/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "ecb6e4ab2c023686293c8b7010a3c27fb9d9184bc67e7ec31b104522f023b496",
+            "critique_sha256": "a3d774f7e6937f298ee222a1ec65e7ae9947d118a7bfb5a1fd0ca1ccf0741b05"
+          }
+        },
+        "64:11": {
+          "printed_tokens": 25,
+          "arabic_slots": 16,
+          "package_sha256": "6e477a483e9df93eb01e966cef211c1289f41af66d1dec795316983bb2c55a33",
+          "citations": [
+            "https://quran.com/64:11?translations=20",
+            "https://quran.com/64:11/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "a84a5bbbb1152000f14a966cacdbbd46239b3f6cff4cd9b2dc004db58114943d",
+            "critique_sha256": "614bf0d67827dfd117a1003ca132a483ce96f208244383e073ab6fa3a0a6252a"
+          }
+        },
+        "64:12": {
+          "printed_tokens": 23,
+          "arabic_slots": 11,
+          "package_sha256": "d9996b63026afe6a943920113932f29ab4d863037978cd4b6c5e4b18072a8008",
+          "citations": [
+            "https://quran.com/64:12?translations=20",
+            "https://quran.com/64:12/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "85236dbe1ab1412f79b1cfd05c9662f6bce67c9a6af290d5cd9747ca54fa3193",
+            "critique_sha256": "485cceb12198b9791a70febe17250fae28076fa908f0db3da81a7f49f88fc053"
+          }
+        },
+        "64:13": {
+          "printed_tokens": 14,
+          "arabic_slots": 9,
+          "package_sha256": "7e7237bfa6cf6586455f4fcf204482f9ecd31cae4fb9534a01f70826dcfefacc",
+          "citations": [
+            "https://quran.com/64:13?translations=20",
+            "https://quran.com/64:13/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "5feb44bcc54d36414ca4c8c16891edb8fa6060716899905e9cb0fff412119b94",
+            "critique_sha256": "1af25738646be2bbfbc5c285d149d8aa0d32318fea554bb85f3e6b48924d2d56"
+          }
+        },
+        "64:14": {
+          "printed_tokens": 35,
+          "arabic_slots": 18,
+          "package_sha256": "a2a0d881a848757ee2c57fcaf1fc1091adc635bb17547c57cd444cf3d320b73f",
+          "citations": [
+            "https://quran.com/64:14?translations=20",
+            "https://quran.com/64:14/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "5d8514161ef4b99fba917ae68fa6600136803abb405a2c0740b94b684277116e",
+            "critique_sha256": "1d8d89970602bc23e4f1a3c03ba20c3a5d46a78d5ce79c4529da28946f815614"
+          }
+        },
+        "64:15": {
+          "printed_tokens": 17,
+          "arabic_slots": 8,
+          "package_sha256": "e3471cff34481d062c0544911771d04b76a0cbdcf7aa19885a7b92479c83e5d9",
+          "citations": [
+            "https://quran.com/64:15?translations=20",
+            "https://quran.com/64:15/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "d21f87e39184328b56f719b7f8b754df2d22392d07c914cac1a65d913c980a45",
+            "critique_sha256": "319808de702f5c2cc150ab7381be054d29014c1dcab99347fefb804d5e4833be"
+          }
+        },
+        "64:16": {
+          "printed_tokens": 44,
+          "arabic_slots": 16,
+          "package_sha256": "20c22bfc63e02496a0a5f0c4bad0154df208a6f9cc41d183b071af094545e7cd",
+          "citations": [
+            "https://quran.com/64:16?translations=20",
+            "https://quran.com/64:16/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "83f9503c9b28f668febb42d9326f637f1533e5dc0bdc84333970cb867323854b",
+            "critique_sha256": "cb70f43eef75295b41ae8d0b46e85ef36848d59e58760722fd8158d9651589fd"
+          }
+        },
+        "64:17": {
+          "printed_tokens": 23,
+          "arabic_slots": 12,
+          "package_sha256": "31ba2657be071fd65056bd200196ce8d65a3356df9d956ada33eb71d73db4522",
+          "citations": [
+            "https://quran.com/64:17?translations=20",
+            "https://quran.com/64:17/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "a9024d79c3e6656836b92377cdd9d4d3163df6187e68e3f1c860f121a56e6282",
+            "critique_sha256": "34691fc03af2bbeccc57e667885afad6bc4276cf14ffa4757eff29669a6abf6c"
+          }
+        },
+        "64:18": {
+          "printed_tokens": 13,
+          "arabic_slots": 5,
+          "package_sha256": "18a95a684b1042e452120736d2b53dc737708c3f1e18b4ee02239c12bd104f33",
+          "citations": [
+            "https://quran.com/64:18?translations=20",
+            "https://quran.com/64:18/tafsirs/926"
+          ],
+          "automation": {
+            "policy_sha256": "dc865d64ebf6774f2e745a04ea4b88f92ee8681466e7f08e2d5716fca8a19a83",
+            "rubric_sha256": "641edc8eb8854d639a0871ace3552df05eeb94f9e3ba702e0f1026d425de43a8",
+            "model": "gpt-6.1-sol",
+            "reasoning_effort": "xhigh",
+            "independent_gold": false,
+            "raw_draft_sha256": "65733879788c5ffb86f56dfd143c0fe6d6c9c35173015b15b011434caaeac669",
+            "critique_sha256": "2a875af2deb88819e8742ab21dd661581fb0880a6f3c983412772493d3c74ccd"
+          }
+        }
+      },
+      "verses": 18
+    }
+  }
+}

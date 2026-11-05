@@ -20,6 +20,7 @@ the correct owner for repeat tint or a tap. These checks do not establish
 | Published English and actual lyricized word-card English | 6,236 verses and 77,429 Arabic steps each; ranges tile, boundaries do not split words, and every heard meaning advances a continuous prefix |
 | Timing rows, all 13 reciters | 81,059 rows from the public DB plus six hash-verified runtime packs; 1,023,989 segments, 17,748 repeat occurrences |
 | Boundary and seek queries, each English source | 12,384,384 checks in forward, backward and scrambled order; same clock gives the same word, high-water ink, repeat chain and handoff |
+| Production English wash functions, published mapper output | 4,128,128 monotone-edge queries in one forward pass; 227,910 completion checks for previously started bands at repeats. Compiles the real window/progress functions; excludes frame interpolation and page-cut rendering |
 | Independent root/lemma meaning cues | 1,403 correspondences: all exact owners, no delayed washes |
 | Annotated exact meaning fixtures | The existing 194 heads plus both words of 24:4 “ever after,” including grammar and sentence-tail completion |
 | Gloss-independent QAC candidates | 12,011 additional checks using vocalized lemmas and POS; all 13,413 combined correspondences pass with twelve reference guesses corrected by the reviewed labels |
@@ -155,6 +156,37 @@ App reciter 1 is Alafasy (QF 7); app reciter 7 is Hani (QF 5), so source
 and app IDs must not be interchanged. General regressions cover
 sentence punctuation, separately spoken tails, missing anchors and reflexives.
 
+## Which verses get a model review
+
+Reviewing every printed verse is not the cheapest path to the same result, and
+the queue is now chosen by measurement rather than by convenience. On the 392
+verses reviewed before this policy, the baseline leaves at least one Arabic
+word named by no printed token in **2,476 of 6,236 verses (40%)**; every one of
+those verses changed under review, they account for **all 177** cases where the
+model had to name a previously unowned word, and **65%** of the ≥2-word
+ownership moves. A verse the baseline covers completely still moved 28% of the
+time, so coverage is a filter, not a certificate.
+
+`tools/english_review_selection.py` therefore queues a verse when its baseline
+leaves an Arabic word unowned, plus a deterministic 10% draw of the covered
+rest (`--audit-rate`), so the untouched majority keeps a measured error bound
+instead of an assertion. The queue is 2,846 verses; `--selection all` restores
+the exhaustive pass, and the same verse is drawn on every run, so a resumed run
+does not re-sample its own audit. A flagged verse is reviewed in one draft and
+one fresh-critique call carrying up to `--batch` verses (default 6); a verse
+that fails the critique is retried on its own, so the per-verse attention is
+restored exactly where it is needed. `--batch 1` keeps the audited per-verse
+stage cache. `report.json` and `selection.json` record
+`queued`, `flagged_uncovered`, `audit_sampled` and `left_at_baseline` per
+chapter, and `python3 tools/test_review_english_selection.py` pins the filter,
+the draw and the chapter bound. A verse already reviewed re-binds to its
+recorded evidence receipt instead of paying for the same four Quran.ai fetches
+again; the hashes, citations and decisions are unchanged.
+
+Staying at baseline is still not certification. The audit sample bounds how
+often a covered verse would have moved; it does not make its owners reviewed,
+and `semantic_accuracy_established` remains false.
+
 ## Establishing a semantic accuracy claim
 
 Any `--require-semantic-accuracy` threshold or `--semantic-reference` now
@@ -174,7 +206,10 @@ changed text, invalid owners and duplicate labels, so repeating rows, timing
 queries, frames or reciters cannot increase semantic confidence. It records
 corpus and mapper hashes in `semantic-certification.json` and exports
 `semantic-reference-template.tsv` without predicted owners, ready for a
-bilingual review. Missing reference data makes the requested gate fail.
+bilingual review. It records the selected-reference coverage fraction, but
+`established` remains false: this file format carries no independent blind-gold
+provenance. `--require-semantic-accuracy` consequently fails even for a fully
+labelled subset. Meaning-delay and strict-owner checks still run first.
 
 Automated QAC candidates, literal agreement and passing regression fixtures
 are kept separate from this reference. They have uncovered real bugs, but
@@ -182,13 +217,16 @@ cannot validate the remaining unreviewed meanings. The finite gold-reference
 score also does not establish a statistical claim about unseen inputs. A
 95% one-sided bound of 99.9% would need at least 2,995 independent,
 representative zero-error observations; 99.99% needs 29,956. These selected
-checks and repeated frames are not that sample. A passing finite-reference
-accuracy gate does not itself establish the independence of that reference.
+checks and repeated frames are not that sample. A finite-reference coverage
+target does not establish the independence of that reference.
 
 `python3 tools/test_audit_english_alignment.py` exercises the production
 mapper and gate with hand-labelled synthetic input: an unreviewed grammar
 word, an unreviewed addition and a wrong owner each fail; a complete correct
-reference passes. CI runs these regressions alongside the JVM tests.
+reference meets its local coverage target. Neither a subset nor model labels
+can set semantic accuracy to established. CI runs these regressions and the
+offline ledger's binding/provenance gates alongside the JVM tests. The initial
+[ledger artifact](ENGLISH_ALIGNMENT_LEDGER.md) has no approved records.
 
 The nine unavailable timing rows are Alafasy 37:152; As-Sudais 2:198, 2:223,
 13:37, 73:4; and Ash-Shuraym 12:50, 12:75, 12:76, 91:15. The audit lists them

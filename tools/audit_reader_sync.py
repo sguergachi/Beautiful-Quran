@@ -28,7 +28,10 @@ corpus = {key: glosses.split('|') for key, _, glosses in
 assert len(corpus) == 6236 and sum(map(len, corpus.values())) == 77429
 
 probe = r'''
+package com.beautifulquran.ui.reader
 import com.beautifulquran.data.model.Segment
+import com.beautifulquran.domain.EnglishAlignment
+import com.beautifulquran.domain.EnglishWordSpan
 import com.beautifulquran.domain.HighlightEngine
 import java.io.File
 
@@ -44,6 +47,7 @@ fun main(args: Array<String>) {
         key to (spans(semantic) to spans(wash))
     }
     var rows = 0L; var segmentsChecked = 0L; var queries = 0L; var repeats = 0L
+    var washQueries = 0L; var repeatWindowsChecked = 0L
     File(args[1]).forEachLine { line ->
         val (reciter, key, words, encoded) = line.split('\t')
         val count = words.toInt()
@@ -57,8 +61,27 @@ fun main(args: Array<String>) {
         check(segments.map { it.position }.toSet() == (1..count).toSet()) { "$label missing Arabic word" }
         val prepared = HighlightEngine.PreparedTimings.prepare(segments)
         val (semantic, wash) = owners.getValue(key)
+        val length = semantic.last().to.toFloat()
+        val alignment = EnglishAlignment(FloatArray(count),
+            semantic.map { EnglishWordSpan(it.from / length, it.to / length, it.owner) },
+            wash.map { EnglishWordSpan(it.from / length, it.to / length, it.owner) })
+        val windows = englishWashWindows(wash.map { it.owner }, segments)
         val clocks = segments.flatMap { listOf(it.startMs - 1, it.startMs,
             (it.startMs + it.endMs) / 2, it.endMs - 1, it.endMs) }.distinct()
+        var priorEdge = 0f
+        for (clock in clocks.sorted()) {
+            val edge = checkNotNull(englishWashThrough(alignment, windows, clock, segments.first().startMs))
+            check(edge >= priorEdge && edge in 0f..1f) { "$label/$clock production wash rewinds" }
+            priorEdge = edge
+            washQueries++
+        }
+        for ((index, segment) in segments.withIndex()) {
+            if (segments.take(index).none { it.position >= segment.position }) continue
+            for (window in windows.values.filter { it.startMs < segment.startMs }) {
+                check(window.progress(segment.startMs) == 1f) { "$label first wash incomplete at repeat" }
+                repeatWindowsChecked++
+            }
+        }
         // Reverse and scrambled queries model backward seeks and quick reversals;
         // their result must depend on the queried clock, never query history.
         for (order in listOf(clocks, clocks.reversed(), clocks.sortedBy { (it * 48271) % 2147483647 })) {
@@ -97,7 +120,7 @@ fun main(args: Array<String>) {
         repeats += segments.indices.count { index -> segments.take(index).any { it.position >= segments[index].position } }
         segmentsChecked += segments.size; rows++
     }
-    println("""{"timing_rows":$rows,"segments":$segmentsChecked,"boundary_and_seek_queries":$queries,"repeat_occurrences":$repeats}""")
+    println("""{"timing_rows":$rows,"segments":$segmentsChecked,"boundary_and_seek_queries":$queries,"repeat_occurrences":$repeats,"production_wash_queries":$washQueries,"repeat_window_checks":$repeatWindowsChecked}""")
 }
 '''
 with sqlite3.connect(f"file:{repo / 'data/quran.db'}?mode=ro", uri=True) as database:
@@ -132,6 +155,12 @@ missing = [(reciter, key) for reciter in reciters for key in corpus
 with tempfile.TemporaryDirectory(prefix="reader-sync-audit-") as temporary:
     directory = Path(temporary)
     (directory / "Probe.kt").write_text(probe)
+    # Only data shapes needed by unexercised rendering helpers; the wash/window
+    # code under test is compiled directly from the production source.
+    (directory / "RenderTypes.kt").write_text('''package com.beautifulquran.ui.reader
+data class ActiveWord(val ayah: Int, val playbackActivation: Long, val isRepeat: Boolean, val startMs: Long)
+data class EnglishInkSpan(val range: IntRange, val from: Float, val to: Float)
+''')
     with (directory / "timings.tsv").open('w') as output:
         for reciter, surah, ayah, encoded in rows:
             key = f'{surah}:{ayah}'
@@ -140,7 +169,9 @@ with tempfile.TemporaryDirectory(prefix="reader-sync-audit-") as temporary:
             output.write(f'{reciter}\t{key}\t{len(corpus[key])}\t' +
                          ';'.join(','.join(map(str, segment)) for segment in segments) + '\n')
     subprocess.run(["kotlinc", str(source / "domain/HighlightEngine.kt"),
-                    str(source / "data/model/Models.kt"), str(directory / "Probe.kt"),
+                    *[str(source / f) for f in ("domain/EnglishWordAlignment.kt", "domain/EnglishPhrase.kt", "domain/EnglishTypography.kt",
+                        "domain/ArabicNormalize.kt", "domain/ReviewedEnglishAlignment.kt", "ui/reader/EnglishWashClock.kt")],
+                    str(source / "data/model/Models.kt"), str(directory / "RenderTypes.kt"), str(directory / "Probe.kt"),
                     "-include-runtime", "-d", str(directory / "probe.jar")], check=True)
     result = subprocess.run(["java", "-jar", str(directory / "probe.jar"),
                              str(args.ownership), str(directory / "timings.tsv")],

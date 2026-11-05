@@ -63,6 +63,19 @@ data class Segment(
 data class SurahContent(
     val surah: Surah,
     val ayahs: List<Ayah>,
+    /** Approved prose records; word-card English remains a separate corpus. */
+    val englishAlignmentRecords: Map<Int, EnglishAlignmentRecord> = emptyMap(),
+    /** AI review stays separate and is used only by the developer toggle. */
+    val aiEnglishAlignmentRecords: Map<Int, EnglishAlignmentRecord> = emptyMap(),
+)
+
+/** Compiled review decisions; exact text/surface binding is checked before use. */
+data class EnglishAlignmentRecord(
+    val fingerprint: String,
+    val inkAnchors: List<Int>,
+    val heads: List<Int> = inkAnchors,
+    /** Null identifies an older artifact without contributor provenance. */
+    val sourceLinked: List<Boolean>? = null,
 )
 
 /** Read-only Quran text joined to one of the reader's persisted bookmarks. */

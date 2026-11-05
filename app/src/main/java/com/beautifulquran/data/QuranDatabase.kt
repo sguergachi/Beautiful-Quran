@@ -3,6 +3,7 @@ package com.beautifulquran.data
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.beautifulquran.DevProfiling
+import com.beautifulquran.domain.ReviewedEnglishAlignment
 import java.io.File
 
 /**
@@ -14,6 +15,17 @@ class QuranDatabase(private val context: Context) {
 
     @Volatile
     private var warmed = false
+
+    /** Loaded once by surahContent on IO; no extraction cache or database bump. */
+    internal val englishAlignmentRecords by lazy { readEnglishAlignments("english-alignments.tsv") }
+    internal val aiEnglishAlignmentRecords by lazy { readEnglishAlignments("english-ai-alignments.tsv") }
+
+    private fun readEnglishAlignments(asset: String) = try {
+        context.assets.open(asset).bufferedReader().use { ReviewedEnglishAlignment.read(it.lineSequence()) }
+    } catch (error: Exception) {
+        android.util.Log.w("EnglishAlignment", "$asset unavailable; using mapper", error)
+        emptyMap()
+    }
 
     val db: SQLiteDatabase by lazy {
         SQLiteDatabase.openDatabase(
