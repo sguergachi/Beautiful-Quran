@@ -36,10 +36,7 @@ import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
@@ -62,6 +59,7 @@ import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.domain.isHizbStop
 import com.beautifulquran.domain.juzOpeningAt
 import com.beautifulquran.ui.theme.BookTextPaintFlags
+import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import com.beautifulquran.ui.theme.QuranTypeProfile
@@ -163,7 +161,7 @@ internal fun pageStartByAyah(ayahs: List<Ayah>): Map<Int, Int> = buildMap {
 
 /**
  * Ayah number → juzʾ (1..30) for the verses where a juzʾ opens in this
- * surah. The expanded wheel marks these with a small ring and the juzʾ number.
+ * surah. The expanded wheel labels these "Juz N".
  */
 internal fun juzStartByAyah(ayahs: List<Ayah>): Map<Int, Int> = buildMap {
     for (ayah in ayahs) {
@@ -174,7 +172,7 @@ internal fun juzStartByAyah(ayahs: List<Ayah>): Map<Int, Int> = buildMap {
 /**
  * Ayah numbers that carry a rubʿ al-ḥizb mark (۞) — the same marker the
  * playback silence-skip reads. The expanded wheel marks these with a small
- * eight-pointed star trailing the ayah number.
+ * ۞ sign trailing the ayah number.
  */
 internal fun hizbAyahs(ayahs: List<Ayah>): Set<Int> = buildSet {
     for (ayah in ayahs) {
@@ -247,15 +245,15 @@ internal fun AyahSelectorRail(
     /** Ayah number → mushaf page where a new page opens — a faded diamond and
      *  page number trailing the tick's label on the expanded wheel. */
     pageStarts: Map<Int, Int> = emptyMap(),
-    /** Ayah numbers carrying a rubʿ al-ḥizb mark (۞) — a faded eight-pointed
-     *  star trailing the tick's label on the expanded wheel, before any
+    /** Ayah numbers carrying a rubʿ al-ḥizb mark (۞) — the ۞
+     *  sign trailing the tick's label on the expanded wheel, before any
      *  page diamond and number on the same verse. */
     hizbAyahs: Set<Int> = emptySet(),
-    /** Ayah number → juzʾ where a juzʾ opens — a faded ring and the juzʾ
-     *  number trailing the tick's label, ahead of the ḥizb star. */
+    /** Ayah number → juzʾ where a juzʾ opens — a faded "Juz N" trailing the
+     *  tick's label, ahead of the ḥizb sign. */
     juzStarts: Map<Int, Int> = emptyMap(),
-    /** Ayah numbers where the reader prostrates (۩) — a faded little arch
-     *  after the ḥizb star, before any page diamond. */
+    /** Ayah numbers where the reader prostrates — the ۩ sign after the ḥizb
+     *  sign, before any page diamond. */
     sajdaAyahs: Set<Int> = emptySet(),
     chromeAlpha: () -> Float,
     /** Plain boolean for the touch-target gate, so composition never reads the
@@ -394,6 +392,11 @@ internal fun AyahSelectorRail(
     val pageFace = remember(fontResolver, serifFontFamily) {
         fontResolver.resolve(serifFontFamily).value as Typeface
     }
+    // The real ۞ and ۩ signs, from the bundled Hafs face, so the rail shows
+    // the marks the printed mushaf uses rather than lookalikes.
+    val signFace = remember(fontResolver) {
+        fontResolver.resolve(HafsFontFamily).value as Typeface
+    }
     val collapsedNumberSize = typeScale(9.sp)
     val collapsedPageSize = typeScale(9.5.sp)
     val selectedNumberSize = typeScale(13.sp)
@@ -440,6 +443,11 @@ internal fun AyahSelectorRail(
                 typeface = numberFace
                 // Junicode's default figures are old-style; a verse number is lining.
                 fontFeatureSettings = "'lnum' 1"
+            }
+            val signPaint = Paint(paintFlags).apply {
+                textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
+                textSize = (collapsedPageSize * 1.6f).toPx()
+                typeface = signFace
             }
             val pagePaint = Paint(paintFlags).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
@@ -661,84 +669,46 @@ internal fun AyahSelectorRail(
                     }
                     val juzStart = juzStarts[ayah]
                     if (juzStart != null) {
-                        // A juzʾ opening: a small ring and the juzʾ number,
-                        // in the page figures' faint ink.
-                        val ringRadius = 3.dp.toPx()
-                        val ringCenter = trailX + 5.dp.toPx() + ringRadius
-                        val juzInk = markInk
-                        drawCircle(
-                            color = juzInk,
-                            radius = ringRadius,
-                            center = Offset(textAnchor(ringCenter), y),
-                            style = Stroke(width = 1.dp.toPx()),
-                        )
-                        pagePaint.color = juzInk.toArgb()
+                        // A juzʾ opening, named in words: there is no sign
+                        // for it in the mushaf, only the running head's
+                        // "Juzʾ N".
+                        val juzLabel = "Juz $juzStart"
+                        pagePaint.color = markInk.toArgb()
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawText(
-                                juzStart.toString(),
-                                textAnchor(ringCenter + ringRadius + 3.dp.toPx()),
+                                juzLabel,
+                                textAnchor(trailX + 6.dp.toPx()),
                                 y + numberPaint.textSize * 0.34f,
                                 pagePaint,
                             )
                         }
-                        trailX = ringCenter + ringRadius + 3.dp.toPx() +
-                            pagePaint.measureText(juzStart.toString())
+                        trailX += 6.dp.toPx() + pagePaint.measureText(juzLabel)
                     }
                     if (ayah in hizbAyahs) {
-                        // The ۞ itself: two overlapping squares, one at 45°.
-                        val starHalf = 4.5.dp.toPx()
-                        val starCenter = trailX + 5.dp.toPx() + starHalf
-                        val cx = textAnchor(starCenter)
-                        val squareHalf = starHalf * 0.7071f
-                        val star = Path().apply {
-                            moveTo(cx - squareHalf, y - squareHalf)
-                            lineTo(cx + squareHalf, y - squareHalf)
-                            lineTo(cx + squareHalf, y + squareHalf)
-                            lineTo(cx - squareHalf, y + squareHalf)
-                            close()
-                            moveTo(cx, y - starHalf)
-                            lineTo(cx + starHalf, y)
-                            lineTo(cx, y + starHalf)
-                            lineTo(cx - starHalf, y)
-                            close()
+                        // The rubʿ al-ḥizb sign itself: ۞.
+                        signPaint.color = markInk.toArgb()
+                        drawIntoCanvas { canvas ->
+                            canvas.nativeCanvas.drawText(
+                                "\u06DE",
+                                textAnchor(trailX + 6.dp.toPx()),
+                                y + signPaint.textSize * 0.2f,
+                                signPaint,
+                            )
                         }
-                        drawPath(
-                            path = star,
-                            color = markInk,
-                            style = Stroke(width = 1.dp.toPx()),
-                        )
-                        trailX = starCenter + starHalf
+                        trailX += 6.dp.toPx() + signPaint.measureText("\u06DE")
                     }
                     if (ayah in sajdaAyahs) {
-                        // Prostration: a small arch over its ground line —
-                        // forehead to the floor.
-                        val archHalf = 3.5.dp.toPx()
-                        val archCenter = trailX + 5.dp.toPx() + archHalf
-                        val cx = textAnchor(archCenter)
-                        val sajdaInk = markInk
-                        val arch = Path().apply {
-                            moveTo(cx - archHalf, y + archHalf)
-                            lineTo(cx - archHalf, y)
-                            arcTo(
-                                Rect(cx - archHalf, y - archHalf, cx + archHalf, y + archHalf),
-                                startAngleDegrees = 180f,
-                                sweepAngleDegrees = 180f,
-                                forceMoveTo = false,
+                        // The prostration sign: ۩.
+                        signPaint.color = markInk.toArgb()
+                        drawIntoCanvas { canvas ->
+                            canvas.nativeCanvas.drawText(
+                                "\u06E9",
+                                textAnchor(trailX + 6.dp.toPx()),
+                                y + signPaint.textSize * 0.2f,
+                                signPaint,
                             )
-                            lineTo(cx + archHalf, y + archHalf)
                         }
-                        drawPath(
-                            path = arch,
-                            color = sajdaInk,
-                            style = Stroke(width = 1.dp.toPx()),
-                        )
-                        drawLine(
-                            color = sajdaInk,
-                            start = Offset(cx - archHalf - 1.dp.toPx(), y + archHalf),
-                            end = Offset(cx + archHalf + 1.dp.toPx(), y + archHalf),
-                            strokeWidth = 1.dp.toPx(),
-                        )
-                        trailX = archCenter + archHalf
+                        trailX += 6.dp.toPx() + signPaint.measureText("\u06E9")
                     }
                     val pageStart = pageStarts[ayah]
                     if (pageStart != null) {
