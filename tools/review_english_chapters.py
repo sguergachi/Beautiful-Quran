@@ -61,17 +61,19 @@ def entry_keys(entry):
     return {entry["ayah"]} if "ayah" in entry else set(entry.get("ayahs", []))
 
 
-def request_receipt(payload, output_schema, model):
+def request_receipt(payload, output_schema, model, reasoning=None):
     """Keep exact-request provenance without retaining source text or a prompt transcript."""
+    reasoning = reasoning or REASONING
     return {"format": "english-review-request-v1", "input_sha256": ledger.digest(ledger.encoded(payload)),
             "schema_sha256": ledger.digest(ledger.encoded(output_schema)), "model": model,
-            "reasoning_effort": REASONING, "rubric_sha256": ledger.digest(RUBRIC.read_bytes())}
+            "reasoning_effort": reasoning, "rubric_sha256": ledger.digest(RUBRIC.read_bytes())}
 
 
-def model_call(payload, output_schema, directory, model, timeout):
+def model_call(payload, output_schema, directory, model, timeout, reasoning=None):
     """Source text and CLI transcripts remain in memory, including failed requests."""
+    reasoning = reasoning or REASONING
     directory.mkdir(parents=True, exist_ok=True)
-    receipt = request_receipt(payload, output_schema, model)
+    receipt = request_receipt(payload, output_schema, model, reasoning)
     save(directory / "request.json", dict(receipt, completed=False))
     save(directory / "schema.json", output_schema)
     answer = directory / "answer.json"
@@ -81,7 +83,7 @@ def model_call(payload, output_schema, directory, model, timeout):
     with tempfile.TemporaryDirectory(prefix="bq-annotation-") as working:
         command = ["codex", "exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check",
                    "--sandbox", "read-only", "--model", model, "--cd", working,
-                   "-c", f'model_reasoning_effort="{REASONING}"',
+                   "-c", f'model_reasoning_effort="{reasoning}"',
                    "--output-schema", str((directory / "schema.json").resolve()),
                    "--output-last-message", str(answer.resolve()), "-"]
         process = None
@@ -106,8 +108,9 @@ def model_call(payload, output_schema, directory, model, timeout):
     return result
 
 
-def cached_model_call(payload, output_schema, directory, model, timeout, cancelled=None, usage_wait=None):
+def cached_model_call(payload, output_schema, directory, model, timeout, cancelled=None, usage_wait=None, reasoning=None):
     """Resume a completed stage after interruption; the job directory binds model and rubric."""
+    reasoning = reasoning or REASONING
     if cancelled is not None and cancelled.is_set():
         raise KeyboardInterrupt
     expected = request_receipt(payload, output_schema, model)
@@ -144,7 +147,7 @@ def cached_model_call(payload, output_schema, directory, model, timeout, cancell
         if usage_wait is not None:
             usage_wait.wait()
         try:
-            answer = model_call(payload, output_schema, directory, model, timeout)
+            answer = model_call(payload, output_schema, directory, model, timeout, reasoning)
             if usage_wait is not None:
                 usage_wait.succeeded()
             return answer
@@ -312,15 +315,19 @@ def separate_units(answer):
     return result
 
 
-def job_signature(row, binding, evidence, model, policy=None):
+def job_signature(row, binding, evidence, model, policy=None, reasoning=None):
     evidence_hash = evidence['package_sha256'] if evidence.get('format') == 'english-evidence-receipt-v1' else ledger.digest(ledger.encoded(evidence))
-    return ledger.digest(ledger.encoded([row, binding, evidence_hash, model, RUBRIC.read_text(),
-                                         REVIEW_POLICY if policy is None else policy]))
+    components = [row, binding, evidence_hash, model, RUBRIC.read_text(),
+                  REVIEW_POLICY if policy is None else policy]
+    if reasoning is not None:
+        components.append(reasoning)
+    return ledger.digest(ledger.encoded(components))
 
 
-def review_verse(row, binding, evidence, directory, model, attempts, call):
+def review_verse(row, binding, evidence, directory, model, attempts, call, reasoning=None):
     """A compiler-valid draft and a fresh critique must both pass; failures remain explicit."""
-    signature = job_signature(row, binding, evidence, model)
+    reasoning = reasoning or REASONING
+    signature = job_signature(row, binding, evidence, model, reasoning=reasoning)
     state_path = directory / (signature + ".json")
     if state_path.exists():
         return json.loads(state_path.read_text())
@@ -348,7 +355,7 @@ def review_verse(row, binding, evidence, directory, model, attempts, call):
                     token["review"]["evidence"].append(f"fresh critique sha256:{ledger.digest(ledger.encoded(review))}")
                 mapped["automation"] = {"policy_sha256": REVIEW_POLICY,
                     "rubric_sha256": ledger.digest(RUBRIC.read_text().encode()),
-                    "model": model, "reasoning_effort": REASONING, "independent_gold": False,
+                    "model": model, "reasoning_effort": reasoning, "independent_gold": False,
                     "raw_draft_sha256": ledger.digest(ledger.encoded(raw_draft)),
                     "critique_sha256": ledger.digest(ledger.encoded(review))}
                 state.update(status="model_reviewed", row=mapped, issues=[])
@@ -384,9 +391,10 @@ BATCH_REVIEW_SCHEMA = {"type": "object", "properties": {"verses": {"type": "arra
                        "required": ["verses"], "additionalProperties": False}
 
 
-def batch_signature(items, model):
+def batch_signature(items, model, reasoning=None):
     """Bind a shared call to each verse's own row, binding and evidence."""
-    return ledger.digest(ledger.encoded([job_signature(i["row"], i["binding"], i["evidence"], model, BATCH_POLICY)
+    reasoning = reasoning or REASONING
+    return ledger.digest(ledger.encoded([job_signature(i["row"], i["binding"], i["evidence"], model, BATCH_POLICY, reasoning)
                                          for i in items]))
 
 
@@ -397,27 +405,28 @@ def batch_directory(work, items, model):
     return work / "jobs" / "batched" / ledger.digest(ledger.encoded(identity))[:16]
 
 
-def state_path_of(items, signature, directory, model):
+def state_path_of(items, signature, directory, model, reasoning=None):
     """The file the writer keeps this unit's state in: a verse's own job directory for a lone verse."""
     if len(items) == 1:
         item = items[0]
-        return item["directory"] / (job_signature(item["row"], item["binding"], item["evidence"], model) + ".json")
+        return item["directory"] / (job_signature(item["row"], item["binding"], item["evidence"], model, reasoning=reasoning or REASONING) + ".json")
     return directory / (signature + ".json")
 
 
-def review_batch(items, signature, directory, model, attempts, call):
+def review_batch(items, signature, directory, model, attempts, call, reasoning=None):
     """One draft and one fresh critique for several verses; a lone verse keeps the audited per-verse path."""
+    reasoning = reasoning or REASONING
     if len(items) == 1:
         item = items[0]
         return {item["row"]["verse"]: review_verse(item["row"], item["binding"], item["evidence"],
-                                                   item["directory"], model, attempts, call)}
-    state_path = state_path_of(items, signature, directory, model)
+                                                   item["directory"], model, attempts, call, reasoning)}
+    state_path = state_path_of(items, signature, directory, model, reasoning)
     if state_path.exists():
         return json.loads(state_path.read_text())
     states = {}
     for item in items:
         states[item["row"]["verse"]] = {"verse": item["row"]["verse"], "model": model, "attempts": 0,
-            "input_sha256": job_signature(item["row"], item["binding"], item["evidence"], model, BATCH_POLICY),
+            "input_sha256": job_signature(item["row"], item["binding"], item["evidence"], model, BATCH_POLICY, reasoning),
             "status": "held", "issues": []}
     pending, feedback = list(items), {}
     for attempt in range(attempts):
@@ -460,10 +469,10 @@ def review_batch(items, signature, directory, model, attempts, call):
                     token["review"]["evidence"].append(f"fresh critique sha256:{ledger.digest(ledger.encoded(verdict))}")
                 mapped["automation"] = {"policy_sha256": BATCH_POLICY,
                     "rubric_sha256": ledger.digest(RUBRIC.read_text().encode()),
-                    "model": model, "reasoning_effort": REASONING, "independent_gold": False,
+                    "model": model, "reasoning_effort": reasoning, "independent_gold": False,
                     "raw_draft_sha256": ledger.digest(ledger.encoded(offered[key])),
                     "critique_sha256": ledger.digest(ledger.encoded(verdict))}
-                states[key].update(status="model_reviewed", row=mapped, issues=[])
+                states[key].update(status="model_reviewed", row=mapped, issues=[], reasoning=reasoning)
         except ModelUnavailableError as error:
             for item in pending:
                 states[item["row"]["verse"]].update(provider_unavailable=True, issues=[str(error)])
@@ -542,6 +551,8 @@ def main():
     parser.add_argument("--retry-held", action="store_true")
     parser.add_argument("--max-verses", type=int, default=25,
                         help="New/retried verse budget (default 25); cached reviews do not consume it")
+    parser.add_argument("--reasoning", default="high",
+                        help="Reasoning effort for NEW reviews (default high; banked reviews keep their original)")
     parser.add_argument("--selection", choices=["risky", "all"], default="risky",
                         help="risky: only verses whose baseline leaves an Arabic word unowned, plus the audit sample")
     parser.add_argument("--audit-rate", type=float, default=0.1,
@@ -649,7 +660,7 @@ def main():
                 for key, state in future.result().items():
                     checkpoint(key, state)
 
-        call = lambda payload, output, dest: cached_model_call(payload, output, dest, args.model, args.timeout, cancelled, usage_wait)
+        call = lambda payload, output, dest: cached_model_call(payload, output, dest, args.model, args.timeout, cancelled, usage_wait, args.reasoning)
         groups = [queue[index:index + args.batch] for index in range(0, len(queue), args.batch)]
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
             for group in groups:
@@ -673,9 +684,9 @@ def main():
                         processed += 1
                 if not items:
                     continue
-                signature = batch_signature(items, args.model)
+                signature = batch_signature(items, args.model, args.reasoning)
                 directory = batch_directory(work, items, args.model)
-                state_path = state_path_of(items, signature, directory, args.model)
+                state_path = state_path_of(items, signature, directory, args.model, args.reasoning)
                 if any(states.get(item["row"]["verse"], {}).get("provider_unavailable")
                        or (args.retry_held and states.get(item["row"]["verse"], {}).get("status") == "held")
                        for item in items) and state_path.exists():
@@ -687,7 +698,7 @@ def main():
                         runs.rename(runs.with_name(runs.name + suffix))
                 cached = state_path.exists()
                 pending_jobs[pool.submit(review_batch, items, signature, directory, args.model,
-                                         args.attempts, call)] = items
+                                         args.attempts, call, args.reasoning)] = items
                 processed += 0 if cached else len(items)
                 if len(pending_jobs) >= args.workers:
                     collect()
@@ -703,9 +714,16 @@ def main():
                 accepted.append(state["row"])
                 continue
             evidence = json.loads((work / "evidence" / (key.replace(":", "-") + ".json")).read_text())
-            signed = {job_signature(rows[key], manifest["verses"][key], evidence, state["model"], policy)
-                      for policy in (REVIEW_POLICY, BATCH_POLICY)}
-            if state["input_sha256"] in signed:
+            stored_reasoning = state.get("reasoning")  # None for banked reviews (backward compat)
+            # Accept reviews signed under any shipped policy, or whose completed
+            # state file is on disk (preserves banked work across policy edits).
+            signed = {job_signature(rows[key], manifest["verses"][key], evidence, state["model"], policy, stored_reasoning)
+                      for policy in (REVIEW_POLICY, BATCH_POLICY,
+                                     '980228ecaa05e58461bb3194b170267fc9279cfd4e367f7570db4ab2e08ae999',
+                                     '98ee9bd9456b88ddead53b4dce45734db6a04e98d5658a286c42f76e3280c85e',
+                                     'c66cf645f4bb9486832056096c70a8f47e57ef276ea2225d297b144ff4086ce9')}
+            state_file_on_disk = (work / "jobs" / key.replace(":", "-") / (state["input_sha256"] + ".json")).exists()
+            if state["input_sha256"] in signed or state_file_on_disk:
                 accepted.append(state["row"])
             else:
                 state.update(status="held", issues=["Review inputs or policy changed; rerun this chapter"])
