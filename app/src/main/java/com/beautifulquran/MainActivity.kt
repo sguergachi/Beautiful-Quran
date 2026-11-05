@@ -17,6 +17,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.asPaddingValues
@@ -100,6 +102,7 @@ import com.beautifulquran.ui.reader.ReaderScreen
 import com.beautifulquran.ui.reader.pinnedBarTurn
 import com.beautifulquran.ui.reader.pinnedBarReveal
 import com.beautifulquran.ui.reader.pinnedChapterBarZIndex
+import com.beautifulquran.ui.reader.rememberAyahRailDimAlpha
 import com.beautifulquran.ui.reader.showPinnedChapterBar
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
@@ -1490,6 +1493,22 @@ private fun PaperStackApp(
                         coverSession = pinnedPlayback.coverSession,
                         stackHeightPx = { stackHeightPx.intValue },
                     ),
+            )
+        }
+
+        // The pinned player bar sits above the reader stack, outside the
+        // reader's own dim; give it the same share of the pass under the
+        // open ayah wheel so the whole screen dims, not all but the bar.
+        val pinnedBarDimAlpha = rememberAyahRailDimAlpha(ayahSelectorExpanded)
+        if (playbackPinned && (ayahSelectorExpanded || pinnedBarDimAlpha.value > 0.01f)) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(pinnedPlaybackHeight)
+                    .zIndex(pinnedChapterBarZIndex(pinnedPlayback.coverSession) + 0.01f)
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = pinnedBarDimAlpha.value))
+                    .absorbPointerEvents(),
             )
         }
 

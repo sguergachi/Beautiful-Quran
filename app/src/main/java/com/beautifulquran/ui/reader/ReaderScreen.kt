@@ -1737,6 +1737,14 @@ fun ReaderScreen(
             }
         }
     }
+    // Hoisted out of the Scaffold content so the dim under the open wheel can
+    // also cover the bars the content slot does not reach.
+    var ayahSelectorExpanded by remember { mutableStateOf(false) }
+    var ayahSelectorDismissRequests by remember { mutableIntStateOf(0) }
+    val railDimAlpha = rememberAyahRailDimAlpha(ayahSelectorExpanded)
+    // The Scaffold's bar extents, read back from the content slot so the dim
+    // strips on the root match the real top and bottom bars.
+    var scaffoldBarInsets by remember { mutableStateOf(PaddingValues()) }
     ProvideHighlightTimeline(viewModel.highlightSyncState) {
     Box(Modifier.fillMaxSize()) {
     Scaffold(
@@ -2132,8 +2140,15 @@ fun ReaderScreen(
             return@Scaffold
         }
 
-        var ayahSelectorExpanded by remember { mutableStateOf(false) }
-        var ayahSelectorDismissRequests by remember { mutableIntStateOf(0) }
+        SideEffect {
+            val top = padding.calculateTopPadding()
+            val bottom = padding.calculateBottomPadding()
+            if (scaffoldBarInsets.calculateTopPadding() != top ||
+                scaffoldBarInsets.calculateBottomPadding() != bottom
+            ) {
+                scaffoldBarInsets = PaddingValues(top = top, bottom = bottom)
+            }
+        }
         LaunchedEffect(ayahSelectorExpanded) {
             onAyahSelectorExpandedChange(ayahSelectorExpanded)
         }
@@ -3572,15 +3587,13 @@ fun ReaderScreen(
                     )
                 }
             }
-            // While the wheel is open the whole page dims under it: the
+            // While the wheel is open the whole screen dims under it: the
             // ticks and numbers reach in over the text, and a local shadow
-            // would fight the glyphs they cross. The dim fades with the
-            // wheel and stops absorbing taps the moment it starts leaving.
-            val railDimAlpha = animateFloatAsState(
-                targetValue = if (ayahSelectorExpanded) 0.5f else 0f,
-                animationSpec = tween(240, easing = FastOutSlowInEasing),
-                label = "railDimAlpha",
-            )
+            // would fight the glyphs they cross. This is the page's share;
+            // the bars outside the content slot carry the rest (root strips
+            // below, and the pinned player bar in MainActivity). The dim
+            // fades with the wheel and stops absorbing taps the moment it
+            // starts leaving.
             if (ayahSelectorExpanded || railDimAlpha.value > 0.01f) {
                 Box(
                     Modifier
@@ -3695,6 +3708,37 @@ fun ReaderScreen(
 
         }
     }
+
+        // The dim's share over the top and player bars, which the content
+        // slot does not reach. Same colour and alpha as the page's dim, so
+        // the three read as one pass across the screen; the rail sits in the
+        // content slot between the strips, so it stays bright.
+        if (!mushafMode && (ayahSelectorExpanded || railDimAlpha.value > 0.01f)) {
+            val barDim = MaterialTheme.colorScheme.scrim.copy(alpha = railDimAlpha.value)
+            val dismissModifier = if (ayahSelectorExpanded) {
+                Modifier.absorbPointerEvents { ayahSelectorDismissRequests += 1 }
+            } else {
+                Modifier
+            }
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(scaffoldBarInsets.calculateTopPadding())
+                    .zIndex(0.5f)
+                    .background(barDim)
+                    .then(dismissModifier),
+            )
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(scaffoldBarInsets.calculateBottomPadding())
+                    .zIndex(0.5f)
+                    .background(barDim)
+                    .then(dismissModifier),
+            )
+        }
 
         // Opaque bar over the status-bar strip while reciting, so the verse
         // scrolling up never shows beneath the notch/camera. Held steady

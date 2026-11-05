@@ -1568,8 +1568,12 @@ drawn as its two overlapping squares — between its number and any page mark
 on the same verse, in slightly stronger ink so the quarter divisions stay
 findable while scrubbing. While the wheel is open the whole page dims to
 half ink under it (the theme scrim, fading with the wheel), so the ticks
-and numbers stay readable where they reach in over the text; the top and
-player bars sit outside the dim and stay bright.
+and numbers stay readable where they reach in over the text. The dim covers
+the entire screen — the page, the top bar and the player bar (including the
+pinned one the root hosts) — and only the rail itself stays bright. A surah
+with fewer verses than the rail has height keeps its ladder of ticks centred
+on the rail; the focal point travels along it rather than the ladder sliding
+to the top or bottom.
 
 - **Unified with the verse.** The ribbon is composed inside `AyahBlock`, so its
   height *is* the block's height (Arabic, gloss, and translation together). It

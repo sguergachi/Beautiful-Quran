@@ -208,6 +208,20 @@ private suspend fun settleDialWheel(
     return target
 }
 
+/**
+ * How far the screen dims under the open ayah wheel (theme scrim, fades with
+ * the wheel). Shared by every layer that carries the dim — the reader's page
+ * and bars, and the pinned player bar the root hosts — so the whole screen
+ * dims in one step, not in separate ones that could drift apart.
+ */
+@Composable
+internal fun rememberAyahRailDimAlpha(expanded: Boolean): State<Float> =
+    animateFloatAsState(
+        targetValue = if (expanded) 0.5f else 0f,
+        animationSpec = tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        label = "railDimAlpha",
+    )
+
 @Composable
 internal fun AyahSelectorRail(
     ayahCount: Int,
@@ -499,8 +513,15 @@ internal fun AyahSelectorRail(
                 // height mirrors the dark bar's relative position in the
                 // surah. On open it blooms out of the dark bar itself, then
                 // glides to (and drags along) that proportional position.
-                val anchorMargin = 72.dp.toPx()
-                val anchorTravel = (size.height - 2f * anchorMargin).coerceAtLeast(0f)
+                //
+                // A short surah has less ink than the rail has height: its
+                // verses span only (count - 1) tick gaps. The thumb then
+                // travels exactly that span and the whole ladder sits
+                // centred, instead of the ticks sliding up to the top margin
+                // or down to the bottom as the dial moves.
+                val maxAnchorTravel = (size.height - 2f * 72.dp.toPx()).coerceAtLeast(0f)
+                val anchorTravel = minOf(maxAnchorTravel, (ayahCount - 1) * tickSpacing)
+                val anchorMargin = (size.height - anchorTravel) / 2f
                 val dialFraction = if (ayahCount > 1) {
                     ((selectedPosition - 1f) / (ayahCount - 1f)).coerceIn(0f, 1f)
                 } else {
