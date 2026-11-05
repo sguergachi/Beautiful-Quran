@@ -655,8 +655,10 @@ internal fun AyahSelectorRail(
                     // Wayfinding marks trail the ayah number in the faintest
                     // ink, in from-edge units so mirroring just works: first
                     // the juzʾ, the rubʿ al-ḥizb sign, the sajda sign, then "pg. N".
+                    // Marks sit a clear gap off the number, wider than the
+                    // gaps between marks, so the label reads as separate.
                     var trailX = wheelX + length + 6.dp.toPx() +
-                        numberPaint.measureText(ayah.toString())
+                        numberPaint.measureText(ayah.toString()) + 8.dp.toPx()
                     // One ink for every wayfinding mark on the verse: faint at
                     // rest, brightening with focus like the number beside it,
                     // and gold on the selected verse so the marks light up
