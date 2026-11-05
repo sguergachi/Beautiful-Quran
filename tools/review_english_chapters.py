@@ -672,6 +672,10 @@ def main():
                     if states.get(key, {}).get("origin") == "prior_ai_review" and not args.refresh_reviewed:
                         checkpoint(key, states[key])
                         continue
+                    if states.get(key, {}).get("status") == "model_reviewed" and not args.refresh_reviewed:
+                        # Already reviewed (possibly by a different model); preserve it.
+                        checkpoint(key, states[key])
+                        continue
                     try:
                         usage_wait.wait()
                         old_state = states.get(key, {})
