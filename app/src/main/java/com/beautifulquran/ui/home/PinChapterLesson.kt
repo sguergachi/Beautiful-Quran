@@ -2,7 +2,7 @@ package com.beautifulquran.ui.home
 
 /**
  * Offers pinning after a hand-scrolled opening of chapter 80–114, more than
- * three foreground minutes across that range, and a return to Chapters. The caller
+ * one foreground minute across that range, and a return to Chapters. The caller
  * supplies a monotonic clock and reports only visibility/lifecycle boundaries;
  * no timer or playback ticks are needed. A new list opening replaces the visit.
  */
@@ -62,6 +62,6 @@ internal class PinChapterLesson {
     }
 
     private companion object {
-        const val MIN_READING_MS = 3 * 60 * 1000L
+        const val MIN_READING_MS = 60 * 1000L
     }
 }

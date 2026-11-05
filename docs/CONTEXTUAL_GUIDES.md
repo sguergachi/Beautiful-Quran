@@ -153,9 +153,10 @@ For the existing lessons, the acceptance actions are:
   guide withdraws as the real scrub wheel blooms.
 - Pin a chapter (Chapters sheet): manually scroll down the unfiltered chapter
   list and tap chapter **80–114**. Read within that chapter range for **more than
-  three minutes**, then close the reader and return to Chapters. Only foreground time
-  with the chapter prepared and the reader unobscured counts; loading,
-  Settings, overlays and background time do not. Reading may resume within the
+  one minute**, then close the reader and return to Chapters. Only foreground time
+  counts: the whole reader visit (Settings and overlays over the reader included),
+  from the chapter being ready until the way back to Chapters; loading and
+  background time do not. Reading may resume within the
   same visit, but separate short visits are not added together. Search results,
   automatic list repositioning, Continue, bookmarks and voice opens do not
   start a qualifying visit. Continuing or jumping between chapters **80–114**

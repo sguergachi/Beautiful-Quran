@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class PinChapterLessonTest {
-    private fun eligibleVisit(chapter: Int = 80, duration: Long = 180_001L): PinChapterLesson =
+    private fun eligibleVisit(chapter: Int = 80, duration: Long = 60_001L): PinChapterLesson =
         PinChapterLesson().apply {
             openFromList(chapter, scrolledDown = true)
             observe(chapter, reading = true, onChapters = false, nowMs = 1_000L)
@@ -21,10 +21,10 @@ class PinChapterLessonTest {
     }
 
     @Test
-    fun exactlyThreeMinutesIsNotMoreThanThreeMinutes() {
-        assertNull(eligibleVisit(duration = 179_999L).offeredChapter)
-        assertNull(eligibleVisit(duration = 180_000L).offeredChapter)
-        assertEquals(80, eligibleVisit(duration = 180_001L).offeredChapter)
+    fun exactlyOneMinuteIsNotMoreThanOneMinute() {
+        assertNull(eligibleVisit(duration = 59_999L).offeredChapter)
+        assertNull(eligibleVisit(duration = 60_000L).offeredChapter)
+        assertEquals(80, eligibleVisit(duration = 60_001L).offeredChapter)
     }
 
     @Test
@@ -65,15 +65,15 @@ class PinChapterLessonTest {
         val lesson = PinChapterLesson()
         lesson.openFromList(80, true)
         lesson.observe(80, true, false, 0)
-        lesson.pauseReading(100_000)
+        lesson.pauseReading(40_000)
         lesson.observe(80, false, false, 500_000)
         lesson.observe(80, true, false, 900_000)
-        lesson.observe(80, false, true, 980_001)
+        lesson.observe(80, false, true, 920_001)
         assertEquals(80, lesson.offeredChapter)
     }
 
     @Test
-    fun threeMinutesSpentInTheBackgroundCannotCompleteAShortRead() {
+    fun timeSpentInTheBackgroundCannotCompleteAShortRead() {
         val lesson = PinChapterLesson()
         lesson.openFromList(80, true)
         lesson.observe(80, true, false, 0)
@@ -87,9 +87,9 @@ class PinChapterLessonTest {
         val lesson = PinChapterLesson()
         lesson.openFromList(80, true)
         lesson.observe(80, true, false, 0)
-        lesson.observe(80, false, false, 180_001)
+        lesson.observe(80, false, false, 60_001)
         assertNull(lesson.offeredChapter)
-        lesson.observe(80, false, true, 181_000)
+        lesson.observe(80, false, true, 61_000)
         assertEquals(80, lesson.offeredChapter)
     }
 
@@ -98,8 +98,8 @@ class PinChapterLessonTest {
         val lesson = PinChapterLesson()
         lesson.openFromList(80, true)
         lesson.observe(80, true, false, 0)
-        lesson.observe(81, true, false, 120_000)
-        lesson.observe(81, false, true, 180_001)
+        lesson.observe(81, true, false, 40_000)
+        lesson.observe(81, false, true, 60_001)
         assertEquals(81, lesson.offeredChapter)
     }
 
@@ -108,22 +108,22 @@ class PinChapterLessonTest {
         val lesson = PinChapterLesson()
         lesson.openFromList(80, true)
         lesson.observe(80, true, false, 0)
-        lesson.observe(114, true, false, 60_000)
-        lesson.observe(90, true, false, 120_000)
-        lesson.observe(80, true, false, 180_000)
-        lesson.observe(80, false, true, 180_001)
+        lesson.observe(114, true, false, 20_000)
+        lesson.observe(90, true, false, 40_000)
+        lesson.observe(80, true, false, 60_000)
+        lesson.observe(80, false, true, 60_001)
         assertEquals(80, lesson.offeredChapter)
     }
 
     @Test
-    fun aggregateTimeMustStillExceedThreeMinutes() {
-        for (duration in listOf(180_000L, 180_001L)) {
+    fun aggregateTimeMustStillExceedOneMinute() {
+        for (duration in listOf(60_000L, 60_001L)) {
             val lesson = PinChapterLesson()
             lesson.openFromList(80, true)
             lesson.observe(80, true, false, 0)
-            lesson.observe(81, true, false, 120_000)
+            lesson.observe(81, true, false, 40_000)
             lesson.observe(81, false, true, duration)
-            assertEquals(81.takeIf { duration > 180_000L }, lesson.offeredChapter)
+            assertEquals(81.takeIf { duration > 60_000L }, lesson.offeredChapter)
         }
     }
 
@@ -132,11 +132,11 @@ class PinChapterLessonTest {
         val lesson = PinChapterLesson()
         lesson.openFromList(80, true)
         lesson.observe(80, true, false, 0)
-        lesson.observe(81, false, false, 60_000)
+        lesson.observe(81, false, false, 20_000)
         lesson.observe(81, true, false, 600_000)
-        lesson.pauseReading(660_000)
+        lesson.pauseReading(620_000)
         lesson.observe(81, true, false, 900_000)
-        lesson.observe(81, false, true, 960_000)
+        lesson.observe(81, false, true, 910_000)
         assertNull(lesson.offeredChapter)
     }
 
@@ -146,22 +146,22 @@ class PinChapterLessonTest {
             val lesson = PinChapterLesson()
             lesson.openFromList(80, true)
             lesson.observe(80, true, false, 0)
-            lesson.observe(earlierChapter, true, false, 190_000)
+            lesson.observe(earlierChapter, true, false, 70_000)
             lesson.observe(81, true, false, 400_000)
-            lesson.observe(81, false, true, 460_000)
+            lesson.observe(81, false, true, 450_000)
             assertNull("Chapter $earlierChapter must reset the clock", lesson.offeredChapter)
         }
     }
 
     @Test
-    fun returningTo80AfterTheResetCanStartAFreshThreeMinutes() {
+    fun returningTo80AfterTheResetCanStartAFreshMinute() {
         val lesson = PinChapterLesson()
         lesson.openFromList(80, true)
         lesson.observe(80, true, false, 0)
-        lesson.observe(79, true, false, 190_000)
+        lesson.observe(79, true, false, 70_000)
         lesson.observe(80, true, false, 600_000)
-        lesson.observe(81, true, false, 720_000)
-        lesson.observe(81, false, true, 780_001)
+        lesson.observe(81, true, false, 620_000)
+        lesson.observe(81, false, true, 660_001)
         assertEquals(81, lesson.offeredChapter)
     }
 
@@ -170,17 +170,17 @@ class PinChapterLessonTest {
         val lesson = PinChapterLesson()
         lesson.openFromList(80, true)
         lesson.observe(80, true, false, 0)
-        lesson.observe(79, true, false, 190_000)
+        lesson.observe(79, true, false, 70_000)
         lesson.observe(79, false, true, 600_000)
         assertNull(lesson.offeredChapter)
     }
 
     @Test
     fun separateShortVisitsAreNotAddedTogether() {
-        val lesson = eligibleVisit(duration = 120_000)
+        val lesson = eligibleVisit(duration = 40_000)
         lesson.openFromList(80, true)
         lesson.observe(80, true, false, 200_000)
-        lesson.observe(80, false, true, 320_000)
+        lesson.observe(80, false, true, 240_000)
         assertNull(lesson.offeredChapter)
     }
 
@@ -192,7 +192,7 @@ class PinChapterLessonTest {
         lesson.openFromList(114, true)
         lesson.pauseReading(200_000)
         lesson.observe(114, true, false, 200_000)
-        lesson.observe(114, false, true, 380_001)
+        lesson.observe(114, false, true, 260_001)
         assertEquals(114, lesson.offeredChapter)
     }
 
