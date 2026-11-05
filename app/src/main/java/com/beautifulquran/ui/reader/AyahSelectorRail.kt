@@ -395,9 +395,9 @@ internal fun AyahSelectorRail(
         fontResolver.resolve(serifFontFamily).value as Typeface
     }
     val collapsedNumberSize = typeScale(9.sp)
-    val collapsedPageSize = typeScale(7.5.sp)
-    val selectedNumberSize = typeScale(11.sp)
-    val unselectedNumberSize = typeScale(8.5.sp)
+    val collapsedPageSize = typeScale(9.5.sp)
+    val selectedNumberSize = typeScale(13.sp)
+    val unselectedNumberSize = typeScale(10.5.sp)
     val paintFlags = BookTextPaintFlags
 
     Box(
@@ -663,7 +663,7 @@ internal fun AyahSelectorRail(
                     if (juzStart != null) {
                         // A juzʾ opening: a small ring and the juzʾ number,
                         // in the page figures' faint ink.
-                        val ringRadius = 2.5.dp.toPx()
+                        val ringRadius = 3.dp.toPx()
                         val ringCenter = trailX + 5.dp.toPx() + ringRadius
                         val juzInk = markInk
                         drawCircle(
@@ -686,7 +686,7 @@ internal fun AyahSelectorRail(
                     }
                     if (ayah in hizbAyahs) {
                         // The ۞ itself: two overlapping squares, one at 45°.
-                        val starHalf = 3.5.dp.toPx()
+                        val starHalf = 4.5.dp.toPx()
                         val starCenter = trailX + 5.dp.toPx() + starHalf
                         val cx = textAnchor(starCenter)
                         val squareHalf = starHalf * 0.7071f
@@ -712,7 +712,7 @@ internal fun AyahSelectorRail(
                     if (ayah in sajdaAyahs) {
                         // Prostration: a small arch over its ground line —
                         // forehead to the floor.
-                        val archHalf = 3.dp.toPx()
+                        val archHalf = 3.5.dp.toPx()
                         val archCenter = trailX + 5.dp.toPx() + archHalf
                         val cx = textAnchor(archCenter)
                         val sajdaInk = markInk
@@ -743,7 +743,7 @@ internal fun AyahSelectorRail(
                     val pageStart = pageStarts[ayah]
                     if (pageStart != null) {
                         val pageInk = markInk
-                        val markHalf = 2.dp.toPx()
+                        val markHalf = 2.5.dp.toPx()
                         val markCenter = trailX + 6.dp.toPx() + markHalf
                         withTransform({
                             rotate(45f, Offset(textAnchor(markCenter), y))
