@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.domain.sajdaAyahsOf
 import com.beautifulquran.domain.EnglishTypography
 import android.app.Activity
 import android.content.Context
@@ -3634,6 +3635,8 @@ fun ReaderScreen(
             // Page-boundary marks for the expanded selector wheel.
             val railPageStarts = remember(content.surah.id) { pageStartByAyah(content.ayahs) }
             val railHizbAyahs = remember(content.surah.id) { hizbAyahs(content.ayahs) }
+            val railJuzStarts = remember(content.surah.id) { juzStartByAyah(content.ayahs) }
+            val railSajdaAyahs = remember(content.surah.id) { sajdaAyahsOf(content.surah.id) }
             if (!mushafMode && editingAnnotationAyah == 0) {
                 AyahSelectorRail(
                     ayahCount = content.surah.ayahCount,
@@ -3644,6 +3647,8 @@ fun ReaderScreen(
                     bookmarkedAyahs = bookmarkedAyahs,
                     pageStarts = railPageStarts,
                     hizbAyahs = railHizbAyahs,
+                    juzStarts = railJuzStarts,
+                    sajdaAyahs = railSajdaAyahs,
                     chromeAlpha = { topBarAlpha.value },
                     interactive = !recitingActive,
                     onJumpToAyah = { ayah ->

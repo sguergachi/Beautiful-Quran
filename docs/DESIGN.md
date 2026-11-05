@@ -1566,7 +1566,12 @@ with focus and edge distance like every other mark on the rail. A verse that
 carries a rubʿ al-ḥizb mark (۞) carries a small eight-pointed star — the ۞
 drawn as its two overlapping squares — between its number and any page mark
 on the same verse, in slightly stronger ink so the quarter divisions stay
-findable while scrubbing. While the wheel is open the whole page dims to
+findable while scrubbing. A verse where a juzʾ opens carries a small ring and the
+juzʾ number ahead of that star, and a verse of prostration (۩, the fifteen sajda
+verses) carries a small arch over its ground line after it — all in the same
+faint ink, trailing the verse number before any page diamond. Every one of these
+marks, and the page number, brightens with focus as the verse number does and
+turns gold on the selected verse. While the wheel is open the whole page dims to
 half ink under it (the theme scrim, fading with the wheel), so the ticks
 and numbers stay readable where they reach in over the text. The dim covers
 the entire screen — the page, the top bar and the player bar (including the

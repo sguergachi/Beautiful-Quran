@@ -36,6 +36,7 @@ import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -59,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.domain.isHizbStop
+import com.beautifulquran.domain.juzOpeningAt
 import com.beautifulquran.ui.theme.BookTextPaintFlags
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
@@ -160,6 +162,16 @@ internal fun pageStartByAyah(ayahs: List<Ayah>): Map<Int, Int> = buildMap {
 }
 
 /**
+ * Ayah number → juzʾ (1..30) for the verses where a juzʾ opens in this
+ * surah. The expanded wheel marks these with a small ring and the juzʾ number.
+ */
+internal fun juzStartByAyah(ayahs: List<Ayah>): Map<Int, Int> = buildMap {
+    for (ayah in ayahs) {
+        juzOpeningAt(ayah.surahId, ayah.number)?.let { put(ayah.number, it) }
+    }
+}
+
+/**
  * Ayah numbers that carry a rubʿ al-ḥizb mark (۞) — the same marker the
  * playback silence-skip reads. The expanded wheel marks these with a small
  * eight-pointed star trailing the ayah number.
@@ -239,6 +251,12 @@ internal fun AyahSelectorRail(
      *  star trailing the tick's label on the expanded wheel, before any
      *  page diamond and number on the same verse. */
     hizbAyahs: Set<Int> = emptySet(),
+    /** Ayah number → juzʾ where a juzʾ opens — a faded ring and the juzʾ
+     *  number trailing the tick's label, ahead of the ḥizb star. */
+    juzStarts: Map<Int, Int> = emptyMap(),
+    /** Ayah numbers where the reader prostrates (۩) — a faded little arch
+     *  after the ḥizb star, before any page diamond. */
+    sajdaAyahs: Set<Int> = emptySet(),
     chromeAlpha: () -> Float,
     /** Plain boolean for the touch-target gate, so composition never reads the
      * animated [chromeAlpha] (which would recompose the rail on every fade
@@ -632,6 +650,40 @@ internal fun AyahSelectorRail(
                     // the rubʿ al-ḥizb star, then the mushaf page diamond.
                     var trailX = wheelX + length + 6.dp.toPx() +
                         numberPaint.measureText(ayah.toString())
+                    // One ink for every wayfinding mark on the verse: faint at
+                    // rest, brightening with focus like the number beside it,
+                    // and gold on the selected verse so the marks light up
+                    // with the number they trail.
+                    val markInk = if (isSelected) {
+                        accents.gold.copy(alpha = 0.95f * arrival)
+                    } else {
+                        onSurface.copy(alpha = (0.2f + 0.5f * focus) * arrival * edgeFade)
+                    }
+                    val juzStart = juzStarts[ayah]
+                    if (juzStart != null) {
+                        // A juzʾ opening: a small ring and the juzʾ number,
+                        // in the page figures' faint ink.
+                        val ringRadius = 2.5.dp.toPx()
+                        val ringCenter = trailX + 5.dp.toPx() + ringRadius
+                        val juzInk = markInk
+                        drawCircle(
+                            color = juzInk,
+                            radius = ringRadius,
+                            center = Offset(textAnchor(ringCenter), y),
+                            style = Stroke(width = 1.dp.toPx()),
+                        )
+                        pagePaint.color = juzInk.toArgb()
+                        drawIntoCanvas { canvas ->
+                            canvas.nativeCanvas.drawText(
+                                juzStart.toString(),
+                                textAnchor(ringCenter + ringRadius + 3.dp.toPx()),
+                                y + numberPaint.textSize * 0.34f,
+                                pagePaint,
+                            )
+                        }
+                        trailX = ringCenter + ringRadius + 3.dp.toPx() +
+                            pagePaint.measureText(juzStart.toString())
+                    }
                     if (ayah in hizbAyahs) {
                         // The ۞ itself: two overlapping squares, one at 45°.
                         val starHalf = 3.5.dp.toPx()
@@ -652,18 +704,45 @@ internal fun AyahSelectorRail(
                         }
                         drawPath(
                             path = star,
-                            color = onSurface.copy(
-                                alpha = (0.3f + 0.35f * focus) * arrival * edgeFade,
-                            ),
+                            color = markInk,
                             style = Stroke(width = 1.dp.toPx()),
                         )
                         trailX = starCenter + starHalf
                     }
+                    if (ayah in sajdaAyahs) {
+                        // Prostration: a small arch over its ground line —
+                        // forehead to the floor.
+                        val archHalf = 3.dp.toPx()
+                        val archCenter = trailX + 5.dp.toPx() + archHalf
+                        val cx = textAnchor(archCenter)
+                        val sajdaInk = markInk
+                        val arch = Path().apply {
+                            moveTo(cx - archHalf, y + archHalf)
+                            lineTo(cx - archHalf, y)
+                            arcTo(
+                                Rect(cx - archHalf, y - archHalf, cx + archHalf, y + archHalf),
+                                startAngleDegrees = 180f,
+                                sweepAngleDegrees = 180f,
+                                forceMoveTo = false,
+                            )
+                            lineTo(cx + archHalf, y + archHalf)
+                        }
+                        drawPath(
+                            path = arch,
+                            color = sajdaInk,
+                            style = Stroke(width = 1.dp.toPx()),
+                        )
+                        drawLine(
+                            color = sajdaInk,
+                            start = Offset(cx - archHalf - 1.dp.toPx(), y + archHalf),
+                            end = Offset(cx + archHalf + 1.dp.toPx(), y + archHalf),
+                            strokeWidth = 1.dp.toPx(),
+                        )
+                        trailX = archCenter + archHalf
+                    }
                     val pageStart = pageStarts[ayah]
                     if (pageStart != null) {
-                        val pageInk = onSurface.copy(
-                            alpha = (0.14f + 0.2f * focus) * arrival * edgeFade,
-                        )
+                        val pageInk = markInk
                         val markHalf = 2.dp.toPx()
                         val markCenter = trailX + 6.dp.toPx() + markHalf
                         withTransform({
