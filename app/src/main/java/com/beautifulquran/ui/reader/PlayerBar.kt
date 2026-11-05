@@ -373,6 +373,9 @@ internal fun ReciterNameButton(
                     DisclosureChevron(
                         expanded = false,
                         modifier = Modifier.padding(start = ReciterChevronGap).size(ReciterChevronSize),
+                        // Chrome furniture grey, like the tune/speed controls;
+                        // primary would stand out as a second accent.
+                        tint = QuranTheme.ink.furniture,
                     )
                 }
             }
