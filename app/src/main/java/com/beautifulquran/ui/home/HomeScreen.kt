@@ -639,6 +639,19 @@ fun HomeScreen(
         }
     }
     val pinTipChapter by viewModel.pinTipChapter.collectAsStateWithLifecycle()
+    // The lesson points at the chapter that was read, wherever the reading
+    // place is: dwell in the reader never moves Continue (only listening does).
+    val pinTipRowKey = pinTipChapter?.let(::chapterKey)
+    var pinTipRowRect by remember(pinTipRowKey) { mutableStateOf<Rect?>(null) }
+    val pinTipRowVisible by remember(pinTipRowKey) {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            pinTipRowKey != null && info.visibleItemsInfo.firstOrNull { it.key == pinTipRowKey }?.let { item ->
+                item.offset >= info.viewportStartOffset &&
+                    item.offset + item.size <= info.viewportEndOffset
+            } == true
+        }
+    }
     var pinTipOpen by remember { mutableStateOf(false) }
     var pinTipRendered by remember { mutableStateOf(false) }
     fun closePinTip() {
@@ -647,13 +660,13 @@ fun HomeScreen(
     }
     // Layout facts read through derivedStateOf: the place row's bounds move
     // on every scroll frame and must not recompose the sheet (PERFORMANCE.md).
-    val placeRowMeasured by remember { derivedStateOf { continueRowRect != null } }
+    val placeRowMeasured by remember { derivedStateOf { pinTipRowRect != null } }
     val listScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
     // Never during a scroll: it would open and be put away by that same
     // scroll, spent without being seen.
     val pinTipEligible = coverSheetVisible && chapterRibbonReady && !searchActive &&
-        pinTipChapter != null && pinTipChapter == continueSurahId &&
-        uiState.pinned.isEmpty() && continueRowVisible && !docking && !undocking &&
+        pinTipChapter != null && uiState.pinned.isEmpty() && pinTipRowVisible &&
+        !docking && !undocking &&
         !transportOnScreen && placeRowMeasured && !listScrolling
     LaunchedEffect(pinTipEligible) {
         if (!pinTipEligible) return@LaunchedEffect
@@ -847,6 +860,14 @@ fun HomeScreen(
                                 modifier
                             }
                             ).then(
+                            if (!searching && key == pinTipRowKey) {
+                                Modifier.onGloballyPositioned {
+                                    pinTipRowRect = it.boundsInWindow()
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ).then(
                             if (moving) {
                                 Modifier
                                     .zIndex(1f)
@@ -1206,7 +1227,7 @@ fun HomeScreen(
             // draw over its vellum, copy or Got it pill. Composed only
             // while it shows: the place row's bounds change every scroll
             // frame and are read here only then.
-            if (pinTipOpen || pinTipRendered) continueRowRect?.let { row ->
+            if (pinTipOpen || pinTipRendered) pinTipRowRect?.let { row ->
                 PinChapterTip(
                     visible = pinTipOpen,
                     target = with(density) {
