@@ -303,7 +303,8 @@ class HomeViewModel(
     internal fun rememberChapterListAnchor(index: Int, offset: Int) =
         settings.rememberChapterListAnchor(index, offset)
 
-    internal fun onListChapterOpened(chapterId: Int, scrolledDown: Boolean) {        pinLesson.openFromList(chapterId, scrolledDown && shouldShowPinTip())
+    internal fun onListChapterOpened(chapterId: Int, scrolledDown: Boolean) {
+        pinLesson.openFromList(chapterId, scrolledDown && shouldShowPinTip())
         _pinTipChapter.value = pinLesson.offeredChapter
     }
 

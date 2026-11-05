@@ -642,7 +642,16 @@ fun HomeScreen(
     // The lesson points at the chapter that was read, wherever the reading
     // place is: dwell in the reader never moves Continue (only listening does).
     val pinTipRowKey = pinTipChapter?.let(::chapterKey)
-    var pinTipRowRect by remember(pinTipRowKey) { mutableStateOf<Rect?>(null) }
+    // The row is placed from the list's own layout info, not captured from the
+    // row: the target can be any visible row, and a row cannot be asked to
+    // report once the guide is already up.
+    var pinListBounds by remember { mutableStateOf<Rect?>(null) }
+    fun pinTipRowRectNow(): Rect? {
+        val key = pinTipRowKey ?: return null
+        val bounds = pinListBounds ?: return null
+        val item = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key } ?: return null
+        return Rect(bounds.left, bounds.top + item.offset, bounds.right, bounds.top + item.offset + item.size)
+    }
     val pinTipRowVisible by remember(pinTipRowKey) {
         derivedStateOf {
             val info = listState.layoutInfo
@@ -660,7 +669,7 @@ fun HomeScreen(
     }
     // Layout facts read through derivedStateOf: the place row's bounds move
     // on every scroll frame and must not recompose the sheet (PERFORMANCE.md).
-    val placeRowMeasured by remember { derivedStateOf { pinTipRowRect != null } }
+    val placeRowMeasured by remember { derivedStateOf { pinListBounds != null } }
     val listScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
     // Never during a scroll: it would open and be put away by that same
     // scroll, spent without being seen.
@@ -860,14 +869,6 @@ fun HomeScreen(
                                 modifier
                             }
                             ).then(
-                            if (!searching && key == pinTipRowKey) {
-                                Modifier.onGloballyPositioned {
-                                    pinTipRowRect = it.boundsInWindow()
-                                }
-                            } else {
-                                Modifier
-                            },
-                        ).then(
                             if (moving) {
                                 Modifier
                                     .zIndex(1f)
@@ -890,6 +891,7 @@ fun HomeScreen(
                     modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .onGloballyPositioned { pinListBounds = it.boundsInWindow() }
                     .nestedScroll(pinTipScroll)
                     .verticalFadingEdges(
                         color = MaterialTheme.colorScheme.background,
@@ -1227,7 +1229,7 @@ fun HomeScreen(
             // draw over its vellum, copy or Got it pill. Composed only
             // while it shows: the place row's bounds change every scroll
             // frame and are read here only then.
-            if (pinTipOpen || pinTipRendered) pinTipRowRect?.let { row ->
+            if (pinTipOpen || pinTipRendered) pinTipRowRectNow()?.let { row ->
                 PinChapterTip(
                     visible = pinTipOpen,
                     target = with(density) {

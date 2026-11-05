@@ -714,6 +714,9 @@ private fun PaperStackApp(
     val scrollSheetSettled by remember {
         derivedStateOf { abs(stackPosition.value - AYAH_LAYER) <= 0.01f }
     }
+    val readerVisitHeld by remember {
+        derivedStateOf { stackPosition.value >= AYAH_LAYER - 0.01f }
+    }
     val readerSheetOpen = selectedSurahId != 0 && settledLayer == AYAH_LAYER
     LaunchedEffect(readerSheetOpen) {
         if (!readerSheetOpen) shareViewModel.onLeaveReaderSheet()
@@ -1475,8 +1478,11 @@ private fun PaperStackApp(
                 coverSheetVisible = coverSheetVisible,
                 readerVisitActive = settledLayer == AYAH_LAYER,
                 readingChapterId = selectedSurahId,
-                readerReadingActive = scrollSheetSettled && readableChapter == selectedSurahId &&
-                    !entranceVisible && !overlayBlocking && !readerAnnotationEditing,
+                // The visit runs from the reader settling until the way back to
+                // Chapters: Settings, overlays and editing over the reader are
+                // still the reader visit and keep the clock running.
+                readerReadingActive = readerVisitHeld && readableChapter == selectedSurahId &&
+                    !entranceVisible,
                 chapterRibbonReady = chapterRibbonReady,
                 bookmarkCount = bookmarkCount,
                 onOpenBookmarks = { animateTo(BOOKMARKS_LAYER) },
