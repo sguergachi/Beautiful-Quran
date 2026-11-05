@@ -38,7 +38,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -147,7 +146,7 @@ internal fun collapsedRailActivation(
 /**
  * Ayah number → mushaf page number for ayahs that open a new page: the first
  * ayah whose page differs from the previous ayah's. The expanded wheel marks
- * these with a faded diamond and page number. Ayahs with no page data (0) are
+ * these with a faded "pg. N" label. Ayahs with no page data (0) are
  * skipped without breaking the boundary chain.
  */
 internal fun pageStartByAyah(ayahs: List<Ayah>): Map<Int, Int> = buildMap {
@@ -242,18 +241,18 @@ internal fun AyahSelectorRail(
     placeAyah: Int? = null,
     /** Ayah numbers bookmarked in this surah — ruby ticks on the collapsed stack. */
     bookmarkedAyahs: Set<Int> = emptySet(),
-    /** Ayah number → mushaf page where a new page opens — a faded diamond and
-     *  page number trailing the tick's label on the expanded wheel. */
+    /** Ayah number → mushaf page where a new page opens — a faded
+     *  "pg. N" label trailing the tick's label on the expanded wheel. */
     pageStarts: Map<Int, Int> = emptyMap(),
     /** Ayah numbers carrying a rubʿ al-ḥizb mark (۞) — the ۞
      *  sign trailing the tick's label on the expanded wheel, before any
-     *  page diamond and number on the same verse. */
+     *  "pg. N" label on the same verse. */
     hizbAyahs: Set<Int> = emptySet(),
     /** Ayah number → juzʾ where a juzʾ opens — a faded "Juz N" trailing the
      *  tick's label, ahead of the ḥizb sign. */
     juzStarts: Map<Int, Int> = emptyMap(),
     /** Ayah numbers where the reader prostrates — the ۩ sign after the ḥizb
-     *  sign, before any page diamond. */
+     *  sign, before any "pg. N" label. */
     sajdaAyahs: Set<Int> = emptySet(),
     chromeAlpha: () -> Float,
     /** Plain boolean for the touch-target gate, so composition never reads the
@@ -655,7 +654,7 @@ internal fun AyahSelectorRail(
                     }
                     // Wayfinding marks trail the ayah number in the faintest
                     // ink, in from-edge units so mirroring just works: first
-                    // the rubʿ al-ḥizb star, then the mushaf page diamond.
+                    // the juzʾ, the rubʿ al-ḥizb sign, the sajda sign, then "pg. N".
                     var trailX = wheelX + length + 6.dp.toPx() +
                         numberPaint.measureText(ayah.toString())
                     // One ink for every wayfinding mark on the verse: faint at
@@ -712,24 +711,13 @@ internal fun AyahSelectorRail(
                     }
                     val pageStart = pageStarts[ayah]
                     if (pageStart != null) {
-                        val pageInk = markInk
-                        val markHalf = 2.5.dp.toPx()
-                        val markCenter = trailX + 6.dp.toPx() + markHalf
-                        withTransform({
-                            rotate(45f, Offset(textAnchor(markCenter), y))
-                        }) {
-                            drawRoundRect(
-                                color = pageInk,
-                                topLeft = Offset(textAnchor(markCenter) - markHalf, y - markHalf),
-                                size = Size(markHalf * 2f, markHalf * 2f),
-                                cornerRadius = CornerRadius(markHalf / 2f),
-                            )
-                        }
-                        pagePaint.color = pageInk.toArgb()
+                        // A new mushaf page, named in words like the juzʾ.
+                        val pageLabel = "pg. $pageStart"
+                        pagePaint.color = markInk.toArgb()
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawText(
-                                pageStart.toString(),
-                                textAnchor(markCenter + markHalf + 3.dp.toPx()),
+                                pageLabel,
+                                textAnchor(trailX + 6.dp.toPx()),
                                 y + numberPaint.textSize * 0.34f,
                                 pagePaint,
                             )

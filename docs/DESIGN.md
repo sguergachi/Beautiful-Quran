@@ -1561,7 +1561,7 @@ marks obey the same chrome rules: they fade with the rest of the chrome and
 vanish entirely while reciting.
 
 The wheel also carries mushaf wayfinding in the faintest ink: where a new page
-opens, a tiny diamond and the page number trail the tick's ayah number, fading
+opens, a tiny "pg. N" label trails the tick's ayah number, fading
 with focus and edge distance like every other mark on the rail. A verse that
 carries a rubʿ al-ḥizb mark (۞) carries that very sign, set in the
 bundled Hafs face (not a lookalike drawn in paths), between its number and any
@@ -1570,7 +1570,7 @@ carries the mushaf's own ۩ the same way. A verse where a juzʾ opens carries th
 words "Juz N" ahead of those — the mushaf has no sign for a juzʾ, only the
 running head's name, so the rail says so in words instead of inventing an icon.
 All of these trail the verse number in the same faint ink, before any page
-diamond. Every one of these marks, and the page number, brightens with focus as
+"pg. N" label. Every one of these marks, including the page label, brightens with focus as
 the verse number does and turns gold on the selected verse. While the wheel is open the whole page dims to
 half ink under it (the theme scrim, fading with the wheel), so the ticks
 and numbers stay readable where they reach in over the text. The dim covers
