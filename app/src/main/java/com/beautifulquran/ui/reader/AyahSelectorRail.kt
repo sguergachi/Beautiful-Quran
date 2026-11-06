@@ -221,6 +221,14 @@ private suspend fun settleDialWheel(
 }
 
 /**
+ * Distance between one verse's tick and the next on the open wheel. The
+ * drawing and the drag gesture both read it, so a finger moves the dial exactly
+ * one verse per this much travel. Roomy enough that the labels, which are set
+ * larger than the rows were originally, never crowd the rows around them.
+ */
+internal val AyahRailTickSpacing = 17.dp
+
+/**
  * How far the screen dims under the open ayah wheel (theme scrim, fades with
  * the wheel). Shared by every layer that carries the dim — the reader's page
  * and bars, and the pinned player bar the root hosts — so the whole screen
@@ -581,7 +589,7 @@ internal fun AyahSelectorRail(
             if (expand > 0.01f) {
                 // Flush with the screen edge, matching the collapsed stack.
                 val wheelX = 0f
-                val tickSpacing = 14.dp.toPx()
+                val tickSpacing = AyahRailTickSpacing.toPx()
                 val focusRadius = (ceil(size.height / tickSpacing / 2f).toInt() + 2)
                     .coerceAtLeast(8)
                 // The focal point rides the rail like a scrollbar thumb: its
@@ -823,7 +831,7 @@ internal fun AyahSelectorRail(
                                 }
                             }
 
-                            val tickSpacingPx = 14.dp.toPx()
+                            val tickSpacingPx = AyahRailTickSpacing.toPx()
                             val velocityTracker = VelocityTracker()
                             var dragged = false
                             releaseJob?.cancel()
