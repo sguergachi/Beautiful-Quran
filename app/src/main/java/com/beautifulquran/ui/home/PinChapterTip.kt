@@ -6,6 +6,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.reader.ContextualPulseMark
@@ -62,4 +65,19 @@ internal fun PinChapterTip(
             )
         }
     }
+}
+
+/**
+ * Lets a guide that is composed inside the padded sheet reach up through the
+ * status-bar inset, so its vellum is full bleed from the top edge of the screen.
+ * The guide is measured [extra] taller and placed [extra] higher; the parent's
+ * own size and layout are untouched. Coordinates inside the guide therefore
+ * start [extra] above the sheet's origin.
+ */
+internal fun Modifier.reachUpThroughTopInset(extra: Dp): Modifier = layout { measurable, constraints ->
+    val extraPx = extra.roundToPx()
+    val placeable = measurable.measure(
+        Constraints.fixed(constraints.maxWidth, constraints.maxHeight + extraPx),
+    )
+    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extraPx) }
 }

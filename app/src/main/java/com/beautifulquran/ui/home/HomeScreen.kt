@@ -1255,12 +1255,14 @@ fun HomeScreen(
                     target = with(density) {
                         DpOffset(
                             (row.left - boxLeft).toDp() + HomeRibbonLane + HomeNumberColumn / 2,
-                            (row.center.y - boxTop).toDp(),
+                            (row.center.y - boxTop).toDp() + padding.calculateTopPadding(),
                         )
                     },
                     onDismiss = ::closePinTip,
                     onRenderedChange = { pinTipRendered = it },
-                    modifier = Modifier.zIndex(10f),
+                    modifier = Modifier
+                        .zIndex(10f)
+                        .reachUpThroughTopInset(padding.calculateTopPadding()),
                 )
             }
         }

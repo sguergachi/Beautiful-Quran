@@ -167,7 +167,7 @@ For the existing lessons, the acceptance actions are:
   persisted dismissal but does not bypass this sequence.
   After return settles, with nothing pinned and that chapter's row fully in
   view, the lesson opens. Its vellum enters from the right with a pointed,
-  softly feathered taper toward the chapter-number column. Copy sits beside
+  softly feathered, narrow triangular point toward the chapter-number column, full bleed from the top edge of the screen (through the status-bar inset). Copy sits beside
   the chapter; **Got it** stays at the bottom right. The guide stays above all
   Chapters content. Press and hold that row
   while the guide is up; the row fills evenly, and holding it full pins it

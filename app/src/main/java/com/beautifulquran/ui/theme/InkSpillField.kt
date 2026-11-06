@@ -311,11 +311,12 @@ private const val VellumFieldFunctions = """
         float tail = 1.0 - 0.68 * smoother(clamp((cross - 0.72) / 0.28, 0.0, 1.0));
         float silhouette = rise * tail;
         float taper = verticalTaper * (1.0 - silhouette);
-        float lessonDistance = (cross - targetCross) / 0.17;
-        // Sloping shoulders give the target a point without hardening the veil.
+        // A narrow triangular reach: straight shoulders meeting at a tip on the
+        // target, so the vellum points at it. The diffusion below, not the
+        // geometry, keeps the veil soft.
+        float lessonDistance = (cross - targetCross) / 0.10;
         float lessonPoint = max(1.0 - abs(lessonDistance) * 0.5, 0.0);
-        float lessonReservoir = verticalTaper * 0.85
-            * lessonPoint * lessonPoint;
+        float lessonReservoir = verticalTaper * 1.15 * lessonPoint;
         // A single diffusion profile has no solid/feather junction to expose.
         // Its midpoint follows only the lesson; the button contour is separate.
         float bodyFloor = body.x + featherWidth * 0.08;
