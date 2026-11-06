@@ -670,6 +670,9 @@ internal fun AyahSelectorRail(
                     // that row. Later ones on the same verse sit a touch wider
                     // apart than that, like words in a phrase.
                     var markGap = 5.dp.toPx()
+                    // Order is by how often the reader needs it: page first
+                    // (most frequent), then the ḥizb sign, then the juzʾ — so
+                    // the two numbered labels never touch — then the sajda.
                     // One ink for every wayfinding mark on the verse: faint at
                     // rest, brightening with focus like the number beside it,
                     // and gold on the selected verse so the marks light up
@@ -678,6 +681,36 @@ internal fun AyahSelectorRail(
                         accents.gold.copy(alpha = 0.95f * arrival)
                     } else {
                         onSurface.copy(alpha = (0.2f + 0.5f * focus) * arrival * edgeFade)
+                    }
+                    val pageStart = pageStarts[ayah]
+                    if (pageStart != null) {
+                        // A new mushaf page, named in words like the juzʾ.
+                        val pageLabel = "pg. $pageStart"
+                        pagePaint.color = markInk.toArgb()
+                        drawIntoCanvas { canvas ->
+                            canvas.nativeCanvas.drawText(
+                                pageLabel,
+                                textAnchor(trailX + markGap),
+                                y + pagePaint.textSize * 0.34f,
+                                pagePaint,
+                            )
+                        }
+                        trailX += markGap + pagePaint.measureText(pageLabel)
+                        markGap = 8.dp.toPx()
+                    }
+                    if (ayah in hizbAyahs) {
+                        // The rubʿ al-ḥizb sign itself: ۞.
+                        signPaint.color = markInk.toArgb()
+                        drawIntoCanvas { canvas ->
+                            canvas.nativeCanvas.drawText(
+                                "\u06DE",
+                                textAnchor(trailX + markGap),
+                                y + signPaint.textSize * 0.2f,
+                                signPaint,
+                            )
+                        }
+                        trailX += markGap + signPaint.measureText("\u06DE")
+                        markGap = 8.dp.toPx()
                     }
                     val juzStart = juzStarts[ayah]
                     if (juzStart != null) {
@@ -697,20 +730,6 @@ internal fun AyahSelectorRail(
                         trailX += markGap + pagePaint.measureText(juzLabel)
                         markGap = 8.dp.toPx()
                     }
-                    if (ayah in hizbAyahs) {
-                        // The rubʿ al-ḥizb sign itself: ۞.
-                        signPaint.color = markInk.toArgb()
-                        drawIntoCanvas { canvas ->
-                            canvas.nativeCanvas.drawText(
-                                "\u06DE",
-                                textAnchor(trailX + markGap),
-                                y + signPaint.textSize * 0.2f,
-                                signPaint,
-                            )
-                        }
-                        trailX += markGap + signPaint.measureText("\u06DE")
-                        markGap = 8.dp.toPx()
-                    }
                     if (ayah in sajdaAyahs) {
                         // The prostration sign: ۩.
                         signPaint.color = markInk.toArgb()
@@ -724,20 +743,6 @@ internal fun AyahSelectorRail(
                         }
                         trailX += markGap + signPaint.measureText("\u06E9")
                         markGap = 8.dp.toPx()
-                    }
-                    val pageStart = pageStarts[ayah]
-                    if (pageStart != null) {
-                        // A new mushaf page, named in words like the juzʾ.
-                        val pageLabel = "pg. $pageStart"
-                        pagePaint.color = markInk.toArgb()
-                        drawIntoCanvas { canvas ->
-                            canvas.nativeCanvas.drawText(
-                                pageLabel,
-                                textAnchor(trailX + markGap),
-                                y + pagePaint.textSize * 0.34f,
-                                pagePaint,
-                            )
-                        }
                     }
                 }
             }

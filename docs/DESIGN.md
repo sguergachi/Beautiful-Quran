@@ -1563,14 +1563,16 @@ vanish entirely while reciting.
 The wheel also carries mushaf wayfinding in the faintest ink: where a new page
 opens, a tiny "pg. N" label trails the tick's ayah number, fading
 with focus and edge distance like every other mark on the rail. A verse that
-carries a rubʿ al-ḥizb mark (۞) carries that very sign, set in the
-bundled Hafs face (not a lookalike drawn in paths), between its number and any
-page mark on the same verse. A verse of prostration (the fifteen sajda verses)
-carries the mushaf's own ۩ the same way. A verse where a juzʾ opens carries the
-words "Juz N" ahead of those — the mushaf has no sign for a juzʾ, only the
-running head's name, so the rail says so in words instead of inventing an icon.
-All of these trail the verse number as one phrase — set in a small italic aside, the first hugging its number (closer than the rows are apart, so it cannot group with a neighbouring verse) and any further ones a touch wider apart — in the same faint ink, before any page
-"pg. N" label. Every one of these marks, including the page label, brightens with focus as
+carries more than one annotation reads them in a fixed order, by how often the
+reader needs them: the page ("pg. N") first, then the rubʿ al-ḥizb sign (۞),
+then the juzʾ ("Juz N"), then the prostration sign (۩, the fifteen sajda
+verses). The signs are the real glyphs, set in the bundled Hafs face rather
+than drawn as lookalikes; the mushaf has no sign for a juzʾ, only the running
+head's name, so the rail says it in words. Where a verse has both, the ۞ sits between the two
+numbered labels so "pg. 22" and "Juz 2" never touch. They trail the verse
+number as one phrase — a small italic aside, the first hugging its number
+(closer than the rows are apart, so it cannot group with a neighbouring verse)
+and later ones a touch wider apart — in the same faint ink. Every one of these marks, including the page label, brightens with focus as
 the verse number does and turns gold on the selected verse. While the wheel is open the whole page dims to
 half ink under it (the theme scrim, fading with the wheel), so the ticks
 and numbers stay readable where they reach in over the text. The dim covers
