@@ -66,6 +66,9 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import android.view.HapticFeedbackConstants
@@ -645,7 +648,7 @@ internal fun mushafDialShouldDismissReturn(
  * with nothing to check it against.
  */
 internal fun mushafDialLabelHead(label: MushafDialLabel, zoomed: Boolean, page: Int): String =
-    if (zoomed) "${label.chapter}  ·  pg. $page" else "${label.number}  ·  ${label.chapter}"
+    if (zoomed) "${label.chapter}  ·  p. $page" else "${label.number}  ·  ${label.chapter}"
 
 /**
  * The line under the head: at chapter tier, the leaf the chapter opens on;
@@ -659,7 +662,7 @@ internal fun mushafDialLabelFoot(
     zoomed: Boolean,
     startPage: Int = 0,
 ): String {
-    if (!zoomed) return if (startPage > 0) "pg. $startPage" else ""
+    if (!zoomed) return if (startPage > 0) "p. $startPage" else ""
     val verses =
         if (label.toAyah <= label.fromAyah) "${label.fromAyah}"
         else "${label.fromAyah}–${label.toAyah}"
@@ -1906,12 +1909,30 @@ internal fun MushafPageDial(
                         // trough; chapterLabel would stay 1..286 for the whole
                         // chapter.
                         val th = troughHud ?: hud
+                        val troughHeadInk = androidx.compose.ui.graphics
+                            .lerp(ink, accents.repeatInk, orange)
+                            .copy(alpha = 0.72f + 0.18f * hudPulse)
+                        val troughHead = mushafDialLabelHead(th, zoomed = true, page = hudPage)
+                        // The chapter is the figure and the folio its aside, so the
+                        // folio ("· p. 42") is set a step quieter than the name it
+                        // trails, as the verse rail's annotations are.
+                        val troughHeadText = remember(troughHead, troughHeadInk) {
+                            val split = troughHead.indexOf("  ·  ")
+                            buildAnnotatedString {
+                                if (split < 0) {
+                                    append(troughHead)
+                                } else {
+                                    append(troughHead.substring(0, split))
+                                    withStyle(
+                                        SpanStyle(color = troughHeadInk.copy(alpha = troughHeadInk.alpha * 0.78f)),
+                                    ) { append(troughHead.substring(split)) }
+                                }
+                            }
+                        }
                         Text(
-                            text = mushafDialLabelHead(th, zoomed = true, page = hudPage),
+                            text = troughHeadText,
                             style = hudType,
-                            color = androidx.compose.ui.graphics
-                                .lerp(ink, accents.repeatInk, orange)
-                                .copy(alpha = 0.72f + 0.18f * hudPulse),
+                            color = troughHeadInk,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.graphicsLayer {
