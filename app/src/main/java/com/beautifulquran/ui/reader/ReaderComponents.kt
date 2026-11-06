@@ -4012,8 +4012,8 @@ fun ChapterOpening(
                     .matchParentSize()
                     .generatedFieldWeave(
                         field = ornament.field,
-                        ink = QuranTheme.ink.wash.let { it.copy(alpha = it.alpha * 0.75f) },
-                        embossLight = accents.embossLight.copy(alpha = 0.0375f),
+                        ink = QuranTheme.ink.wash.let { it.copy(alpha = it.alpha * 0.675f) },
+                        embossLight = accents.embossLight.copy(alpha = 0.03375f),
                     )
                     .verticalFadingEdges(color = weaveFade, top = 40.dp, bottom = 32.dp),
             )

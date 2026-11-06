@@ -372,7 +372,15 @@ internal fun ReciterNameButton(
                 if (disclosure) {
                     DisclosureChevron(
                         expanded = false,
-                        modifier = Modifier.padding(start = ReciterChevronGap).size(ReciterChevronSize),
+                        // A pixel above the name's optical centre; the arrow's
+                        // mass sits low in its box.
+                        modifier = Modifier
+                            .padding(start = ReciterChevronGap)
+                            .size(ReciterChevronSize)
+                            .offset(y = (-1).dp),
+                        // Chrome furniture grey, like the tune/speed controls;
+                        // primary would stand out as a second accent.
+                        tint = QuranTheme.ink.furniture,
                     )
                 }
             }
