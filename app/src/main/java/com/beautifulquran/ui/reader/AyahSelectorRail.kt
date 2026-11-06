@@ -417,9 +417,9 @@ internal fun AyahSelectorRail(
         fontResolver.resolve(HafsFontFamily).value as Typeface
     }
     val collapsedNumberSize = typeScale(9.sp)
-    val collapsedPageSize = typeScale(9.5.sp)
-    val selectedNumberSize = typeScale(13.sp)
-    val unselectedNumberSize = typeScale(10.5.sp)
+    val collapsedPageSize = typeScale(11.sp)
+    val selectedNumberSize = typeScale(15.sp)
+    val unselectedNumberSize = typeScale(12.sp)
     val paintFlags = BookTextPaintFlags
 
     Box(
@@ -493,7 +493,7 @@ internal fun AyahSelectorRail(
             }
             val juzPaint = Paint(paintFlags).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
-                textSize = (collapsedPageSize * 0.86f).toPx()
+                textSize = (collapsedPageSize * 0.88f).toPx()
                 typeface = juzFace
                 letterSpacing = 0.1f
                 fontFeatureSettings = "'lnum' 1"
