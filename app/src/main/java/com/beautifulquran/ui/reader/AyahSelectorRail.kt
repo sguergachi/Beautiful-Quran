@@ -706,20 +706,16 @@ internal fun AyahSelectorRail(
                         )
                     }
                     // Wayfinding marks trail the ayah number in the faintest
-                    // ink, in from-edge units so mirroring just works: first
-                    // the juzʾ, the rubʿ al-ḥizb sign, the sajda sign, then "pg. N".
-                    // Marks sit a clear gap off the number, wider than the
-                    // gaps between marks, so the label reads as separate.
+                    // ink, in from-edge units so mirroring just works.
                     var trailX = wheelX + length + 6.dp.toPx() +
                         numberPaint.measureText(ayah.toString())
-                    // Proximity: the first annotation hugs its verse number,
-                    // closer than the rows are apart, so it can only belong to
-                    // that row. Later ones on the same verse sit a touch wider
-                    // apart than that, like words in a phrase.
-                    var markGap = 5.dp.toPx()
-                    // Order is by how often the reader needs it: page first
-                    // (most frequent), then the ḥizb sign, then the juzʾ — so
-                    // the two numbered labels never touch — then the sajda.
+                    // One even gap everywhere: number to first mark, and mark to
+                    // mark. Measured from the glyphs' ink, not their advance
+                    // boxes, so an italic "p" or the ۞'s own side space can't
+                    // make one gap read wider than another. At 6dp it is closer
+                    // than the rows are apart, so a mark can only belong to its
+                    // own verse.
+                    val markGap = 6.dp.toPx()
                     // One ink for every wayfinding mark on the verse: faint at
                     // rest, brightening with focus like the number beside it,
                     // and gold on the selected verse so the marks light up
@@ -729,69 +725,40 @@ internal fun AyahSelectorRail(
                     } else {
                         onSurface.copy(alpha = (0.5f + 0.4f * focus) * arrival * edgeFade)
                     }
-                    val pageStart = pageStarts[ayah]
-                    if (pageStart != null) {
-                        // A new mushaf page, named in words like the juzʾ.
-                        val pageLabel = "pg. $pageStart"
-                        pagePaint.color = markInk.toArgb()
-                        drawIntoCanvas { canvas ->
-                            canvas.nativeCanvas.drawText(
-                                pageLabel,
-                                textAnchor(trailX + markGap),
-                                y + pagePaint.textSize * 0.34f,
-                                pagePaint,
-                            )
+                    // Draws [text] with its ink starting [markGap] past the trail
+                    // and moves the trail to the end of that ink.
+                    fun putMark(text: String, paint: Paint, baselineDrop: Float) {
+                        val bounds = android.graphics.Rect()
+                        paint.getTextBounds(text, 0, text.length, bounds)
+                        val advance = paint.measureText(text)
+                        val start = trailX + markGap
+                        val originX = if (mirrored) {
+                            textAnchor(start) + advance - bounds.right
+                        } else {
+                            start - bounds.left
                         }
-                        trailX += markGap + pagePaint.measureText(pageLabel)
-                        markGap = 8.dp.toPx()
+                        paint.color = markInk.toArgb()
+                        drawIntoCanvas { canvas ->
+                            canvas.nativeCanvas.drawText(text, originX, y + baselineDrop, paint)
+                        }
+                        trailX = start + bounds.width()
                     }
+                    // Order is by how often the reader needs it: page first
+                    // (most frequent), then the ḥizb sign, then the juzʾ — so
+                    // the two numbered labels never touch — then the sajda.
+                    pageStarts[ayah]?.let { putMark("pg. $it", pagePaint, pagePaint.textSize * 0.34f) }
                     if (ayah in hizbAyahs) {
                         // The rubʿ al-ḥizb sign itself: ۞.
-                        signPaint.color = markInk.toArgb()
-                        drawIntoCanvas { canvas ->
-                            canvas.nativeCanvas.drawText(
-                                "\u06DE",
-                                textAnchor(trailX + markGap),
-                                y + signPaint.textSize * 0.2f,
-                                signPaint,
-                            )
-                        }
-                        trailX += markGap + signPaint.measureText("\u06DE")
-                        markGap = 8.dp.toPx()
+                        putMark("\u06DE", signPaint, signPaint.textSize * 0.2f)
                     }
-                    val juzStart = juzStarts[ayah]
-                    if (juzStart != null) {
-                        // A juzʾ opening, named in words: there is no sign
-                        // for it in the mushaf, only the running head's
-                        // "Juzʾ N".
-                        val juzLabel = "JUZ $juzStart"
-                        // A wider berth than between annotations of one kind.
-                        markGap = maxOf(markGap, 11.dp.toPx())
-                        juzPaint.color = markInk.toArgb()
-                        drawIntoCanvas { canvas ->
-                            canvas.nativeCanvas.drawText(
-                                juzLabel,
-                                textAnchor(trailX + markGap),
-                                y + juzPaint.textSize * 0.34f,
-                                juzPaint,
-                            )
-                        }
-                        trailX += markGap + juzPaint.measureText(juzLabel)
-                        markGap = 8.dp.toPx()
+                    juzStarts[ayah]?.let {
+                        // The juzʾ, named in words: the mushaf has no sign for
+                        // it, only the running head's "Juzʾ N".
+                        putMark("JUZ $it", juzPaint, juzPaint.textSize * 0.34f)
                     }
                     if (ayah in sajdaAyahs) {
                         // The prostration sign: ۩.
-                        signPaint.color = markInk.toArgb()
-                        drawIntoCanvas { canvas ->
-                            canvas.nativeCanvas.drawText(
-                                "\u06E9",
-                                textAnchor(trailX + markGap),
-                                y + signPaint.textSize * 0.2f,
-                                signPaint,
-                            )
-                        }
-                        trailX += markGap + signPaint.measureText("\u06E9")
-                        markGap = 8.dp.toPx()
+                        putMark("\u06E9", signPaint, signPaint.textSize * 0.2f)
                     }
                 }
             }
