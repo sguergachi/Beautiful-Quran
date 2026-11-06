@@ -572,7 +572,10 @@ internal fun AyahSelectorRail(
                     val y = anchorY + offset * tickSpacing
                     val distance = (abs(offset) / focusRadius).coerceIn(0f, 1f)
                     val focus = 1f - distance
-                    val major = ayah == 1 || ayah == ayahCount || ayah % 5 == 0
+                    // Only the first and last verse run long. Every fifth verse
+                    // used to as well, which made a rhythm of long bars that
+                    // fought the labels; the haptic still ticks harder on fives.
+                    val major = ayah == 1 || ayah == ayahCount
                     // Bloom outward from the focal tick on open, retract on close.
                     val arrival = ((expand - distance * 0.3f) / 0.7f).coerceIn(0f, 1f)
                     if (arrival <= 0.01f) continue
