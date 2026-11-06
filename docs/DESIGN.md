@@ -1561,25 +1561,29 @@ marks obey the same chrome rules: they fade with the rest of the chrome and
 vanish entirely while reciting.
 
 The wheel also carries mushaf wayfinding in the faintest ink: where a new page
-opens, a tiny "pg. N" label trails the tick's ayah number, fading
+opens, a tiny "p. N" label trails the tick's ayah number, fading
 with focus and edge distance like every other mark on the rail. A verse that
 carries more than one annotation reads them in a fixed order, by how often the
-reader needs them: the page ("pg. N") first, then the rubʿ al-ḥizb sign (۞),
+reader needs them: the page ("p. N") first, then the rubʿ al-ḥizb sign (۞),
 then the juzʾ ("Juz N"), then the prostration sign (۩, the fifteen sajda
 verses). The signs are the real glyphs, set in the bundled Hafs face rather
 than drawn as lookalikes; the mushaf has no sign for a juzʾ, only the running
 head's name, so the rail says it in words. The juzʾ is a different kind of mark from the page, so it is
 set differently — letterspaced capitals ("JUZ 2") against the page's upright
-lowercase ("pg. 22"). The ۞ sits between them where a verse has one; where none
+lowercase ("p. 22"). The ۞ sits between them where a verse has one; where none
 does (nine juzʾ open on a surah's first verse, which carries no ۞) a middle dot
-holds the ۞'s place, so "pg. 262 · JUZ 14" keeps the same rhythm and the two
+holds the ۞'s place, so "p. 262 · JUZ 14" keeps the same rhythm and the two
 figures never touch. They trail the verse
 number as one phrase — each mark the same 6dp from the one before it, and the
 first a wider 13dp off the verse number, which is the figure the rest annotate,
 all measured from the ink so no glyph's own side space
 makes one gap look wider, and closer than the rows are apart so a mark cannot
 group with a neighbouring verse — in the same faint ink. Every one of these marks, including the page label, brightens with focus as
-the verse number does and turns gold on the selected verse. While the wheel is open the whole page dims to
+the verse number does — always at about four-fifths of the number's own ink, so
+the aside is never louder than the figure — and turns gold on the selected
+verse. The verse numbers themselves thicken toward the finger (medium far out,
+semibold a few rows away, bold at the focus), and the ۞ and ۩ signs are centred
+on the row by their ink so they sit at the words' x-height. While the wheel is open the whole page dims to
 half ink under it (the theme scrim, fading with the wheel); behind the labels
 themselves a wash of paper holds solid and eases out about 200dp in from the
 rail, so the small ticks, numbers and annotations read on clean paper rather

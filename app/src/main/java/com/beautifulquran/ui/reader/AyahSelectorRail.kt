@@ -149,7 +149,7 @@ internal fun collapsedRailActivation(
 /**
  * Ayah number → mushaf page number for ayahs that open a new page: the first
  * ayah whose page differs from the previous ayah's. The expanded wheel marks
- * these with a faded "pg. N" label. Ayahs with no page data (0) are
+ * these with a faded "p. N" label. Ayahs with no page data (0) are
  * skipped without breaking the boundary chain.
  */
 internal fun pageStartByAyah(ayahs: List<Ayah>): Map<Int, Int> = buildMap {
@@ -253,17 +253,17 @@ internal fun AyahSelectorRail(
     /** Ayah numbers bookmarked in this surah — ruby ticks on the collapsed stack. */
     bookmarkedAyahs: Set<Int> = emptySet(),
     /** Ayah number → mushaf page where a new page opens — a faded
-     *  "pg. N" label trailing the tick's label on the expanded wheel. */
+     *  "p. N" label trailing the tick's label on the expanded wheel. */
     pageStarts: Map<Int, Int> = emptyMap(),
     /** Ayah numbers carrying a rubʿ al-ḥizb mark (۞) — the ۞
      *  sign trailing the tick's label on the expanded wheel, before any
-     *  "pg. N" label on the same verse. */
+     *  "p. N" label on the same verse. */
     hizbAyahs: Set<Int> = emptySet(),
     /** Ayah number → juzʾ where a juzʾ opens — a faded "Juz N" trailing the
      *  tick's label, ahead of the ḥizb sign. */
     juzStarts: Map<Int, Int> = emptyMap(),
     /** Ayah numbers where the reader prostrates — the ۩ sign after the ḥizb
-     *  sign, before any "pg. N" label. */
+     *  sign, before any "p. N" label. */
     sajdaAyahs: Set<Int> = emptySet(),
     chromeAlpha: () -> Float,
     /** Plain boolean for the touch-target gate, so composition never reads the
@@ -403,6 +403,16 @@ internal fun AyahSelectorRail(
     } else {
         SerifFontFamily
     }
+    // The verse number's weight follows the finger: medium far from it,
+    // semibold a few rows out, bold at the focus. Opacity alone made every
+    // number equally heavy at every distance; weight lets the wheel read as
+    // a lens, and leaves the lighter annotations room at the edges.
+    val numberFaceFar = remember(fontResolver, serifFontFamily) {
+        fontResolver.resolve(serifFontFamily, FontWeight.Medium).value as Typeface
+    }
+    val numberFaceMid = remember(fontResolver, serifFontFamily) {
+        fontResolver.resolve(serifFontFamily, FontWeight.SemiBold).value as Typeface
+    }
     val numberFace = remember(fontResolver, serifFontFamily) {
         fontResolver.resolve(serifFontFamily, FontWeight.Bold).value as Typeface
     }
@@ -424,9 +434,9 @@ internal fun AyahSelectorRail(
         fontResolver.resolve(HafsFontFamily).value as Typeface
     }
     val collapsedNumberSize = typeScale(9.sp)
-    val collapsedPageSize = typeScale(11.sp)
+    val collapsedPageSize = typeScale(10.5.sp)
     val selectedNumberSize = typeScale(15.sp)
-    val unselectedNumberSize = typeScale(12.sp)
+    val unselectedNumberSize = typeScale(13.sp)
     val paintFlags = BookTextPaintFlags
 
     Box(
@@ -495,14 +505,14 @@ internal fun AyahSelectorRail(
             }
             val signPaint = Paint(paintFlags).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
-                textSize = (collapsedPageSize * 1.2f).toPx()
+                textSize = (collapsedPageSize * 1.1f).toPx()
                 typeface = signFace
             }
             val juzPaint = Paint(paintFlags).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
-                textSize = (collapsedPageSize * 0.88f).toPx()
+                textSize = (collapsedPageSize * 0.92f).toPx()
                 typeface = juzFace
-                letterSpacing = 0.1f
+                letterSpacing = 0.08f
                 fontFeatureSettings = "'lnum' 1"
             }
             val pagePaint = Paint(paintFlags).apply {
@@ -687,6 +697,14 @@ internal fun AyahSelectorRail(
                             cornerRadius = tickCorner,
                         )
                     }
+                    numberPaint.typeface = when {
+                        isSelected || abs(offset) <= 1f -> numberFace
+                        abs(offset) <= 4f -> numberFaceMid
+                        else -> numberFaceFar
+                    }
+                    // The number's own ink; the annotations trail at a fraction
+                    // of it, so the aside is never louder than the figure.
+                    val numberInkAlpha = (0.30f + 0.5f * focus) * arrival * edgeFade
                     numberPaint.color = when {
                         isSelected -> accents.gold.copy(alpha = 0.95f * arrival).toArgb()
                         isBookmarked -> accents.bookmarkRibbon
@@ -696,7 +714,7 @@ internal fun AyahSelectorRail(
                             .copy(alpha = (0.4f + 0.5f * focus) * arrival * edgeFade)
                             .toArgb()
                         else -> onSurface
-                            .copy(alpha = (0.18f + 0.46f * focus) * arrival * edgeFade)
+                            .copy(alpha = numberInkAlpha)
                             .toArgb()
                     }
                     numberPaint.textSize = if (isSelected) {
@@ -732,13 +750,13 @@ internal fun AyahSelectorRail(
                     // and gold on the selected verse so the marks light up
                     // with the number they trail.
                     val markInk = if (isSelected) {
-                        accents.gold.copy(alpha = 0.95f * arrival)
+                        accents.gold.copy(alpha = 0.85f * arrival)
                     } else {
-                        onSurface.copy(alpha = (0.5f + 0.4f * focus) * arrival * edgeFade)
+                        onSurface.copy(alpha = numberInkAlpha * 0.78f)
                     }
                     // Draws [text] with its ink starting [markGap] past the trail
                     // and moves the trail to the end of that ink.
-                    fun putMark(text: String, paint: Paint, baselineDrop: Float) {
+                    fun putMark(text: String, paint: Paint, baselineDrop: Float, centerInk: Boolean = false) {
                         val bounds = android.graphics.Rect()
                         paint.getTextBounds(text, 0, text.length, bounds)
                         val advance = paint.measureText(text)
@@ -750,21 +768,25 @@ internal fun AyahSelectorRail(
                         }
                         paint.color = markInk.toArgb()
                         drawIntoCanvas { canvas ->
-                            canvas.nativeCanvas.drawText(text, originX, y + baselineDrop, paint)
+                            // The signs are ornaments, not letters: centre their ink on the row so
+                            // they sit at the x-height of the words beside them, instead of
+                            // hanging from a baseline their tall shapes were not drawn for.
+                            val baseline = if (centerInk) y - bounds.exactCenterY() else y + baselineDrop
+                            canvas.nativeCanvas.drawText(text, originX, baseline, paint)
                         }
                         trailX = start + bounds.width()
                     }
                     // Order is by how often the reader needs it: page first
                     // (most frequent), then the ḥizb sign, then the juzʾ — so
                     // the two numbered labels never touch — then the sajda.
-                    pageStarts[ayah]?.let { putMark("pg. $it", pagePaint, pagePaint.textSize * 0.34f) }
+                    pageStarts[ayah]?.let { putMark("p. $it", pagePaint, pagePaint.textSize * 0.34f) }
                     if (ayah in hizbAyahs) {
                         // The rubʿ al-ḥizb sign itself: ۞.
-                        putMark("\u06DE", signPaint, signPaint.textSize * 0.2f)
+                        putMark("\u06DE", signPaint, 0f, centerInk = true)
                     }
                     juzStarts[ayah]?.let {
                         // Without a ۞ before it, a middle dot holds the ۞'s place
-                        // so "pg. 262" and "JUZ 14" keep the same rhythm and
+                        // so "p. 262" and "JUZ 14" keep the same rhythm and
                         // never touch as two figures.
                         if (ayah !in hizbAyahs) putMark("\u00B7", pagePaint, pagePaint.textSize * 0.34f)
                         // The juzʾ, named in words: the mushaf has no sign for
@@ -773,7 +795,7 @@ internal fun AyahSelectorRail(
                     }
                     if (ayah in sajdaAyahs) {
                         // The prostration sign: ۩.
-                        putMark("\u06E9", signPaint, signPaint.textSize * 0.2f)
+                        putMark("\u06E9", signPaint, 0f, centerInk = true)
                     }
                 }
             }
