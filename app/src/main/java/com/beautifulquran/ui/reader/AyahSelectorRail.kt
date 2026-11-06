@@ -414,10 +414,10 @@ internal fun AyahSelectorRail(
     // surah's first verse, which carries none) the two still never read as one
     // "pg. 262 14".
     val juzFace = remember(fontResolver, serifFontFamily) {
-        fontResolver.resolve(serifFontFamily, FontWeight.Medium).value as Typeface
+        fontResolver.resolve(serifFontFamily, FontWeight.SemiBold).value as Typeface
     }
     val pageFace = remember(fontResolver, serifFontFamily) {
-        fontResolver.resolve(serifFontFamily, FontWeight.Normal, FontStyle.Italic).value as Typeface
+        fontResolver.resolve(serifFontFamily, FontWeight.Medium, FontStyle.Italic).value as Typeface
     }
     // The real ۞ and ۩ signs, from the bundled Hafs face, so the rail shows
     // the marks the printed mushaf uses rather than lookalikes.
