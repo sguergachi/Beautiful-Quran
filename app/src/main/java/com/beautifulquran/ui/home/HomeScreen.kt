@@ -673,6 +673,18 @@ fun HomeScreen(
         pinTipChapter != null && uiState.pinned.isEmpty() && pinTipRowVisible &&
         !docking && !undocking &&
         !transportOnScreen && placeRowMeasured && !listScrolling
+    // The chapter that earned the lesson may be nowhere near the list's last
+    // position (Continue and search open it from anywhere): bring its row into
+    // view, a few rows down from the top, so the lesson has a row to point at.
+    LaunchedEffect(pinTipChapter, coverSheetVisible, chapterRibbonReady, searchActive, pinTipRowVisible) {
+        val chapter = pinTipChapter ?: return@LaunchedEffect
+        if (pinTipRowVisible || !coverSheetVisible || !chapterRibbonReady || searchActive) return@LaunchedEffect
+        if (uiState.pinned.isNotEmpty() || !viewModel.shouldShowPinTip()) return@LaunchedEffect
+        val index = uiState.surahs.indexOfFirst { it.id == chapter }
+        if (index < 0) return@LaunchedEffect
+        delay(500)
+        listState.animateScrollToItem((index - 3).coerceAtLeast(0))
+    }
     // Developer-only: a qualified visit that the Chapters sheet then refuses to show.
     LaunchedEffect(pinTipChapter, pinTipEligible) {
         if (pinTipChapter == null || pinTipEligible || !viewModel.shouldShowPinTip()) return@LaunchedEffect
@@ -855,7 +867,6 @@ fun HomeScreen(
                             )
                         },
                         onClick = {
-                            viewModel.onListChapterOpened(surah.id, fromList = !searchActive)
                             focusManager.clearFocus()
                             // Leaving for the reader puts the lesson away with it.
                             if (pinTipOpen) closePinTip()

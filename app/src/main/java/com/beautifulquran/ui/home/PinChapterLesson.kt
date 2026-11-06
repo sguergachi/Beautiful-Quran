@@ -1,10 +1,12 @@
 package com.beautifulquran.ui.home
 
 /**
- * Offers pinning after opening chapter 80–114 from the chapter list, more than
- * one foreground minute across that range, and a return to Chapters. The caller
- * supplies a monotonic clock and reports only visibility/lifecycle boundaries;
- * no timer or playback ticks are needed. A new list opening replaces the visit.
+ * Offers pinning after a reader visit that reads chapter 80–114 for more than
+ * one foreground minute across that range, and a return to Chapters. However
+ * the reader was reached (list row, Continue, search), a visit begins when a
+ * chapter of 80–114 is first read. The caller supplies a monotonic clock and
+ * reports only visibility/lifecycle boundaries; no timer or playback ticks are
+ * needed.
  */
 internal class PinChapterLesson {
     var offeredChapter: Int? = null
@@ -18,17 +20,13 @@ internal class PinChapterLesson {
     private var endedVisitSeconds: Long? = null
     fun takeEndedVisitSeconds(): Long? = endedVisitSeconds.also { endedVisitSeconds = null }
 
-    fun openFromList(chapterId: Int, eligible: Boolean) {
-        clearVisit()
-        offeredChapter = null
-        chapter = chapterId.takeIf { eligible && it in 80..114 }
-    }
-
     /** Hidden/background time pauses the clock; chapters below 80 reset it. */
     fun observe(chapterId: Int, reading: Boolean, onChapters: Boolean, nowMs: Long) {
         if (chapter == null) {
             if (reading || chapterId != offeredChapter) offeredChapter = null
-            return
+            // A visit begins when a late chapter is first read, by any route.
+            if (!reading || chapterId !in 80..114) return
+            chapter = chapterId
         }
         if (chapterId !in 1..114) {
             clearVisit()
