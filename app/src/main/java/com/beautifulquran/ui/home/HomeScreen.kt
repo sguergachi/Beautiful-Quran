@@ -675,15 +675,20 @@ fun HomeScreen(
         !transportOnScreen && placeRowMeasured && !listScrolling
     // The chapter that earned the lesson may be nowhere near the list's last
     // position (Continue and search open it from anywhere): bring its row into
-    // view, a few rows down from the top, so the lesson has a row to point at.
-    LaunchedEffect(pinTipChapter, coverSheetVisible, chapterRibbonReady, searchActive, pinTipRowVisible) {
+    // view, in the upper part of the screen, so the lesson has a row to point at.
+    // Not keyed on the row's visibility: it turns true as the scroll brings the row
+    // into view, which would cancel the scroll before it reaches its resting place.
+    LaunchedEffect(pinTipChapter, coverSheetVisible, chapterRibbonReady, searchActive) {
         val chapter = pinTipChapter ?: return@LaunchedEffect
         if (pinTipRowVisible || !coverSheetVisible || !chapterRibbonReady || searchActive) return@LaunchedEffect
         if (uiState.pinned.isNotEmpty() || !viewModel.shouldShowPinTip()) return@LaunchedEffect
         val index = uiState.surahs.indexOfFirst { it.id == chapter }
         if (index < 0) return@LaunchedEffect
         delay(500)
-        listState.animateScrollToItem((index - 3).coerceAtLeast(0))
+        // The row's top lands about a quarter of the way down the list, in the
+        // upper part of the screen, where the vellum and its copy have room.
+        val inset = (listState.layoutInfo.viewportSize.height * 0.22f).toInt()
+        listState.animateScrollToItem(index, scrollOffset = -inset)
     }
     // Developer-only: a qualified visit that the Chapters sheet then refuses to show.
     LaunchedEffect(pinTipChapter, pinTipEligible) {
