@@ -406,18 +406,17 @@ internal fun AyahSelectorRail(
     val numberFace = remember(fontResolver, serifFontFamily) {
         fontResolver.resolve(serifFontFamily, FontWeight.Bold).value as Typeface
     }
-    // Annotations (pg., Juz) are set as a quiet italic aside to the verse
-    // number: same family, lighter and slanted, so the number stays the figure.
+    // The page label is set upright in the book face, a step lighter than the
+    // verse number beside it, so the number stays the figure.
     // The juzʾ label is a different kind of mark from the page number, so it
-    // gets a different form: upright letterspaced capitals against the page's
-    // italic lowercase. Where no ۞ sits between them (nine juzʾ open on a
-    // surah's first verse, which carries none) the two still never read as one
-    // "pg. 262 14".
+    // gets a different form: letterspaced capitals against the page's lowercase.
+    // Where no ۞ sits between them (nine juzʾ open on a surah's first verse,
+    // which carries none) a middle dot stands in for it.
     val juzFace = remember(fontResolver, serifFontFamily) {
         fontResolver.resolve(serifFontFamily, FontWeight.SemiBold).value as Typeface
     }
     val pageFace = remember(fontResolver, serifFontFamily) {
-        fontResolver.resolve(serifFontFamily, FontWeight.Medium, FontStyle.Italic).value as Typeface
+        fontResolver.resolve(serifFontFamily, FontWeight.Medium).value as Typeface
     }
     // The real ۞ and ۩ signs, from the bundled Hafs face, so the rail shows
     // the marks the printed mushaf uses rather than lookalikes.
@@ -760,6 +759,10 @@ internal fun AyahSelectorRail(
                         putMark("\u06DE", signPaint, signPaint.textSize * 0.2f)
                     }
                     juzStarts[ayah]?.let {
+                        // Without a ۞ before it, a middle dot holds the ۞'s place
+                        // so "pg. 262" and "JUZ 14" keep the same rhythm and
+                        // never touch as two figures.
+                        if (ayah !in hizbAyahs) putMark("\u00B7", pagePaint, pagePaint.textSize * 0.34f)
                         // The juzʾ, named in words: the mushaf has no sign for
                         // it, only the running head's "Juzʾ N".
                         putMark("JUZ $it", juzPaint, juzPaint.textSize * 0.34f)
