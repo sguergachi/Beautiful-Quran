@@ -1569,7 +1569,7 @@ page mark on the same verse. A verse of prostration (the fifteen sajda verses)
 carries the mushaf's own ۩ the same way. A verse where a juzʾ opens carries the
 words "Juz N" ahead of those — the mushaf has no sign for a juzʾ, only the
 running head's name, so the rail says so in words instead of inventing an icon.
-All of these trail the verse number in the same faint ink, before any page
+All of these trail the verse number in the same faint ink, each led in by its own hairline dash (the verse number, dash, mark; then dash, next mark), before any page
 "pg. N" label. Every one of these marks, including the page label, brightens with focus as
 the verse number does and turns gold on the selected verse. While the wheel is open the whole page dims to
 half ink under it (the theme scrim, fading with the wheel), so the ticks
