@@ -50,6 +50,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -388,8 +389,10 @@ internal fun AyahSelectorRail(
     val numberFace = remember(fontResolver, serifFontFamily) {
         fontResolver.resolve(serifFontFamily, FontWeight.Bold).value as Typeface
     }
+    // Annotations (pg., Juz) are set as a quiet italic aside to the verse
+    // number: same family, lighter and slanted, so the number stays the figure.
     val pageFace = remember(fontResolver, serifFontFamily) {
-        fontResolver.resolve(serifFontFamily).value as Typeface
+        fontResolver.resolve(serifFontFamily, FontWeight.Normal, FontStyle.Italic).value as Typeface
     }
     // The real ۞ and ۩ signs, from the bundled Hafs face, so the rail shows
     // the marks the printed mushaf uses rather than lookalikes.
@@ -661,7 +664,12 @@ internal fun AyahSelectorRail(
                     // Marks sit a clear gap off the number, wider than the
                     // gaps between marks, so the label reads as separate.
                     var trailX = wheelX + length + 6.dp.toPx() +
-                        numberPaint.measureText(ayah.toString()) + 8.dp.toPx()
+                        numberPaint.measureText(ayah.toString())
+                    // Proximity: the first annotation hugs its verse number,
+                    // closer than the rows are apart, so it can only belong to
+                    // that row. Later ones on the same verse sit a touch wider
+                    // apart than that, like words in a phrase.
+                    var markGap = 5.dp.toPx()
                     // One ink for every wayfinding mark on the verse: faint at
                     // rest, brightening with focus like the number beside it,
                     // and gold on the selected verse so the marks light up
@@ -681,12 +689,13 @@ internal fun AyahSelectorRail(
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawText(
                                 juzLabel,
-                                textAnchor(trailX + 6.dp.toPx()),
+                                textAnchor(trailX + markGap),
                                 y + pagePaint.textSize * 0.34f,
                                 pagePaint,
                             )
                         }
-                        trailX += 6.dp.toPx() + pagePaint.measureText(juzLabel)
+                        trailX += markGap + pagePaint.measureText(juzLabel)
+                        markGap = 8.dp.toPx()
                     }
                     if (ayah in hizbAyahs) {
                         // The rubʿ al-ḥizb sign itself: ۞.
@@ -694,12 +703,13 @@ internal fun AyahSelectorRail(
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawText(
                                 "\u06DE",
-                                textAnchor(trailX + 6.dp.toPx()),
+                                textAnchor(trailX + markGap),
                                 y + signPaint.textSize * 0.2f,
                                 signPaint,
                             )
                         }
-                        trailX += 6.dp.toPx() + signPaint.measureText("\u06DE")
+                        trailX += markGap + signPaint.measureText("\u06DE")
+                        markGap = 8.dp.toPx()
                     }
                     if (ayah in sajdaAyahs) {
                         // The prostration sign: ۩.
@@ -707,12 +717,13 @@ internal fun AyahSelectorRail(
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawText(
                                 "\u06E9",
-                                textAnchor(trailX + 6.dp.toPx()),
+                                textAnchor(trailX + markGap),
                                 y + signPaint.textSize * 0.2f,
                                 signPaint,
                             )
                         }
-                        trailX += 6.dp.toPx() + signPaint.measureText("\u06E9")
+                        trailX += markGap + signPaint.measureText("\u06E9")
+                        markGap = 8.dp.toPx()
                     }
                     val pageStart = pageStarts[ayah]
                     if (pageStart != null) {
@@ -722,7 +733,7 @@ internal fun AyahSelectorRail(
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawText(
                                 pageLabel,
-                                textAnchor(trailX + 6.dp.toPx()),
+                                textAnchor(trailX + markGap),
                                 y + pagePaint.textSize * 0.34f,
                                 pagePaint,
                             )
