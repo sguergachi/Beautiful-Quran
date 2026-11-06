@@ -2,6 +2,7 @@ package com.beautifulquran.ui.reader
 
 import androidx.compose.ui.geometry.Offset
 import com.beautifulquran.data.model.Ayah
+import com.beautifulquran.domain.sajdaAyahsOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -80,10 +81,36 @@ class AyahSelectorRailTest {
         assertEquals(mapOf(2 to 5, 5 to 6), pageStartByAyah(ayahs))
     }
 
-    private fun ayah(number: Int, page: Int) = Ayah(
-        surahId = 1,
+    @Test
+    fun hizbAyahs_marksVersesCarryingTheRubMark() {
+        val ayahs = listOf(
+            ayah(1, page = 0, text = "بِسْمِ ٱللَّهِ"),
+            ayah(2, page = 0, text = "۞وَإِذِ ٱبْتَلَىٰٓ"),
+            ayah(3, page = 0, text = ""),
+            ayah(4, page = 0, text = "قَوْلٞ مَّعْرُوفٞ ۞"),
+        )
+        assertEquals(setOf(2, 4), hizbAyahs(ayahs))
+    }
+
+    @Test
+    fun juzStartByAyah_marksOnlyTheJuzOpeningsInTheSurah() {
+        // In Al-Baqarah, 2:142 opens juz 2 and 2:253 opens juz 3.
+        val ayahs = listOf(1, 141, 142, 143, 252, 253).map { ayah(it, page = 0, surahId = 2) }
+        assertEquals(mapOf(142 to 2, 253 to 3), juzStartByAyah(ayahs))
+    }
+
+    @Test
+    fun sajdaAyahsOf_listsTheProstrationVerses() {
+        assertEquals(setOf(206), sajdaAyahsOf(7))
+        assertEquals(setOf(18, 77), sajdaAyahsOf(22))
+        assertEquals(emptySet<Int>(), sajdaAyahsOf(2))
+        assertEquals(15, (1..114).sumOf { sajdaAyahsOf(it).size })
+    }
+
+    private fun ayah(number: Int, page: Int, text: String = "", surahId: Int = 1) = Ayah(
+        surahId = surahId,
         number = number,
-        text = "",
+        text = text,
         translation = "",
         page = page,
         words = emptyList(),

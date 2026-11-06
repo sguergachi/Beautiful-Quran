@@ -394,11 +394,11 @@ follow the comb. In the comb it is the chapter, by number then name on one
 line, joined by the same middle dot the trough uses — a reader crossing the
 book at this speed is counting chapters, and the number is the thing they are
 counting. The
-second line is the leaf that chapter opens on, `pg.` and its folio, in the
+second line is the leaf that chapter opens on, `p.` and its folio, in the
 lighter ink everything subordinate takes. No verse appears there: one turning
 over by hundreds between frames is noise, and worse, it invites the reader to
 aim with it. In the trough the leaf itself is the target, so the label names it
-the way the leaf names itself — the chapter, then `pg.` and its folio — and
+the way the leaf names itself — the chapter, then `p.` and its folio — and
 gives the verses standing on it a second line of their own, in that same
 lighter ink. The chapter stays at the front of that, because a folio alone
 would leave the reader with nothing to check it against.
@@ -1563,8 +1563,38 @@ marks obey the same chrome rules: they fade with the rest of the chrome and
 vanish entirely while reciting.
 
 The wheel also carries mushaf wayfinding in the faintest ink: where a new page
-opens, a tiny diamond and the page number trail the tick's ayah number, fading
-with focus and edge distance like every other mark on the rail.
+opens, a tiny "p. N" label trails the tick's ayah number, fading
+with focus and edge distance like every other mark on the rail. A verse that
+carries more than one annotation reads them in a fixed order, by how often the
+reader needs them: the page ("p. N") first, then the rubʿ al-ḥizb sign (۞),
+then the juzʾ ("Juz N"), then the prostration sign (۩, the fifteen sajda
+verses). The signs are the real glyphs, set in the bundled Hafs face rather
+than drawn as lookalikes; the mushaf has no sign for a juzʾ, only the running
+head's name, so the rail says it in words. The juzʾ is a different kind of mark from the page, so it is
+set differently — letterspaced capitals ("JUZ 2") against the page's upright
+lowercase ("p. 22"). The ۞ sits between them where a verse has one; where none
+does (nine juzʾ open on a surah's first verse, which carries no ۞) a middle dot
+holds the ۞'s place, so "p. 262 · JUZ 14" keeps the same rhythm and the two
+figures never touch. They trail the verse
+number as one phrase — each mark the same 6dp from the one before it, and the
+first a wider 13dp off the verse number, which is the figure the rest annotate,
+all measured from the ink so no glyph's own side space
+makes one gap look wider, and closer than the rows are apart so a mark cannot
+group with a neighbouring verse — in the same faint ink. Every one of these marks, including the page label, brightens with focus as
+the verse number does — always at about four-fifths of the number's own ink, so
+the aside is never louder than the figure — and turns gold on the selected
+verse. The verse numbers themselves thicken toward the finger (medium far out,
+semibold a few rows away, bold at the focus), and the ۞ and ۩ signs are centred
+on the row by their ink so they sit at the words' x-height. While the wheel is open the whole page dims to
+half ink under it (the theme scrim, fading with the wheel); behind the labels
+themselves a wash of paper holds solid and eases out about 200dp in from the
+rail, so the small ticks, numbers and annotations read on clean paper rather
+than across the Arabic strokes they reach over. The dim covers
+the entire screen — the page, the top bar and the player bar (including the
+pinned one the root hosts) — and only the rail itself stays bright. A surah
+with fewer verses than the rail has height keeps its ladder of ticks centred
+on the rail; the focal point travels along it rather than the ladder sliding
+to the top or bottom.
 
 - **Unified with the verse.** The ribbon is composed inside `AyahBlock`, so its
   height *is* the block's height (Arabic, gloss, and translation together). It

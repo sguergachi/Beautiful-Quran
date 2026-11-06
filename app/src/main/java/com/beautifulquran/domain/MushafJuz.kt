@@ -55,3 +55,16 @@ fun juzOf(surahId: Int, ayah: Int): Int {
     }
     return juz
 }
+
+/**
+ * The juzʾ (1..30) that opens exactly at this ayah, or null for every other
+ * verse. The expanded ayah wheel marks these openings.
+ */
+fun juzOpeningAt(surahId: Int, ayah: Int): Int? {
+    for (index in 0 until MUSHAF_JUZ_COUNT) {
+        if (JUZ_STARTS[index * 2] == surahId && JUZ_STARTS[index * 2 + 1] == ayah) {
+            return index + 1
+        }
+    }
+    return null
+}
