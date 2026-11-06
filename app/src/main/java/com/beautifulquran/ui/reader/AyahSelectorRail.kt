@@ -391,6 +391,14 @@ internal fun AyahSelectorRail(
     }
     // Annotations (pg., Juz) are set as a quiet italic aside to the verse
     // number: same family, lighter and slanted, so the number stays the figure.
+    // The juzʾ label is a different kind of mark from the page number, so it
+    // gets a different form: upright letterspaced capitals against the page's
+    // italic lowercase. Where no ۞ sits between them (nine juzʾ open on a
+    // surah's first verse, which carries none) the two still never read as one
+    // "pg. 262 14".
+    val juzFace = remember(fontResolver, serifFontFamily) {
+        fontResolver.resolve(serifFontFamily, FontWeight.Medium).value as Typeface
+    }
     val pageFace = remember(fontResolver, serifFontFamily) {
         fontResolver.resolve(serifFontFamily, FontWeight.Normal, FontStyle.Italic).value as Typeface
     }
@@ -450,6 +458,13 @@ internal fun AyahSelectorRail(
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
                 textSize = (collapsedPageSize * 1.6f).toPx()
                 typeface = signFace
+            }
+            val juzPaint = Paint(paintFlags).apply {
+                textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
+                textSize = (collapsedPageSize * 0.86f).toPx()
+                typeface = juzFace
+                letterSpacing = 0.1f
+                fontFeatureSettings = "'lnum' 1"
             }
             val pagePaint = Paint(paintFlags).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
@@ -717,17 +732,19 @@ internal fun AyahSelectorRail(
                         // A juzʾ opening, named in words: there is no sign
                         // for it in the mushaf, only the running head's
                         // "Juzʾ N".
-                        val juzLabel = "Juz $juzStart"
-                        pagePaint.color = markInk.toArgb()
+                        val juzLabel = "JUZ $juzStart"
+                        // A wider berth than between annotations of one kind.
+                        markGap = maxOf(markGap, 11.dp.toPx())
+                        juzPaint.color = markInk.toArgb()
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawText(
                                 juzLabel,
                                 textAnchor(trailX + markGap),
-                                y + pagePaint.textSize * 0.34f,
-                                pagePaint,
+                                y + juzPaint.textSize * 0.34f,
+                                juzPaint,
                             )
                         }
-                        trailX += markGap + pagePaint.measureText(juzLabel)
+                        trailX += markGap + juzPaint.measureText(juzLabel)
                         markGap = 8.dp.toPx()
                     }
                     if (ayah in sajdaAyahs) {

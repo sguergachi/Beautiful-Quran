@@ -1568,8 +1568,12 @@ reader needs them: the page ("pg. N") first, then the rubʿ al-ḥizb sign (۞),
 then the juzʾ ("Juz N"), then the prostration sign (۩, the fifteen sajda
 verses). The signs are the real glyphs, set in the bundled Hafs face rather
 than drawn as lookalikes; the mushaf has no sign for a juzʾ, only the running
-head's name, so the rail says it in words. Where a verse has both, the ۞ sits between the two
-numbered labels so "pg. 22" and "Juz 2" never touch. They trail the verse
+head's name, so the rail says it in words. The juzʾ is a different kind of mark from the page, so it is
+set differently — upright letterspaced capitals ("JUZ 2") against the page's
+italic lowercase ("pg. 22") — and given a wider berth; where a ۞ sits between
+them it separates them further, and where none does (a juzʾ that opens on a
+surah's first verse) the form alone keeps "pg. 262 JUZ 14" from reading as one
+phrase. They trail the verse
 number as one phrase — a small italic aside, the first hugging its number
 (closer than the rows are apart, so it cannot group with a neighbouring verse)
 and later ones a touch wider apart — in the same faint ink. Every one of these marks, including the page label, brightens with focus as
