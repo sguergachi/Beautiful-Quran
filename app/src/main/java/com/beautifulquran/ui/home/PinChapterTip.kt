@@ -6,6 +6,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.reader.ContextualPulseMark
@@ -18,16 +21,15 @@ import com.beautifulquran.ui.theme.royalGreenOverlayInk
 /**
  * The pinning lesson, written around the live row of the chapter being read:
  * the one a reader is most likely to want kept at the top. The row stays the
- * real target — holding it until it is full pins it — and the lesson's body
- * takes the paper above or below it, whichever half of the sheet is open
- * ([bodyBelow], from [pinTipBodyBelow]). [target] is the row's centre in this
- * sheet's own space.
+ * real target — holding it until it is full pins it. The lesson occupies the
+ * right side, level with the chapter, and the vellum tapers left toward its
+ * number column. [target] is that column's centre in this sheet's own space.
+ * The copy follows the chapter; **Got it** stays at the bottom of the guide.
  */
 @Composable
 internal fun PinChapterTip(
     visible: Boolean,
     target: DpOffset,
-    bodyBelow: Boolean,
     onDismiss: () -> Unit,
     onRenderedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -48,11 +50,16 @@ internal fun PinChapterTip(
                 body = "Press and hold this chapter to pin it.",
                 onDismiss = onDismiss,
                 spotlightCenter = { target },
-                placement = ContextualTipPlacement(bodyAngleDegrees = if (bodyBelow) 90f else 270f),
+                placement = ContextualTipPlacement(bodyAngleDegrees = 0f),
+                actionCenter = {
+                    DpOffset(maxWidth - 68.dp, maxHeight - 72.dp)
+                },
                 dismissPaperColor = paper,
                 dismissInkColor = ink,
                 onRenderedChange = onRenderedChange,
-                contentPadding = PaddingValues(horizontal = 32.dp),
+                contentPadding = PaddingValues(start = 18.dp, end = 28.dp),
+                guideWidthFraction = 0.62f,
+                guideHeight = 300.dp,
                 mark = { ContextualPulseMark() },
                 modifier = modifier.fillMaxSize(),
             )
@@ -60,5 +67,17 @@ internal fun PinChapterTip(
     }
 }
 
-/** The lesson sits in whichever half of the sheet the row leaves open. */
-internal fun pinTipBodyBelow(targetY: Float, sheetHeight: Float): Boolean = targetY < sheetHeight / 2f
+/**
+ * Lets a guide that is composed inside the padded sheet reach up through the
+ * status-bar inset, so its vellum is full bleed from the top edge of the screen.
+ * The guide is measured [extra] taller and placed [extra] higher; the parent's
+ * own size and layout are untouched. Coordinates inside the guide therefore
+ * start [extra] above the sheet's origin.
+ */
+internal fun Modifier.reachUpThroughTopInset(extra: Dp): Modifier = layout { measurable, constraints ->
+    val extraPx = extra.roundToPx()
+    val placeable = measurable.measure(
+        Constraints.fixed(constraints.maxWidth, constraints.maxHeight + extraPx),
+    )
+    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extraPx) }
+}

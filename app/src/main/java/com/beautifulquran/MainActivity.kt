@@ -149,6 +149,8 @@ import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -432,6 +434,11 @@ private fun PaperStackApp(
     val homeViewModel: HomeViewModel = viewModel(factory = AppViewModelFactory)
     val bookmarksViewModel: BookmarksViewModel = viewModel(factory = AppViewModelFactory)
     val readerViewModel: ReaderViewModel = viewModel(factory = AppViewModelFactory)
+    val readableChapter by remember(readerViewModel) {
+        readerViewModel.uiState.map { state ->
+            state.content?.surah?.id.takeUnless { state.isLoading }
+        }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = null)
     val settingsViewModel: SettingsViewModel = viewModel(factory = AppViewModelFactory)
     val timingsLabViewModel: TimingsLabViewModel = viewModel(factory = AppViewModelFactory)
     val ornamentsLabViewModel: OrnamentsLabViewModel = viewModel(factory = AppViewModelFactory)
@@ -706,6 +713,9 @@ private fun PaperStackApp(
     // Reader entry policy consumes a threshold, never the animated position.
     val scrollSheetSettled by remember {
         derivedStateOf { abs(stackPosition.value - AYAH_LAYER) <= 0.01f }
+    }
+    val readerVisitHeld by remember {
+        derivedStateOf { stackPosition.value >= AYAH_LAYER - 0.01f }
     }
     val readerSheetOpen = selectedSurahId != 0 && settledLayer == AYAH_LAYER
     LaunchedEffect(readerSheetOpen) {
@@ -1467,6 +1477,12 @@ private fun PaperStackApp(
                 // leaving for the reader — not only when nowPlaying flips.
                 coverSheetVisible = coverSheetVisible,
                 readerVisitActive = settledLayer == AYAH_LAYER,
+                readingChapterId = selectedSurahId,
+                // The visit runs from the reader settling until the way back to
+                // Chapters: Settings, overlays and editing over the reader are
+                // still the reader visit and keep the clock running.
+                readerReadingActive = readerVisitHeld && readableChapter == selectedSurahId &&
+                    !entranceVisible,
                 chapterRibbonReady = chapterRibbonReady,
                 bookmarkCount = bookmarkCount,
                 onOpenBookmarks = { animateTo(BOOKMARKS_LAYER) },
