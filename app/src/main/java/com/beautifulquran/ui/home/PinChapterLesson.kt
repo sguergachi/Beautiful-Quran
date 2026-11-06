@@ -14,6 +14,10 @@ internal class PinChapterLesson {
     private var readingSince: Long? = null
     private var readMs = 0L
 
+    /** Whole seconds read in the visit that just ended, until [takeEndedVisitSeconds]. */
+    private var endedVisitSeconds: Long? = null
+    fun takeEndedVisitSeconds(): Long? = endedVisitSeconds.also { endedVisitSeconds = null }
+
     fun openFromList(chapterId: Int, scrolledDown: Boolean) {
         clearVisit()
         offeredChapter = null
@@ -39,6 +43,7 @@ internal class PinChapterLesson {
         // reader visit can make its subsequent return a teaching moment.
         if (onChapters && enteredReader) {
             offeredChapter = chapter.takeIf { readMs > MIN_READING_MS }
+            endedVisitSeconds = readMs / 1000
             clearVisit()
         }
     }

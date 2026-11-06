@@ -74,6 +74,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -639,6 +640,14 @@ fun HomeScreen(
         }
     }
     val pinTipChapter by viewModel.pinTipChapter.collectAsStateWithLifecycle()
+    val pinTipDiagnostic by viewModel.pinTipDiagnostic.collectAsStateWithLifecycle()
+    val diagnosticContext = LocalContext.current
+    LaunchedEffect(pinTipDiagnostic) {
+        pinTipDiagnostic?.let {
+            android.widget.Toast.makeText(diagnosticContext, it, android.widget.Toast.LENGTH_LONG).show()
+            viewModel.pinTipDiagnosticShown()
+        }
+    }
     // The lesson points at the chapter that was read, wherever the reading
     // place is: dwell in the reader never moves Continue (only listening does).
     val pinTipRowKey = pinTipChapter?.let(::chapterKey)
@@ -677,6 +686,17 @@ fun HomeScreen(
         pinTipChapter != null && uiState.pinned.isEmpty() && pinTipRowVisible &&
         !docking && !undocking &&
         !transportOnScreen && placeRowMeasured && !listScrolling
+    // Developer-only: a qualified visit that the Chapters sheet then refuses to show.
+    LaunchedEffect(pinTipChapter, pinTipEligible) {
+        if (pinTipChapter == null || pinTipEligible || !viewModel.shouldShowPinTip()) return@LaunchedEffect
+        delay(1500)
+        android.widget.Toast.makeText(
+            diagnosticContext,
+            "Pin guide qualified but blocked: pinned=${uiState.pinned.size} rowVisible=$pinTipRowVisible " +
+                "search=$searchActive transport=$transportOnScreen scrolling=$listScrolling",
+            android.widget.Toast.LENGTH_LONG,
+        ).show()
+    }
     LaunchedEffect(pinTipEligible) {
         if (!pinTipEligible) return@LaunchedEffect
         delay(600)

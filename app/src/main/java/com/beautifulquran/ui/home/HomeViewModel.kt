@@ -173,6 +173,14 @@ class HomeViewModel(
     /** The qualifying visit's chapter, published only after returning to Chapters. */
     val pinTipChapter: StateFlow<Int?> = _pinTipChapter
 
+    /** Developer-only: why the pinning guide did or did not qualify, shown as a toast. */
+    private val _pinTipDiagnostic = MutableStateFlow<String?>(null)
+    val pinTipDiagnostic: StateFlow<String?> = _pinTipDiagnostic
+    internal fun pinTipDiagnosticShown() { _pinTipDiagnostic.value = null }
+    private fun diagnose(message: String) {
+        if (settings.settings.value.developerModeEnabled) _pinTipDiagnostic.value = message
+    }
+
     val uiState: StateFlow<HomeUiState> =
         combine(
             combine(query, allSurahs, settings.settings, player.state, reciterNames) {
@@ -304,12 +312,28 @@ class HomeViewModel(
         settings.rememberChapterListAnchor(index, offset)
 
     internal fun onListChapterOpened(chapterId: Int, scrolledDown: Boolean) {
+        val show = shouldShowPinTip()
+        diagnose(
+            when {
+                !show -> "Pin guide off: guides disabled or already dismissed (Replay re-arms)"
+                !scrolledDown -> "Pin guide: opening $chapterId without a manual scroll first"
+                chapterId < 80 -> "Pin guide: chapter $chapterId is below 80"
+                else -> "Pin guide: counting reader time for chapter $chapterId"
+            },
+        )
         pinLesson.openFromList(chapterId, scrolledDown && shouldShowPinTip())
         _pinTipChapter.value = pinLesson.offeredChapter
     }
 
     internal fun observePinTipVisit(chapterId: Int, reading: Boolean, onChapters: Boolean, nowMs: Long) {
         pinLesson.observe(chapterId, reading, onChapters, nowMs)
+        pinLesson.takeEndedVisitSeconds()?.let { seconds ->
+            val pinned = uiState.value.pinned.size
+            diagnose(
+                "Pin guide: read ${seconds}s (needs >60s), chapter $chapterId, " +
+                    "$pinned pinned" + if (pinLesson.offeredChapter != null) " — qualifies" else " — not enough time",
+            )
+        }
         _pinTipChapter.value = pinLesson.offeredChapter
     }
 
