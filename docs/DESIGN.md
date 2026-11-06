@@ -1578,8 +1578,10 @@ number as one phrase — a small italic aside, the first hugging its number
 (closer than the rows are apart, so it cannot group with a neighbouring verse)
 and later ones a touch wider apart — in the same faint ink. Every one of these marks, including the page label, brightens with focus as
 the verse number does and turns gold on the selected verse. While the wheel is open the whole page dims to
-half ink under it (the theme scrim, fading with the wheel), so the ticks
-and numbers stay readable where they reach in over the text. The dim covers
+half ink under it (the theme scrim, fading with the wheel); behind the labels
+themselves a wash of paper holds solid and eases out about 200dp in from the
+rail, so the small ticks, numbers and annotations read on clean paper rather
+than across the Arabic strokes they reach over. The dim covers
 the entire screen — the page, the top bar and the player bar (including the
 pinned one the root hosts) — and only the rail itself stays bright. A surah
 with fewer verses than the rail has height keeps its ladder of ticks centred

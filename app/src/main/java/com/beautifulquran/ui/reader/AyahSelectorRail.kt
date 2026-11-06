@@ -37,8 +37,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerInputChange
@@ -378,6 +380,13 @@ internal fun AyahSelectorRail(
     }
     val accents = LocalQuranAccents.current
     val onSurface = MaterialTheme.colorScheme.onSurface
+    // The paper as it looks under the page dim, leaning toward the scrim, so the
+    // wash behind the labels reads as the same sheet and not a lighter panel.
+    val paper = lerp(
+        MaterialTheme.colorScheme.background,
+        MaterialTheme.colorScheme.scrim,
+        0.18f,
+    )
     val currentPlaceGreen = MaterialTheme.colorScheme.primary
     // Classic retains the rail's original system serif figures.
     val fontResolver = LocalFontFamilyResolver.current
@@ -433,6 +442,29 @@ internal fun AyahSelectorRail(
                 },
         ) {
             val expand = expansion.value
+            if (expand > 0.01f) {
+                // A wash of paper behind the wheel's labels. The ticks, numbers
+                // and annotations reach in over the verse text, and no amount
+                // of dimming makes small italic read across Arabic strokes; so
+                // the text itself recedes into the paper under them, holding
+                // solid across the labels and easing out beyond. Whole-page dim
+                // still carries the rest of the screen.
+                val washWidth = 200.dp.toPx()
+                val edgeX = if (mirrored) size.width else 0f
+                val farX = if (mirrored) size.width - washWidth else washWidth
+                val solid = paper.copy(alpha = 0.92f * expand)
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        0f to solid,
+                        0.72f to solid,
+                        1f to paper.copy(alpha = 0f),
+                        startX = edgeX,
+                        endX = farX,
+                    ),
+                    topLeft = Offset(minOf(edgeX, farX), 0f),
+                    size = Size(washWidth, size.height),
+                )
+            }
             // The right-side rail is the left layout mirrored across the rail's
             // own width: bar rects flip so their hidden cap lands under the far
             // edge, and numbers hang off the inner end instead.
@@ -456,7 +488,7 @@ internal fun AyahSelectorRail(
             }
             val signPaint = Paint(paintFlags).apply {
                 textAlign = if (mirrored) Paint.Align.RIGHT else Paint.Align.LEFT
-                textSize = (collapsedPageSize * 1.6f).toPx()
+                textSize = (collapsedPageSize * 1.2f).toPx()
                 typeface = signFace
             }
             val juzPaint = Paint(paintFlags).apply {
@@ -695,7 +727,7 @@ internal fun AyahSelectorRail(
                     val markInk = if (isSelected) {
                         accents.gold.copy(alpha = 0.95f * arrival)
                     } else {
-                        onSurface.copy(alpha = (0.2f + 0.5f * focus) * arrival * edgeFade)
+                        onSurface.copy(alpha = (0.5f + 0.4f * focus) * arrival * edgeFade)
                     }
                     val pageStart = pageStarts[ayah]
                     if (pageStart != null) {
