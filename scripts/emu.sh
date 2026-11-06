@@ -14,7 +14,7 @@
 #   * One golden AVD holds a booted snapshot. Every pool slot is a -read-only
 #     instance of it, so N agents boot in ~20s (vs ~40s cold) and need no AVD of
 #     their own. Slots are rented homes: they stay booted between tenants and a
-#     new tenant gets the app's data wiped, not a reboot.
+#     new tenant gets the app's data wiped (the QF content cache is kept), not a reboot.
 #   * Host GPU via -gpu host (NVIDIA GLES translator); Vulkan is left off, it
 #     is the path that has crashed the renderer. -no-window still needs a live
 #     X display for the GL context, so DISPLAY/XAUTHORITY are discovered.
@@ -195,6 +195,28 @@ boot_slot() {
   exec 7>&-
 }
 
+# Gives the next tenant a clean app: no bookmarks, settings or reading place.
+# The Quran Foundation content and timing caches are kept, because they are
+# public reference data and the first sync is ~95MB / ~2 minutes: a tenant that
+# judged page numbers or English glosses before it finished saw them missing.
+# Keeping them needs run-as, i.e. a debuggable build; any other state (release
+# build, app not installed) falls back to a full `pm clear`. EMU_KEEP_QF=0 forces
+# the full clear.
+wipe_app_state() {
+  local serial="$1"
+  adb_s "$serial" shell 'am force-stop com.beautifulquran' >/dev/null 2>&1 || true
+  if [[ "${EMU_KEEP_QF:-1}" != 0 ]] && adb_s "$serial" shell \
+      'run-as com.beautifulquran sh -c "
+        for d in files databases shared_prefs cache code_cache; do rm -rf \$d/* 2>/dev/null; done
+        find no_backup -maxdepth 1 -type f ! -name \"qf-*\" -delete 2>/dev/null
+        test -f no_backup/qf-content-cache.db"' >/dev/null 2>&1; then
+    log "Kept the QF content cache on $serial (EMU_KEEP_QF=0 to drop it)"
+  else
+    adb_s "$serial" shell 'pm clear com.beautifulquran' >/dev/null 2>&1 || true
+  fi
+  adb_s "$serial" shell 'input keyevent 3' >/dev/null 2>&1 || true
+}
+
 # Prints the serial of a free (or abandoned) slot, ready to use. Slots are
 # rented homes: they stay booted between tenants, so a warm one is preferred and
 # only its app state is wiped. A cold slot is booted only when none is warm.
@@ -212,7 +234,7 @@ lease() {
   [[ -n "$got" ]] || { status >&2; fail "all $SLOTS slots are leased; wait, or release one that is idle"; }
   if [[ "$got" == "$warm" ]]; then
     log "Reusing warm $got"
-    adb_s "$got" shell 'am force-stop com.beautifulquran; pm clear com.beautifulquran; input keyevent 3' >/dev/null 2>&1 || true
+    wipe_app_state "$got"
   else
     boot_slot "$got"
   fi
