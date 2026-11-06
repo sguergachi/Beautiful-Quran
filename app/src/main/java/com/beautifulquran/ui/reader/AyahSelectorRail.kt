@@ -658,8 +658,10 @@ internal fun AyahSelectorRail(
                     // Wayfinding marks trail the ayah number in the faintest
                     // ink, in from-edge units so mirroring just works: first
                     // the juzʾ, the rubʿ al-ḥizb sign, the sajda sign, then "pg. N".
+                    // Marks sit a clear gap off the number, wider than the
+                    // gaps between marks, so the label reads as separate.
                     var trailX = wheelX + length + 6.dp.toPx() +
-                        numberPaint.measureText(ayah.toString())
+                        numberPaint.measureText(ayah.toString()) + 8.dp.toPx()
                     // One ink for every wayfinding mark on the verse: faint at
                     // rest, brightening with focus like the number beside it,
                     // and gold on the selected verse so the marks light up
@@ -669,23 +671,8 @@ internal fun AyahSelectorRail(
                     } else {
                         onSurface.copy(alpha = (0.2f + 0.5f * focus) * arrival * edgeFade)
                     }
-                    // A hairline dash leads into every mark, whether it follows
-                    // the verse number or another mark, so each one reads as
-                    // its own entry on the verse. Returns where the mark starts.
-                    fun dashInto(from: Float): Float {
-                        val start = from + 5.dp.toPx()
-                        val end = start + 9.dp.toPx()
-                        drawLine(
-                            color = markInk,
-                            start = Offset(textAnchor(start), y),
-                            end = Offset(textAnchor(end), y),
-                            strokeWidth = 1f,
-                        )
-                        return end
-                    }
                     val juzStart = juzStarts[ayah]
                     if (juzStart != null) {
-                        trailX = dashInto(trailX)
                         // A juzʾ opening, named in words: there is no sign
                         // for it in the mushaf, only the running head's
                         // "Juzʾ N".
@@ -694,51 +681,48 @@ internal fun AyahSelectorRail(
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawText(
                                 juzLabel,
-                                textAnchor(trailX + 4.dp.toPx()),
+                                textAnchor(trailX + 6.dp.toPx()),
                                 y + pagePaint.textSize * 0.34f,
                                 pagePaint,
                             )
                         }
-                        trailX += 4.dp.toPx() + pagePaint.measureText(juzLabel)
+                        trailX += 6.dp.toPx() + pagePaint.measureText(juzLabel)
                     }
                     if (ayah in hizbAyahs) {
-                        trailX = dashInto(trailX)
                         // The rubʿ al-ḥizb sign itself: ۞.
                         signPaint.color = markInk.toArgb()
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawText(
                                 "\u06DE",
-                                textAnchor(trailX + 4.dp.toPx()),
+                                textAnchor(trailX + 6.dp.toPx()),
                                 y + signPaint.textSize * 0.2f,
                                 signPaint,
                             )
                         }
-                        trailX += 4.dp.toPx() + signPaint.measureText("\u06DE")
+                        trailX += 6.dp.toPx() + signPaint.measureText("\u06DE")
                     }
                     if (ayah in sajdaAyahs) {
-                        trailX = dashInto(trailX)
                         // The prostration sign: ۩.
                         signPaint.color = markInk.toArgb()
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawText(
                                 "\u06E9",
-                                textAnchor(trailX + 4.dp.toPx()),
+                                textAnchor(trailX + 6.dp.toPx()),
                                 y + signPaint.textSize * 0.2f,
                                 signPaint,
                             )
                         }
-                        trailX += 4.dp.toPx() + signPaint.measureText("\u06E9")
+                        trailX += 6.dp.toPx() + signPaint.measureText("\u06E9")
                     }
                     val pageStart = pageStarts[ayah]
                     if (pageStart != null) {
-                        trailX = dashInto(trailX)
                         // A new mushaf page, named in words like the juzʾ.
                         val pageLabel = "pg. $pageStart"
                         pagePaint.color = markInk.toArgb()
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawText(
                                 pageLabel,
-                                textAnchor(trailX + 4.dp.toPx()),
+                                textAnchor(trailX + 6.dp.toPx()),
                                 y + pagePaint.textSize * 0.34f,
                                 pagePaint,
                             )
