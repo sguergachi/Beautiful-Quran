@@ -639,6 +639,7 @@ fun HomeScreen(
             viewModel.pausePinTipReading(SystemClock.elapsedRealtime())
         }
     }
+    val titleScope = rememberCoroutineScope()
     val pinTipChapter by viewModel.pinTipChapter.collectAsStateWithLifecycle()
     val pinTipDiagnostic by viewModel.pinTipDiagnostic.collectAsStateWithLifecycle()
     val diagnosticContext = LocalContext.current
@@ -783,7 +784,10 @@ fun HomeScreen(
                         enter = fadeIn(tween(180)) + expandVertically(tween(220)),
                         exit = fadeOut(tween(140)) + shrinkVertically(tween(200)),
                     ) {
-                        HomeHeader(onOpenSettings = onOpenSettings)
+                        HomeHeader(
+                            onOpenSettings = onOpenSettings,
+                            onTitleClick = { titleScope.launch { listState.animateScrollToItem(0) } },
+                        )
                     }
                     // The same breath stands in for the receded masthead so
                     // the bar keeps its spot over the list's first ink.
@@ -1272,6 +1276,7 @@ fun HomeScreen(
 @Composable
 private fun HomeHeader(
     onOpenSettings: () -> Unit,
+    onTitleClick: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -1292,6 +1297,8 @@ private fun HomeHeader(
                         lineHeight = 40.sp,
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
+                    // The masthead is the way back to the top of the list.
+                    modifier = Modifier.quietClickable(role = Role.Button, onClick = onTitleClick),
                 )
             }
             Spacer(Modifier.height(24.dp))
