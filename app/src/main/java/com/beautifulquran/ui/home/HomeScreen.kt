@@ -129,9 +129,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.currentStateAsState
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import com.beautifulquran.R
 import com.beautifulquran.data.model.Surah
@@ -321,17 +318,6 @@ fun HomeScreen(
     // Search mode: field focused or a query still on the sheet (results stay
     // after the keyboard dismisses). Float stays gone for the whole stretch.
     val searchActive = searchFocused || searching
-    var scrolledDownForPinTip by remember { mutableStateOf(false) }
-    val pinTipScroll = remember(coverSheetVisible, searchActive) {
-        object : NestedScrollConnection {
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (coverSheetVisible && !searchActive && source == NestedScrollSource.UserInput && consumed.y < 0f) {
-                    scrolledDownForPinTip = true
-                }
-                return Offset.Zero
-            }
-        }
-    }
     val showFloatingPlayback = shouldShowFloatingPlayback(
         nowPlayingPresent = floatingPlayback != null,
         coverSheetVisible = coverSheetVisible,
@@ -713,7 +699,6 @@ fun HomeScreen(
     // puts the lesson away, so it never holds the stack or Back from behind
     // the reader.
     LaunchedEffect(coverSheetVisible, searchActive) {
-        if (!coverSheetVisible || searchActive) scrolledDownForPinTip = false
         if (!coverSheetVisible && pinTipOpen) closePinTip()
     }
     LaunchedEffect(pinTipOpen, pinTipRendered) {
@@ -870,8 +855,7 @@ fun HomeScreen(
                             )
                         },
                         onClick = {
-                            viewModel.onListChapterOpened(surah.id, scrolledDownForPinTip && !searchActive)
-                            scrolledDownForPinTip = false
+                            viewModel.onListChapterOpened(surah.id, fromList = !searchActive)
                             focusManager.clearFocus()
                             // Leaving for the reader puts the lesson away with it.
                             if (pinTipOpen) closePinTip()
@@ -916,7 +900,6 @@ fun HomeScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .onGloballyPositioned { pinListBounds = it.boundsInWindow() }
-                    .nestedScroll(pinTipScroll)
                     .verticalFadingEdges(
                         color = MaterialTheme.colorScheme.background,
                         // The feather under the search field. It is the list's

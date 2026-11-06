@@ -7,7 +7,7 @@ import org.junit.Test
 class PinChapterLessonTest {
     private fun eligibleVisit(chapter: Int = 80, duration: Long = 60_001L): PinChapterLesson =
         PinChapterLesson().apply {
-            openFromList(chapter, scrolledDown = true)
+            openFromList(chapter, eligible = true)
             observe(chapter, reading = true, onChapters = false, nowMs = 1_000L)
             observe(chapter, reading = false, onChapters = true, nowMs = 1_000L + duration)
         }
@@ -28,9 +28,9 @@ class PinChapterLessonTest {
     }
 
     @Test
-    fun searchAutomaticScrollAndOtherEntryPointsCannotQualify() {
+    fun searchAndOtherEntryPointsCannotQualify() {
         val lesson = PinChapterLesson()
-        lesson.openFromList(80, scrolledDown = false)
+        lesson.openFromList(80, eligible = false)
         lesson.observe(80, true, false, 0)
         lesson.observe(80, false, true, 600_000)
         assertNull(lesson.offeredChapter)

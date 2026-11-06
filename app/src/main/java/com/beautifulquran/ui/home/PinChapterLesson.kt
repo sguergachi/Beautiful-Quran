@@ -1,7 +1,7 @@
 package com.beautifulquran.ui.home
 
 /**
- * Offers pinning after a hand-scrolled opening of chapter 80–114, more than
+ * Offers pinning after opening chapter 80–114 from the chapter list, more than
  * one foreground minute across that range, and a return to Chapters. The caller
  * supplies a monotonic clock and reports only visibility/lifecycle boundaries;
  * no timer or playback ticks are needed. A new list opening replaces the visit.
@@ -18,10 +18,10 @@ internal class PinChapterLesson {
     private var endedVisitSeconds: Long? = null
     fun takeEndedVisitSeconds(): Long? = endedVisitSeconds.also { endedVisitSeconds = null }
 
-    fun openFromList(chapterId: Int, scrolledDown: Boolean) {
+    fun openFromList(chapterId: Int, eligible: Boolean) {
         clearVisit()
         offeredChapter = null
-        chapter = chapterId.takeIf { scrolledDown && it in 80..114 }
+        chapter = chapterId.takeIf { eligible && it in 80..114 }
     }
 
     /** Hidden/background time pauses the clock; chapters below 80 reset it. */

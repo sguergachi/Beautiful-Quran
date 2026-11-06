@@ -311,17 +311,17 @@ class HomeViewModel(
     internal fun rememberChapterListAnchor(index: Int, offset: Int) =
         settings.rememberChapterListAnchor(index, offset)
 
-    internal fun onListChapterOpened(chapterId: Int, scrolledDown: Boolean) {
+    internal fun onListChapterOpened(chapterId: Int, fromList: Boolean) {
         val show = shouldShowPinTip()
         diagnose(
             when {
                 !show -> "Pin guide off: guides disabled or already dismissed (Replay re-arms)"
-                !scrolledDown -> "Pin guide: opening $chapterId without a manual scroll first"
+                !fromList -> "Pin guide: chapter $chapterId opened from search, which does not count"
                 chapterId < 80 -> "Pin guide: chapter $chapterId is below 80"
                 else -> "Pin guide: counting reader time for chapter $chapterId"
             },
         )
-        pinLesson.openFromList(chapterId, scrolledDown && shouldShowPinTip())
+        pinLesson.openFromList(chapterId, fromList && show)
         _pinTipChapter.value = pinLesson.offeredChapter
     }
 

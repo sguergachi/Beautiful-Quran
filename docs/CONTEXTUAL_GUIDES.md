@@ -151,15 +151,14 @@ For the existing lessons, the acceptance actions are:
   inline note editor opens focused. A short tap does not unbookmark it.
 - Ayah rail: tap the spotlighted collapsed rail, or drag it vertically; the
   guide withdraws as the real scrub wheel blooms.
-- Pin a chapter (Chapters sheet): manually scroll down the unfiltered chapter
-  list and tap chapter **80–114**. Read within that chapter range for **more than
+- Pin a chapter (Chapters sheet): tap chapter **80–114** in the
+  unfiltered chapter list (no scrolling is required). Read within that chapter range for **more than
   one minute**, then close the reader and return to Chapters. Only foreground time
   counts: the whole reader visit (Settings and overlays over the reader included),
   from the chapter being ready until the way back to Chapters; loading and
   background time do not. Reading may resume within the
   same visit, but separate short visits are not added together. Search results,
-  automatic list repositioning, Continue, bookmarks and voice opens do not
-  start a qualifying visit. Continuing or jumping between chapters **80–114**
+  Continue, bookmarks and voice opens do not start a qualifying visit. Continuing or jumping between chapters **80–114**
   retains the accumulated time. Entering **1–79** resets it; returning to 80–114
   within the visit starts counting afresh. The guide targets the last chapter
   read when returning to Chapters. The visit is
