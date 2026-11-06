@@ -1574,8 +1574,9 @@ lowercase ("pg. 22"). The ۞ sits between them where a verse has one; where none
 does (nine juzʾ open on a surah's first verse, which carries no ۞) a middle dot
 holds the ۞'s place, so "pg. 262 · JUZ 14" keeps the same rhythm and the two
 figures never touch. They trail the verse
-number as one phrase — each mark the same 6dp from the one before it (the
-number counts as the first), measured from the ink so no glyph's own side space
+number as one phrase — each mark the same 6dp from the one before it, and the
+first a wider 13dp off the verse number, which is the figure the rest annotate,
+all measured from the ink so no glyph's own side space
 makes one gap look wider, and closer than the rows are apart so a mark cannot
 group with a neighbouring verse — in the same faint ink. Every one of these marks, including the page label, brightens with focus as
 the verse number does and turns gold on the selected verse. While the wheel is open the whole page dims to

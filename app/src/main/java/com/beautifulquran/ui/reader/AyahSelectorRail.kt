@@ -714,8 +714,12 @@ internal fun AyahSelectorRail(
                     }
                     // Wayfinding marks trail the ayah number in the faintest
                     // ink, in from-edge units so mirroring just works.
+                    // The verse number is the figure and the marks are its
+                    // aside, so the number gets a wider berth than the marks
+                    // have among themselves: they read as one annotation after
+                    // it, not as part of the number.
                     var trailX = wheelX + length + 6.dp.toPx() +
-                        numberPaint.measureText(ayah.toString())
+                        numberPaint.measureText(ayah.toString()) + 7.dp.toPx()
                     // One even gap everywhere: number to first mark, and mark to
                     // mark. Measured from the glyphs' ink, not their advance
                     // boxes, so an italic "p" or the ۞'s own side space can't
