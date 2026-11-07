@@ -4184,7 +4184,7 @@ button.ayah-mark {
 }
 
 .settings .reciters h1 {
-  margin-bottom: 10px;
+  margin-bottom: 2px;
 }
 
 /* The leaf's opening sentence is read, so it takes the reading size
@@ -4831,7 +4831,7 @@ button.ayah-mark {
 }
 
 .settings .acknowledgements h1 {
-  margin-bottom: 10px;
+  margin-bottom: 2px;
 }
 
 /* Leaf intro at the reading size (Android LeafIntro: 15/22 muted). */

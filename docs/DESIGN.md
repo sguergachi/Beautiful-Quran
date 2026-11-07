@@ -1051,7 +1051,8 @@ not the app's.
   name — Reciters, Customize, Download manager, Acknowledgements — are one rung
   (`muted`), and the footer version is a fact too (`labelSmall`). A leaf's
   opening sentence under its title (`LeafIntro`) is read, so it takes
-  `bodyMedium` 15 / 22 in `muted`, never a 12 sp caption. On the Reciters
+  `bodyMedium` 15 / 22 in `muted`, never a 12 sp caption, and sits 2 dp under
+  the title (the title's 34 sp leading already carries the air). On the Reciters
   leaf every voice names its style (Murattal, Mujawwad, Muallim) on a second
   line, 12 / 16 `muted`, so all rows share one height (58 dp; the star's 48 dp
   target overhangs the text block). Never inline after the name. Settings'

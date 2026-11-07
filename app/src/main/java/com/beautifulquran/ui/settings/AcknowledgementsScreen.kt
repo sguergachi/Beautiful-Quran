@@ -111,7 +111,7 @@ internal fun AcknowledgementsPage(onBack: () -> Unit) {
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(2.dp))
             LeafIntro("Every source this app stands on.")
             ACKNOWLEDGEMENTS.forEach { acknowledgement ->
                 Spacer(Modifier.height(28.dp))

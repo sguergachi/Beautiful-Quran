@@ -217,7 +217,7 @@ internal fun DownloadManagerPage(
                         style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(2.dp))
                     when {
                         !catalogLoaded -> FactActionRow(
                             factStyle = MaterialTheme.typography.bodyMedium.lining(),

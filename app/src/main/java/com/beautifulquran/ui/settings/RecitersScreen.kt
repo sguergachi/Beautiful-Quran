@@ -90,7 +90,7 @@ internal fun RecitersPage(
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(2.dp))
                 LeafIntro("Choose a voice. Star favorites for Settings.")
                 // No "All reciters" label: the title already says it.
                 Spacer(Modifier.height(24.dp))
