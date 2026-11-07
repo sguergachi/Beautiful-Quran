@@ -1037,12 +1037,32 @@ not the app's.
   scripture, translation, names, facts, captions — stays serif. Do not "fix"
   the sans slots back to the serif.
   Settings rows and the Download manager share one scale: **17 / 26**
-  bodyLarge for names, **12 / 16** labelSmall for facts and every verb
+  bodyLarge in **Medium** for names (#897 — regular read too light as a list title), **12 / 16** labelSmall for facts and every verb
   (Download, Resume, Pause, Delete, Keep). Reciter verbs sit 16 dp
   after the facts. Chapter verbs trail in a reserved slot; Pause flips
   in place to Resume (right edge), Delete to its left. Fetch verbs are green;
   settle and delete are quiet ink. Never size a destructive verb up
   to the name.
+  Section labels (Settings, Customize, Download manager) are tracked caps in
+  `labelMedium` (13 / 17 — one step above the 12 / 16 facts they head),
+  SemiBold, on the `secondary` ink rung, so they scan at a glance (#897); they
+  stay below row names and never reach scripture weight. Every label sits 10 dp
+  above its first row (`Section`: 32 dp above, 10 dp below). Facts under a row
+  name — Reciters, Customize, Download manager, Acknowledgements — are one rung
+  (`muted`), and the footer version is a fact too (`labelSmall`). A leaf's
+  opening sentence under its title (`LeafIntro`) is read, so it takes
+  `bodyMedium` 15 / 22 in `muted`, never a 12 sp caption, and sits 2 dp under
+  the title (the title's 34 sp leading already carries the air). On the Reciters
+  leaf every voice names its style (Murattal, Mujawwad, Muallim) on a second
+  line, 12 / 16 `muted`, so all rows share one height (58 dp; the star's 48 dp
+  target overhangs the text block). Never inline after the name. Settings'
+  favourites show no style and stay one line (42 dp).
+  Acknowledgements: titles are row names (17 / 26 Medium), bodies are read
+  citations (`bodyMedium` 15 / 22 `muted`). Download manager: reciter names are
+  row names too; its storage line sits under the title like a leaf intro
+  (`bodyMedium` with lining figures); every fact line holds its verb's 44 dp
+  target without adding height, so name and fact sit tight and every reciter
+  block is the same height, verb or not.
 - **Product stage** (`Alpha`): the same letterspaced labelSmall whisper as a
   settings section label, sitting next to the product name on the home
   masthead and the settings colophon. Never a chip, pill, or badge with a
@@ -1909,7 +1929,12 @@ Settings, **Reciters**, **Customize**, and **Download manager** are consecutive
 leaves in the physical paper stack. Their rows turn to the requested detail leaf, and
 the back chevron or a rightward swipe returns to main Settings while leaving
 that detail underneath for a forward swipe to reopen. Main Settings
-shows only favorite voices above the Reciters row; the Reciters leaf always
+shows only favorite voices, unselected ones on the `secondary` ink rung (live
+choices, never a disabled-looking fade), then a "Show all 13 reciters" link in
+Home search's "Show N more" voice (sans labelLarge) in quiet `muted` ink —
+green text would compete with the selected voice's nuqta — started in the
+names' column and followed directly by the page rows' chevron (not at the right
+edge, where it floated away from the words), that opens the Reciters leaf. The Reciters leaf always
 keeps the complete catalog accessible and uses a qalam nuqta for the selected
 voice plus quiet gold stars for favorites. The original seven voices begin as
 favorites when this preference does not exist, preserving the old main leaf;

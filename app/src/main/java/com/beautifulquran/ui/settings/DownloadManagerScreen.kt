@@ -1,9 +1,13 @@
 package com.beautifulquran.ui.settings
 
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -73,6 +77,7 @@ import com.beautifulquran.playback.reciterHeaderActionIsFetch
 import com.beautifulquran.playback.reciterHeaderSubtitle
 import com.beautifulquran.playback.reciterProgressLabel
 import com.beautifulquran.playback.reciterResumeSurahs
+import com.beautifulquran.ui.theme.lining
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.quietClickable
@@ -212,9 +217,10 @@ internal fun DownloadManagerPage(
                         style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(Modifier.height(36.dp))
+                    Spacer(Modifier.height(2.dp))
                     when {
                         !catalogLoaded -> FactActionRow(
+                            factStyle = MaterialTheme.typography.bodyMedium.lining(),
                             fact = "Downloads",
                             action = "…",
                             fetch = false,
@@ -224,12 +230,13 @@ internal fun DownloadManagerPage(
                         pending == Pending.DeleteAll -> Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
+                                .tightToFactLine(MaterialTheme.typography.bodyMedium.lineHeight)
                                 .fillMaxWidth()
                                 .heightIn(min = 44.dp),
                         ) {
                             Text(
                                 text = "Delete all downloads?",
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MaterialTheme.typography.bodyMedium.lining(),
                                 color = QuranTheme.ink.muted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -248,6 +255,7 @@ internal fun DownloadManagerPage(
                             )
                         }
                         deleting == Pending.DeleteAll -> FactActionRow(
+                            factStyle = MaterialTheme.typography.bodyMedium.lining(),
                             fact = formatUsage(usage),
                             action = "…",
                             fetch = false,
@@ -255,6 +263,7 @@ internal fun DownloadManagerPage(
                             onAction = {},
                         )
                         usage.total <= 0L -> FactActionRow(
+                            factStyle = MaterialTheme.typography.bodyMedium.lining(),
                             fact = formatUsage(usage),
                             action = null,
                             fetch = false,
@@ -262,6 +271,7 @@ internal fun DownloadManagerPage(
                             onAction = {},
                         )
                         else -> FactActionRow(
+                            factStyle = MaterialTheme.typography.bodyMedium.lining(),
                             fact = formatUsage(usage),
                             action = "Delete all",
                             fetch = false,
@@ -313,7 +323,7 @@ internal fun DownloadManagerPage(
                 }
                 item(key = "reciter-$reciterId") {
                     Column {
-                        if (index > 0) Spacer(Modifier.height(24.dp))
+                        if (index > 0) Spacer(Modifier.height(20.dp))
                         ReciterHeader(
                             name = reciterRow.reciter.name,
                             expanded = expanded,
@@ -499,7 +509,8 @@ private fun ReciterHeader(
         ) {
             Text(
                 text = name,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -519,14 +530,14 @@ private fun ReciterHeader(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
+                    .tightToFactLine(MaterialTheme.typography.labelSmall.lineHeight)
                     .fillMaxWidth()
-                    .heightIn(min = 44.dp)
-                    .padding(top = 2.dp),
+                    .heightIn(min = 44.dp),
             ) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.labelSmall,
-                    color = QuranTheme.ink.quiet,
+                    color = QuranTheme.ink.muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
@@ -545,7 +556,6 @@ private fun ReciterHeader(
                 fetch = reciterHeaderActionIsFetch(action),
                 enabled = actionEnabled,
                 onAction = onAction,
-                modifier = Modifier.padding(top = 2.dp),
             )
         } else {
             FactActionRow(
@@ -554,7 +564,6 @@ private fun ReciterHeader(
                 fetch = false,
                 enabled = false,
                 onAction = {},
-                modifier = Modifier.padding(top = 2.dp),
             )
         }
     }
@@ -568,17 +577,19 @@ private fun FactActionRow(
     enabled: Boolean = true,
     onAction: () -> Unit,
     modifier: Modifier = Modifier,
+    factStyle: TextStyle = MaterialTheme.typography.labelSmall,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
+            .tightToFactLine(factStyle.lineHeight)
             .fillMaxWidth()
             .heightIn(min = 44.dp),
     ) {
         Text(
             text = fact,
-            style = MaterialTheme.typography.labelSmall,
-            color = QuranTheme.ink.quiet,
+            style = factStyle,
+            color = QuranTheme.ink.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
@@ -592,6 +603,22 @@ private fun FactActionRow(
                 modifier = Modifier.padding(start = 16.dp),
             )
         }
+    }
+}
+
+/**
+ * A fact line keeps its verb's 44 dp touch target but takes only its own line
+ * in the layout: the target's spare height is trimmed above and below, so the
+ * fact sits straight under its name (as Settings' notes do) and every reciter
+ * block has the same height whether or not it carries a verb (#897). The
+ * target still extends into the name row above, inside the block's bounds.
+ */
+private fun Modifier.tightToFactLine(lineHeight: TextUnit): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val line = lineHeight.roundToPx()
+    val trim = ((placeable.height - line) / 2).coerceAtLeast(0)
+    layout(placeable.width, placeable.height - 2 * trim) {
+        placeable.place(0, -trim)
     }
 }
 
@@ -725,6 +752,7 @@ private fun ChapterRow(
             Text(
                 text = row.surah.nameTransliteration,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -735,7 +763,7 @@ private fun ChapterRow(
                 color = if (downloading || paused || row.complete) {
                     progressInk
                 } else {
-                    QuranTheme.ink.quiet
+                    QuranTheme.ink.muted
                 },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

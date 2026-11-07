@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.theme.QuranTheme
 import com.beautifulquran.ui.theme.verticalFadingEdges
@@ -110,20 +111,22 @@ internal fun AcknowledgementsPage(onBack: () -> Unit) {
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            Spacer(Modifier.height(10.dp))
-            Caption("Every source this app stands on.")
+            Spacer(Modifier.height(2.dp))
+            LeafIntro("Every source this app stands on.")
             ACKNOWLEDGEMENTS.forEach { acknowledgement ->
                 Spacer(Modifier.height(28.dp))
                 Text(
                     text = acknowledgement.title,
                     style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = acknowledgement.body,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = QuranTheme.ink.quiet,
+                    // A citation, read: the muted rung, not running-head quiet.
+                    color = QuranTheme.ink.muted,
                 )
             }
             Spacer(Modifier.height(32.dp))

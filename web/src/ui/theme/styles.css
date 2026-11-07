@@ -3886,6 +3886,55 @@ button.ayah-mark {
   cursor: pointer;
 }
 
+/* Under the favourites: Home search's "Show N more" voice, started in the
+   names' column (nuqta width + 16px gap). Quiet ink, not accent: green text
+   would compete with the selected voice's nuqta. */
+.settings-show-all-reciters {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.75rem 0 0.75rem calc(1.4375rem + 16px);
+  text-align: start;
+  font-size: 0.95rem;
+  color: var(--ink-rung-muted);
+  cursor: pointer;
+}
+
+/* Unselected voices are live choices: the secondary rung, not a 55% fade. */
+.reciter-choices .paper-choice-label {
+  color: var(--ink-rung-secondary);
+}
+
+/* A style (Mujawwad, Muallim) is a fact under a name: Settings' note rung. */
+.reciter-choices .paper-choice-desc {
+  color: var(--ink-rung-muted);
+}
+
+/* Every voice on the full list carries its style (Murattal / Mujawwad /
+   Muallim) on a second line, so all rows share one height; Settings'
+   favourites show none (Android ReciterChoiceRow showStyle). */
+.reciter-choices .paper-choice-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The star's 48px target draws its glyph at the right edge; let text run into
+   the empty left of it (12px clear of the glyph) so long names keep their style. */
+.reciter-choices .paper-choice-trailing {
+  margin-inline-start: -14px;
+}
+
+/* The row is its two-line text block; the star's 48px target overhangs it
+   into the row padding instead of setting the pitch. */
+.reciter-choices .reciter-favorite {
+  margin-block: -3px;
+}
+
 .settings-nav-copy {
   display: flex;
   flex-direction: column;
@@ -4095,6 +4144,12 @@ button.ayah-mark {
   margin-bottom: 20px;
 }
 
+/* The reciter section stands apart from the page rows by the same air as the
+   colophon below Acknowledgements (Android: 48dp spacer, 76dp ink to ink). */
+.settings-section-reciter {
+  margin-bottom: 48px;
+}
+
 .settings-section-toggles {
   display: flex;
   flex-direction: column;
@@ -4107,14 +4162,16 @@ button.ayah-mark {
   margin-bottom: 1.5rem;
 }
 
-/* Letterspaced, low-ink label — never competes with the reading. */
+/* Letterspaced small-caps label, semibold on the secondary rung so sections
+   scan at a glance (#897) — still below row names, never competes with the
+   reading. */
 .settings-section h2 {
   font-size: calc(12px * 1.15);
   letter-spacing: 2px;
   text-transform: uppercase;
   font-feature-settings: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
-  color: var(--ink-rung-muted);
-  font-weight: 500;
+  color: var(--ink-rung-secondary);
+  font-weight: 600;
   margin: 0 0 4px;
   font-family: var(--font-body);
 }
@@ -4127,11 +4184,16 @@ button.ayah-mark {
 }
 
 .settings .reciters h1 {
-  margin-bottom: 10px;
+  margin-bottom: 2px;
 }
 
+/* The leaf's opening sentence is read, so it takes the reading size
+   (Android LeafIntro: bodyMedium 15/22, muted), not a 12px caption. */
 .settings .reciters-caption {
-  margin: 0 0 32px;
+  margin: 0 0 24px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-rung-muted);
 }
 
 .reciter-favorite {
@@ -4769,11 +4831,15 @@ button.ayah-mark {
 }
 
 .settings .acknowledgements h1 {
-  margin-bottom: 10px;
+  margin-bottom: 2px;
 }
 
+/* Leaf intro at the reading size (Android LeafIntro: 15/22 muted). */
 .settings .acknowledgements-caption {
-  margin: 0 0 12px;
+  margin: 0 0 28px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-rung-muted);
 }
 
 .acknowledgements-entry {
@@ -4783,19 +4849,21 @@ button.ayah-mark {
 .acknowledgements-title {
   margin: 0 0 2px;
   font-family: var(--font-body);
-  font-size: 1.05rem;
-  line-height: 1.35;
-  font-weight: 400;
+  /* Row names: 17/26 Medium, as on Settings (Android bodyLarge Medium). */
+  font-size: 17px;
+  line-height: 26px;
+  font-weight: 500;
   letter-spacing: normal;
   text-transform: none;
   color: var(--ink);
 }
 
+/* A citation, read: bodyMedium 15/22 on the muted rung, not running-head quiet. */
 .acknowledgements-body {
   margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: var(--ink-rung-quiet);
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-rung-muted);
 }
 
 .settings .acknowledgements-foot {

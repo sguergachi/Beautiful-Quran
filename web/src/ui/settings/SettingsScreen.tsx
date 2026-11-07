@@ -396,7 +396,7 @@ export function SettingsScreen({
           <BackChevron />
         </button>
         <h1>Settings</h1>
-        <section className="settings-section">
+        <section className="settings-section settings-section-reciter">
           <h2>Reciter</h2>
           <ReciterChoices
             reciters={favoriteReciters}
@@ -406,11 +406,9 @@ export function SettingsScreen({
           {favoriteReciters.length === 0 ? (
             <p className="settings-caption">No favorites yet — keep them from the full list.</p>
           ) : null}
-          <button type="button" className="settings-nav" onClick={() => setPage('reciters')}>
-            <span className="settings-nav-copy">
-              <span className="settings-nav-label">All reciters</span>
-              <span className="settings-nav-note">{reciters.length} reciters total</span>
-            </span>
+          {/* A link under the favourites, in Home search's "Show N more" voice. */}
+          <button type="button" className="settings-show-all-reciters" onClick={() => setPage('reciters')}>
+            <span>Show all {reciters.length} reciters</span>
             <DisclosureChevron expanded={false} />
           </button>
         </section>

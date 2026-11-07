@@ -14,6 +14,7 @@ type ReciterChoicesProps = {
 /** Android's voice rows: a nuqta selects; a separate star keeps a favorite. */
 export function ReciterChoices({ reciters, selectedId, onSelect, favorites, onToggleFavorite }: ReciterChoicesProps) {
   return (
+    <div className="reciter-choices">
     <PaperChoiceList
       aria-label="Reciter"
       value={String(selectedId)}
@@ -24,7 +25,9 @@ export function ReciterChoices({ reciters, selectedId, onSelect, favorites, onTo
         return {
           value: String(reciter.id),
           label: reciter.name,
-          description: style,
+          // The full list names every voice's style on a second line (Murattal
+          // included) so rows share one height; Settings' favourites stay one line.
+          description: onToggleFavorite ? reciter.style : undefined,
           trailing: onToggleFavorite ? (
             <button
               type="button"
@@ -51,6 +54,7 @@ export function ReciterChoices({ reciters, selectedId, onSelect, favorites, onTo
       })}
       onChange={(id) => onSelect(Number(id))}
     />
+    </div>
   )
 }
 
@@ -63,10 +67,10 @@ export function RecitersScreen({ onBack, ...choices }: ReciterChoicesProps & { o
       </button>
       <h1>Reciters</h1>
       <p className="settings-caption reciters-caption">
-        Choose a voice. Star favorites to keep them on the main Settings leaf.
+        Choose a voice. Star favorites for Settings.
       </p>
+      {/* No "All reciters" label: the title already says it. */}
       <section className="settings-section">
-        <h2>All reciters</h2>
         <ReciterChoices {...choices} reciters={[...choices.reciters].sort((a, b) => a.name.localeCompare(b.name))} />
       </section>
     </div>

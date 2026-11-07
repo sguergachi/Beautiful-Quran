@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -60,6 +61,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -264,7 +266,7 @@ internal fun SettingsScreen(
             Spacer(Modifier.height(36.dp))
 
             SectionLabel("Reciter")
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(10.dp))
             favoriteReciters.forEach { reciter ->
                 ReciterChoiceRow(
                     reciter = reciter,
@@ -274,15 +276,13 @@ internal fun SettingsScreen(
             }
             if (favoriteReciters.isEmpty()) {
                 Caption("No favorites yet — keep them from the full list.")
-                Spacer(Modifier.height(8.dp))
             }
-            NavigateRow(
-                label = "All reciters",
-                note = "${reciters.size} reciters total",
-                onClick = onOpenReciters,
-            )
+            ShowAllRecitersLink(total = reciters.size, onClick = onOpenReciters)
 
-            Spacer(Modifier.height(20.dp))
+            // The reciter section stands apart from the page rows by the same
+            // visible air as the colophon below Acknowledgements (76 dp ink to
+            // ink on screen), so the sheet has one large break, used twice.
+            Spacer(Modifier.height(48.dp))
             NavigateRow(
                 label = "Customize",
                 note = customizeSummary(settings),
@@ -290,27 +290,11 @@ internal fun SettingsScreen(
             )
 
             Spacer(Modifier.height(20.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .quietClickable { onOpenDownloads() }
-                    .padding(vertical = 8.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = "Download manager",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = usage?.let(::formatUsage) ?: "…",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = QuranTheme.ink.quiet,
-                    )
-                }
-                DisclosureChevron(expanded = false)
-            }
+            NavigateRow(
+                label = "Download manager",
+                note = usage?.let(::formatUsage) ?: "…",
+                onClick = { onOpenDownloads() },
+            )
 
             Spacer(Modifier.height(20.dp))
             NavigateRow(
@@ -377,7 +361,7 @@ private fun DeveloperSection(
     var educationRearmed by remember { mutableStateOf(false) }
 
     SectionLabel("Developer")
-    Spacer(Modifier.height(2.dp))
+    Spacer(Modifier.height(4.dp))
     Caption("Tools for testing work in progress.")
 
     if (Build.VERSION.SDK_INT >= 33) {
@@ -386,15 +370,15 @@ private fun DeveloperSection(
             "Paper ink study",
             Modifier.fillMaxWidth().quietClickable {
                 context.startActivity(android.content.Intent(context, com.beautifulquran.ui.reader.PaperInkStudyActivity::class.java))
-            }.padding(vertical = 6.dp),
+            }.padding(vertical = 8.dp),
             style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.primary,
         )
         Caption("Al-Fatihah 1:1–3 with a repeat. Compare inside-out and bottom-up ink filling.")
     }
 
-    Spacer(Modifier.height(20.dp))
-    SectionLabel("English type")
+    Section("English type")
     BookTypeface.entries.forEach { face ->
         SelectRow(
             label = face.label,
@@ -404,8 +388,7 @@ private fun DeveloperSection(
     }
     Caption("Readers get Junicode, set to Garamond's size, measure and colour. The earlier EB Garamond stays for comparison.")
 
-    Spacer(Modifier.height(20.dp))
-    SectionLabel("Scroll Arabic")
+    Section("Scroll Arabic")
     ScrollArabicFace.entries.forEach { face ->
         SelectRow(
             label = face.label,
@@ -415,8 +398,7 @@ private fun DeveloperSection(
     }
     Caption("Readers get Hafs. The others are set to Hafs's letter height; verse marks stay in Hafs, and Mushaf leaves keep their own faces.")
 
-    Spacer(Modifier.height(20.dp))
-    SectionLabel("Chapter banner")
+    Section("Chapter banner")
     MushafBannerStyle.entries.forEach { style ->
         SelectRow(
             label = style.label,
@@ -452,6 +434,7 @@ private fun DeveloperSection(
     Text(
         text = "Replay feature guides",
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable {
@@ -459,7 +442,7 @@ private fun DeveloperSection(
                 viewModel.settings.update { it.copy(educationGuidesEnabled = true) }
                 educationRearmed = true
             }
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption(
@@ -478,10 +461,11 @@ private fun DeveloperSection(
             else -> "Log export"
         },
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(enabled = !logExport.preparing, onClick = onLogExport)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption(
@@ -495,7 +479,8 @@ private fun DeveloperSection(
         Text(
             text = "Share latest log",
             style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.fillMaxWidth().quietClickable(onClick = onShareLogExport).padding(vertical = 6.dp),
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.fillMaxWidth().quietClickable(onClick = onShareLogExport).padding(vertical = 8.dp),
             color = MaterialTheme.colorScheme.primary,
         )
     }
@@ -504,10 +489,11 @@ private fun DeveloperSection(
         Text(
             text = "Share last crash",
             style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
             modifier = Modifier
                 .fillMaxWidth()
                 .quietClickable { com.beautifulquran.CrashTrace.share(context) }
-                .padding(vertical = 6.dp),
+                .padding(vertical = 8.dp),
             color = MaterialTheme.colorScheme.primary,
         )
         Caption("The app stopped unexpectedly. Share what killed it.")
@@ -517,10 +503,11 @@ private fun DeveloperSection(
     Text(
         text = "Timings Lab",
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(onClick = onOpenTimingsLab)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption("Edit word-level timing marks; also opens from a word long-press.")
@@ -529,10 +516,11 @@ private fun DeveloperSection(
     Text(
         text = "Tarjīʿ Lab",
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(onClick = onOpenTarjiLab)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption(
@@ -544,10 +532,11 @@ private fun DeveloperSection(
     Text(
         text = "Ornaments Lab",
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(onClick = onOpenOrnamentsLab)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption("Explore, design, and save seeds for the procedural star-and-cross ornament generator.")
@@ -556,10 +545,11 @@ private fun DeveloperSection(
     Text(
         text = "Component kit",
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(onClick = onOpenComponentKit)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption("Tune the nuqta, ink check and brush circle live, one component per page.")
@@ -620,13 +610,40 @@ private fun Colophon(
                 append("Version ${BuildConfig.VERSION_NAME}")
                 if (developerModeEnabled) append(" · developer mode")
             },
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             color = QuranTheme.ink.quiet,
         )
     }
 }
 
 // ── Selection vocabulary ───────────────────────────────────────────────────
+
+/** Under the favourites: a link, not another option. Sans labelLarge (Home
+ * search's "Show N more" voice) started in the names' column, so it belongs to
+ * the list without posing as a voice. Quiet ink with the page rows' green
+ * chevron right after the words: green text would compete with the selected
+ * voice's nuqta, the one thing in this section that should hold the eye. */
+@Composable
+private fun ShowAllRecitersLink(total: Int, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .quietClickable(role = Role.Button, onClick = onClick)
+            .padding(
+                start = LocalNuqtaParams.current.sizeDp.dp + 16.dp,
+                top = 12.dp,
+                bottom = 12.dp,
+            ),
+    ) {
+        Text(
+            text = "Show all $total reciters",
+            style = MaterialTheme.typography.labelLarge,
+            color = QuranTheme.ink.muted,
+        )
+        DisclosureChevron(expanded = false)
+    }
+}
 
 /** Opens a sub-page on this same sheet — label, quiet summary, chevron. */
 @Composable
@@ -646,6 +663,7 @@ private fun NavigateRow(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
@@ -687,6 +705,7 @@ internal fun SelectRow(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha),
             )
             if (note != null) {
@@ -729,6 +748,7 @@ internal fun ToggleRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
@@ -1243,6 +1263,7 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?, timings: Runtim
     Text(
         text = "Quran Foundation word & QCF cache",
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.onSurface,
     )
     if (cache == null) {
@@ -1285,6 +1306,7 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?, timings: Runtim
             "Force Quran cache update"
         },
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(
@@ -1295,7 +1317,7 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?, timings: Runtim
                     timings.refresh()
                 },
             )
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary.copy(
             alpha = if (status.phase == RuntimeCachePhase.REFRESHING) 0.4f else 1f,
         ),
@@ -1337,14 +1359,28 @@ internal fun Section(text: String) {
     Spacer(Modifier.height(10.dp))
 }
 
-/** Letterspaced, low-ink label — a whisper that never competes with the
- * reading (docs/DESIGN.md). */
+/** Letterspaced small-caps label. SemiBold on the secondary ink rung so the
+ * sections can be found at a glance (#897) — still below row names and never
+ * competing with the reading (docs/DESIGN.md). */
 @Composable
 internal fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall.forCaps(),
+        style = MaterialTheme.typography.labelMedium.forCaps(),
         letterSpacing = 2.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = QuranTheme.ink.secondary,
+    )
+}
+
+/** A leaf's opening sentence, under its title. It is read, not scanned, so it
+ * takes the reading size (bodyMedium 15 / 22, as Acknowledgements' prose)
+ * rather than a 12 sp caption. */
+@Composable
+internal fun LeafIntro(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
         color = QuranTheme.ink.muted,
     )
 }
