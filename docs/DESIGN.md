@@ -1055,6 +1055,12 @@ not the app's.
   (Mujawwad, Muallim) are facts: 12 / 16 `muted`, on the name's baseline after
   it — never a second line, so every voice row has the same pitch (48 dp on the
   full list, where the star's target is the row; 42 dp on Settings).
+  Acknowledgements: titles are row names (17 / 26 Medium), bodies are read
+  citations (`bodyMedium` 15 / 22 `muted`). Download manager: reciter names are
+  row names too; its storage line sits under the title like a leaf intro
+  (`bodyMedium` with lining figures); every fact line holds its verb's 44 dp
+  target without adding height, so name and fact sit tight and every reciter
+  block is the same height, verb or not.
 - **Product stage** (`Alpha`): the same letterspaced labelSmall whisper as a
   settings section label, sitting next to the product name on the home
   masthead and the settings colophon. Never a chip, pill, or badge with a

@@ -4845,8 +4845,12 @@ button.ayah-mark {
   margin-bottom: 10px;
 }
 
+/* Leaf intro at the reading size (Android LeafIntro: 15/22 muted). */
 .settings .acknowledgements-caption {
-  margin: 0 0 12px;
+  margin: 0 0 28px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-rung-muted);
 }
 
 .acknowledgements-entry {
@@ -4856,19 +4860,21 @@ button.ayah-mark {
 .acknowledgements-title {
   margin: 0 0 2px;
   font-family: var(--font-body);
-  font-size: 1.05rem;
-  line-height: 1.35;
-  font-weight: 400;
+  /* Row names: 17/26 Medium, as on Settings (Android bodyLarge Medium). */
+  font-size: 17px;
+  line-height: 26px;
+  font-weight: 500;
   letter-spacing: normal;
   text-transform: none;
   color: var(--ink);
 }
 
+/* A citation, read: bodyMedium 15/22 on the muted rung, not running-head quiet. */
 .acknowledgements-body {
   margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: var(--ink-rung-quiet);
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-rung-muted);
 }
 
 .settings .acknowledgements-foot {
