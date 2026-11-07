@@ -91,8 +91,8 @@ tools/measure_english_leaves.py  Where the English leaf's fit constants come fro
                         …and the product page (index.html + styles.css), served by Cloudflare
 docs/ornaments.css      Generated: the product page's ornaments (see below); do not hand-edit
 web/                    Browser port (Vite + React): Focus / Highlight / Ink + paper reader
-.github/workflows/build.yml   CI: tests on all branches; assembleRelease + publish APK on master only
-.github/workflows/web.yml     CI: Vitest + web build + product-page staging check (no web deploy)
+.github/workflows/build.yml   CI: release update only (master): DB check + unit tests + assembleRelease + publish APK. PR branches run nothing.
+.github/workflows/web.yml     CI: release update only (master): Vitest + web build + product-page staging check (no web deploy). PR branches run nothing.
 ```
 
 ## Quran.ai MCP — reliable Quran reference
@@ -197,9 +197,9 @@ python3 tools/test_build_db.py  # timing pipeline regressions (~1s, no Gradle)
   Notes: a lease reinstalls the app on a wiped slot, so never rely on leftover state;
   the 260MB APK needs the 3GB guest (2GB crashed surfaceflinger); a fresh
   install janks until AOT-compiled, which `run` does for you.
-- CI runs on every push: verifies the DB asset exists and runs unit tests.
-  On `master` only, it also builds the release APK and publishes it to the
-  rolling `latest` GitHub release.
+- CI runs only on `master` (the release update), not per PR: verifies the DB
+  asset exists, runs unit tests, builds the release APK and publishes it to
+  the rolling `latest` GitHub release. PR branches do not trigger CI.
 
 ## Invariants — do not break these
 
