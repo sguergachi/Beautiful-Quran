@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: ["**"]
+    branches: ["master"]
   workflow_dispatch:
 
 permissions:
@@ -61,10 +61,11 @@ jobs:
       - name: Unit tests
         run: ./gradlew --no-daemon testDebugUnitTest
 
-      # APK assemble + rolling release are master-only. Feature-branch pushes
-      # still verify the DB asset and run unit tests so PRs stay gated, but they
-      # skip the slower release build and must not contend for the shared
-      # "latest" tag.
+      # Master-only: this workflow is the release update. It verifies the DB
+      # asset, runs unit tests, assembles the release APK, and publishes it to
+      # the rolling "latest" tag. PR branches run nothing here -- no per-PR
+      # build. The step guards below also hold for a manual workflow_dispatch
+      # from a non-master ref, so it cannot publish a release by accident.
       - name: Restore release keystore
         if: github.ref == 'refs/heads/master'
         env:

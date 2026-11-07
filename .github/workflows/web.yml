@@ -3,17 +3,7 @@ name: Web
 on:
   workflow_dispatch:
   push:
-    paths:
-      - 'web/**'
-      - 'data/quran.db'
-      - 'data/lexicon.db'
-      - 'data/dictionary.db'
-      - 'docs/**'
-      - 'scripts/stage_site.mjs'
-      - 'wrangler.jsonc'
-      - 'licenses/**'
-      - '.github/workflows/web.yml'
-  pull_request:
+    branches: ["master"]
     paths:
       - 'web/**'
       - 'data/quran.db'
