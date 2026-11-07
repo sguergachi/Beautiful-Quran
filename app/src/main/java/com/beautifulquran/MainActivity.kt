@@ -17,6 +17,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.asPaddingValues
@@ -45,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -603,6 +606,9 @@ private fun PaperStackApp(
     var readerSession by rememberSaveable { mutableIntStateOf(0) }
     var settledLayer by rememberSaveable { mutableIntStateOf(COVER_LAYER) }
     var ayahSelectorExpanded by remember { mutableStateOf(false) }
+    // A tap on dim the root owns (over the pinned player bar) asks the reader to
+    // close its wheel, as a tap anywhere else on the dimmed screen does.
+    var ayahWheelDismissSignal by remember { mutableIntStateOf(0) }
     /** True while a verse annotation editor is open in the reader sheet. */
     var readerAnnotationEditing by remember { mutableStateOf(false) }
     /** True while a verse annotation editor is open in the bookmarks index. */
@@ -1339,6 +1345,7 @@ private fun PaperStackApp(
                             selectedSearchText = null
                         },
                         onAyahSelectorExpandedChange = { ayahSelectorExpanded = it },
+                        ayahWheelDismissSignal = ayahWheelDismissSignal,
                         onEditingAnnotationChange = { readerAnnotationEditing = it },
                         onOpenRootViewer = { sid, a, word -> onWordLongPress(sid, a, word) },
                         onRootReturnUserMoved = { onRootReturnUserMovedLatest.value() },
@@ -1506,6 +1513,30 @@ private fun PaperStackApp(
                         coverSession = pinnedPlayback.coverSession,
                         stackHeightPx = { stackHeightPx.intValue },
                     ),
+            )
+        }
+
+        // The pinned player bar sits above the reader stack, outside the
+        // reader's own tap catcher; while the ayah wheel is open a tap on it
+        // closes the wheel instead of reaching the transport.
+        // Only while the reader is the settled sheet: a wheel left open as the
+        // stack moves away must never leave Home's transport dead.
+        val wheelCoversPinnedBar = ayahSelectorExpanded && settledLayer == AYAH_LAYER
+        if (playbackPinned && wheelCoversPinnedBar) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(pinnedPlaybackHeight)
+                    .zIndex(pinnedChapterBarZIndex(pinnedPlayback.coverSession) + 0.01f)
+                    // Rides with the bar it covers, or the two part company
+                    // whenever the stack moves.
+                    .pinnedBarRidesReader(
+                        stackPosition = stackPositionProvider,
+                        coverSession = pinnedPlayback.coverSession,
+                        stackHeightPx = { stackHeightPx.intValue },
+                    )
+                    .absorbPointerEvents { ayahWheelDismissSignal += 1 },
             )
         }
 

@@ -86,10 +86,12 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -256,6 +258,8 @@ fun ReaderScreen(
     /** Opens the previous chapter from a top-of-chapter overscroll pull. */
     onOpenPreviousChapter: (surahId: Int) -> Unit = {},
     onAyahSelectorExpandedChange: (Boolean) -> Unit = {},
+    /** Bumped by the root when a tap lands on dim it owns (the pinned player bar). */
+    ayahWheelDismissSignal: Int = 0,
     /** Reports whether a verse annotation editor is open, so the paper stack
      *  can hold its page turn while the reader is writing. */
     onEditingAnnotationChange: (Boolean) -> Unit = {},
@@ -1737,11 +1741,29 @@ fun ReaderScreen(
             }
         }
     }
-    ProvideHighlightTimeline(viewModel.highlightSyncState) {
-    Box(Modifier.fillMaxSize()) {
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = topBar@{
+    // Hoisted out of the Scaffold content so a tap on the bars, which the
+    // content slot does not reach, can close the open wheel too.
+    var ayahSelectorExpanded by remember { mutableStateOf(false) }
+    var ayahSelectorDismissRequests by remember { mutableIntStateOf(0) }
+    // Back closes the wheel before it leaves the reader. Registered after the
+    // root's stack handlers, so it wins while the wheel is open.
+    BackHandler(enabled = ayahSelectorExpanded) { ayahSelectorDismissRequests += 1 }
+    // The rail is composed only with content, outside the Mushaf and outside a
+    // note being written. Whenever it cannot be, the wheel is closed too, or the
+    // hoisted flag would leave the bars dimmed with no rail to clear it.
+    val railComposable = uiState.content != null && !mushafMode && editingAnnotationAyah == 0
+    LaunchedEffect(railComposable) {
+        if (!railComposable) ayahSelectorExpanded = false
+    }
+    // Outside the content slot, so a reset while content is away (above) still
+    // reaches the root.
+    LaunchedEffect(ayahSelectorExpanded) {
+        onAyahSelectorExpandedChange(ayahSelectorExpanded)
+    }
+    LaunchedEffect(ayahWheelDismissSignal) {
+        if (ayahWheelDismissSignal > 0 && ayahSelectorExpanded) ayahSelectorDismissRequests += 1
+    }
+    val readerTopBar: @Composable () -> Unit = topBar@{
             if (mushafMode) return@topBar
             if (editingAnnotationAyah != 0) {
                 // Reclaim the app bar while writing, but keep ink below a
@@ -2037,8 +2059,8 @@ fun ReaderScreen(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
             )
-        },
-        bottomBar = bottomBar@{
+        }
+    val readerBottomBar: @Composable () -> Unit = bottomBar@{
             if (mushafMode) return@bottomBar
             Column {
                 // Errors take the reciter name's place in the bar (see
@@ -2083,6 +2105,26 @@ fun ReaderScreen(
                     )
                 }
             }
+        }
+    ProvideHighlightTimeline(viewModel.highlightSyncState) {
+    Box(Modifier.fillMaxSize()) {
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            AyahWheelDismissHost(
+                expanded = ayahSelectorExpanded,
+                onDismiss = { ayahSelectorDismissRequests += 1 },
+                content = readerTopBar,
+            )
+        },
+        bottomBar = {
+            AyahWheelDismissHost(
+                // A pinned bar is hosted (and its taps caught) by the root;
+                // this slot only holds its height.
+                expanded = ayahSelectorExpanded && !playbackPinned,
+                onDismiss = { ayahSelectorDismissRequests += 1 },
+                content = readerBottomBar,
+            )
         },
     ) { padding ->
         val content = uiState.content
@@ -2139,11 +2181,6 @@ fun ReaderScreen(
             return@Scaffold
         }
 
-        var ayahSelectorExpanded by remember { mutableStateOf(false) }
-        var ayahSelectorDismissRequests by remember { mutableIntStateOf(0) }
-        LaunchedEffect(ayahSelectorExpanded) {
-            onAyahSelectorExpandedChange(ayahSelectorExpanded)
-        }
         LaunchedEffect(editingAnnotationAyah) {
             if (editingAnnotationAyah != 0) ayahSelectorExpanded = false
             dispatch(ReaderInteractionEvent.SetAnnotating(editingAnnotationAyah != 0))
@@ -3579,6 +3616,11 @@ fun ReaderScreen(
                     )
                 }
             }
+            // While the wheel is open a tap anywhere off it closes the wheel
+            // (committing the verse under the finger) instead of reaching the
+            // page. Nothing is drawn: only the rail's own edge fades to paper.
+            // Each Scaffold bar catches its taps itself (AyahWheelDismissHost),
+            // and the root catches a pinned player bar's.
             if (ayahSelectorExpanded) {
                 Box(
                     Modifier
@@ -3607,6 +3649,9 @@ fun ReaderScreen(
             }
             // Page-boundary marks for the expanded selector wheel.
             val railPageStarts = remember(content.surah.id) { pageStartByAyah(content.ayahs) }
+            val railHizbAyahs = remember(content.surah.id) { hizbAyahs(content.ayahs) }
+            val railJuzStarts = remember(content.surah.id) { juzStartByAyah(content.ayahs) }
+            val railSajdaAyahs = remember(content.surah.id) { sajdaAyahs(content.ayahs) }
             if (!mushafMode && editingAnnotationAyah == 0) {
                 AyahSelectorRail(
                     ayahCount = content.surah.ayahCount,
@@ -3616,6 +3661,9 @@ fun ReaderScreen(
                     placeAyah = parkedPlaceAyah,
                     bookmarkedAyahs = bookmarkedAyahs,
                     pageStarts = railPageStarts,
+                    hizbAyahs = railHizbAyahs,
+                    juzStarts = railJuzStarts,
+                    sajdaAyahs = railSajdaAyahs,
                     chromeAlpha = { topBarAlpha.value },
                     interactive = !recitingActive,
                     onJumpToAyah = { ayah ->
@@ -3633,6 +3681,9 @@ fun ReaderScreen(
                     },
                     onExpandedChange = { expanded ->
                         ayahSelectorExpanded = expanded
+                        // Told now, not on the next LaunchedEffect pass, so the
+                        // root's dim over a pinned bar starts on the same frame.
+                        onAyahSelectorExpandedChange(expanded)
                         if (expanded && ayahRailTipOpen) {
                             viewModel.dismissAyahRailTip()
                             ayahRailTipOpen = false
@@ -3847,4 +3898,22 @@ private fun rememberSurahSearchState(): SurahSearchState {
     val query = rememberSaveable { mutableStateOf("") }
     val index = rememberSaveable { mutableIntStateOf(0) }
     return remember { SurahSearchState(active, query, index) }
+}
+
+/**
+ * A Scaffold bar that, while the ayah wheel is open, closes the wheel on a tap
+ * instead of passing it to the bar's controls.
+ */
+@Composable
+private fun AyahWheelDismissHost(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box {
+        content()
+        if (expanded) {
+            Box(Modifier.matchParentSize().absorbPointerEvents { onDismiss() })
+        }
+    }
 }
