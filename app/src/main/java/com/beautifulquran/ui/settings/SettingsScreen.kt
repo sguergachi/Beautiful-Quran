@@ -1373,6 +1373,18 @@ internal fun SectionLabel(text: String) {
     )
 }
 
+/** A leaf's opening sentence, under its title. It is read, not scanned, so it
+ * takes the reading size (bodyMedium 15 / 22, as Acknowledgements' prose)
+ * rather than a 12 sp caption. */
+@Composable
+internal fun LeafIntro(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = QuranTheme.ink.muted,
+    )
+}
+
 @Composable
 internal fun Caption(text: String) {
     Text(

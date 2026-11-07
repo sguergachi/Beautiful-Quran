@@ -3908,6 +3908,31 @@ button.ayah-mark {
   color: var(--ink-rung-secondary);
 }
 
+/* A style (Mujawwad, Muallim) is a fact under a name: Settings' note rung. */
+.reciter-choices .paper-choice-desc {
+  color: var(--ink-rung-muted);
+}
+
+/* Nuqta, name and star centre on the name's line; a subtitle hangs below
+   instead of pulling the marks off it. The slot is the star's 48px target on
+   the full list, the name's 26px leading on Settings (Android ReciterChoiceRow). */
+.reciter-choices .paper-choice-row,
+.reciter-choices .paper-choice-select {
+  align-items: flex-start;
+}
+
+.reciter-choices .ink-nuqta {
+  margin-top: calc((26px - 1.4375rem) / 2);
+}
+
+.reciter-choices:has(.reciter-favorite) .ink-nuqta {
+  margin-top: calc((48px - 1.4375rem) / 2);
+}
+
+.reciter-choices:has(.reciter-favorite) .paper-choice-copy {
+  padding-top: 11px;
+}
+
 .settings-nav-copy {
   display: flex;
   flex-direction: column;
@@ -4160,8 +4185,13 @@ button.ayah-mark {
   margin-bottom: 10px;
 }
 
+/* The leaf's opening sentence is read, so it takes the reading size
+   (Android LeafIntro: bodyMedium 15/22, muted), not a 12px caption. */
 .settings .reciters-caption {
-  margin: 0 0 32px;
+  margin: 0 0 24px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-rung-muted);
 }
 
 .reciter-favorite {

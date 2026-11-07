@@ -67,8 +67,8 @@ export function RecitersScreen({ onBack, ...choices }: ReciterChoicesProps & { o
       <p className="settings-caption reciters-caption">
         Choose a voice. Star favorites to keep them on the main Settings leaf.
       </p>
+      {/* No "All reciters" label: the title already says it. */}
       <section className="settings-section">
-        <h2>All reciters</h2>
         <ReciterChoices {...choices} reciters={[...choices.reciters].sort((a, b) => a.name.localeCompare(b.name))} />
       </section>
     </div>

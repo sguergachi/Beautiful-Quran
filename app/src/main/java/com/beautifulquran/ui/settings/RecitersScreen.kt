@@ -32,6 +32,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import com.beautifulquran.ui.theme.QuranTheme
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -87,10 +90,9 @@ internal fun RecitersPage(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.height(10.dp))
-                Caption("Choose a voice. Star favorites to keep them on the main Settings leaf.")
-                Spacer(Modifier.height(32.dp))
-                SectionLabel("All reciters")
-                Spacer(Modifier.height(4.dp))
+                LeafIntro("Choose a voice. Star favorites to keep them on the main Settings leaf.")
+                // No "All reciters" label: the title already says it.
+                Spacer(Modifier.height(24.dp))
             }
             items(reciters.sortedBy(Reciter::name), key = Reciter::id) { reciter ->
                 ReciterChoiceRow(
@@ -122,8 +124,11 @@ internal fun ReciterChoiceRow(
         if (selected) MaterialTheme.colorScheme.onSurface else QuranTheme.ink.secondary,
         label = "reciterInk",
     )
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    // Nuqta and star centre on the name as it is actually measured; a
+    // Mujawwad / Muallim subtitle hangs directly under the name instead of
+    // pulling the marks off the name's line (#897). A Row centred the marks on
+    // name + subtitle; a fixed leading guessed the name box and missed.
+    Layout(
         modifier = Modifier
             .fillMaxWidth()
             .semantics { this.selected = selected }
@@ -132,58 +137,84 @@ internal fun ReciterChoiceRow(
                 onSelect()
             }
             .padding(vertical = 8.dp),
-    ) {
-        InkNuqta(selected = selected)
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f)) {
+        content = {
+            Box(Modifier.layoutId(NuqtaSlot)) { InkNuqta(selected = selected) }
             Text(
                 text = reciter.name,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
                 color = nameInk,
+                modifier = Modifier.layoutId(NameSlot),
             )
             if (reciter.style != "Murattal") {
                 Text(
                     text = reciter.style,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    // A fact under a name: the same rung as Settings' row notes.
+                    color = QuranTheme.ink.muted,
+                    modifier = Modifier.layoutId(StyleSlot),
                 )
             }
-        }
-        if (favorite != null && onToggleFavorite != null) {
-            val gold = LocalQuranAccents.current.gold
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .semantics {
-                        contentDescription = if (favorite) {
-                            "Remove ${reciter.name} from favorites"
-                        } else {
-                            "Add ${reciter.name} to favorites"
+            if (favorite != null && onToggleFavorite != null) {
+                val gold = LocalQuranAccents.current.gold
+                Box(
+                    modifier = Modifier
+                        .layoutId(StarSlot)
+                        .size(48.dp)
+                        .semantics {
+                            contentDescription = if (favorite) {
+                                "Remove ${reciter.name} from favorites"
+                            } else {
+                                "Add ${reciter.name} to favorites"
+                            }
+                            toggleableState = if (favorite) {
+                                ToggleableState.On
+                            } else {
+                                ToggleableState.Off
+                            }
                         }
-                        toggleableState = if (favorite) {
-                            ToggleableState.On
+                        .quietClickable(role = Role.Checkbox) {
+                            view.paperToggleHaptic(!favorite)
+                            onToggleFavorite()
+                        },
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    Icon(
+                        imageVector = if (favorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                        contentDescription = null,
+                        tint = if (favorite) {
+                            gold
                         } else {
-                            ToggleableState.Off
-                        }
-                    }
-                    .quietClickable(role = Role.Checkbox) {
-                        view.paperToggleHaptic(!favorite)
-                        onToggleFavorite()
-                    },
-                contentAlignment = Alignment.CenterEnd,
-            ) {
-                Icon(
-                    imageVector = if (favorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                    contentDescription = null,
-                    tint = if (favorite) {
-                        gold
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-                    },
-                    modifier = Modifier.size(22.dp),
-                )
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                        },
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
+        },
+    ) { measurables, constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val gap = 16.dp.roundToPx()
+        val nuqta = measurables.first { it.layoutId == NuqtaSlot }.measure(loose)
+        val star = measurables.firstOrNull { it.layoutId == StarSlot }?.measure(loose)
+        val textWidth = (constraints.maxWidth - nuqta.width - gap - (star?.width ?: 0)).coerceAtLeast(0)
+        val textConstraints = Constraints(maxWidth = textWidth)
+        val name = measurables.first { it.layoutId == NameSlot }.measure(textConstraints)
+        val style = measurables.firstOrNull { it.layoutId == StyleSlot }?.measure(textConstraints)
+        val slot = maxOf(name.height, nuqta.height, star?.height ?: 0)
+        val nameY = (slot - name.height) / 2
+        val styleY = nameY + name.height
+        val height = maxOf(slot, styleY + (style?.height ?: 0))
+        layout(constraints.maxWidth, height) {
+            nuqta.place(0, (slot - nuqta.height) / 2)
+            name.place(nuqta.width + gap, nameY)
+            style?.place(nuqta.width + gap, styleY)
+            star?.place(constraints.maxWidth - star.width, (slot - star.height) / 2)
         }
     }
 }
+
+private const val NuqtaSlot = "nuqta"
+private const val NameSlot = "name"
+private const val StyleSlot = "style"
+private const val StarSlot = "star"
