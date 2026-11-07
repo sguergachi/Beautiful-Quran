@@ -3892,9 +3892,12 @@ button.ayah-mark {
   padding-inline-start: calc(1.4375rem + 16px);
 }
 
+/* Same type as an unselected voice name (.paper-choice-label). */
 .settings-all-reciters .settings-nav-label {
   flex: 1;
-  color: var(--ink-rung-secondary);
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+  font-size: 17px;
+  line-height: 26px;
 }
 
 .settings-nav-copy {

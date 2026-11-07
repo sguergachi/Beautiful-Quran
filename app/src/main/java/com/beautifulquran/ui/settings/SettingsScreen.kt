@@ -617,7 +617,8 @@ private fun Colophon(
 
 /** The last option in the favourites list: the full catalogue. It stands in the
  * names' column (the nuqta's width left empty) with a chevron, so it reads as
- * one more choice that opens a page instead of selecting a voice. */
+ * one more choice that opens a page instead of selecting a voice. Its type is
+ * an unselected voice's, exactly — only the chevron tells them apart. */
 @Composable
 private fun AllRecitersRow(onClick: () -> Unit) {
     Row(
@@ -632,7 +633,8 @@ private fun AllRecitersRow(onClick: () -> Unit) {
             text = "All reciters",
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
-            color = QuranTheme.ink.secondary,
+            // The same ink as an unselected voice name (ReciterChoiceRow).
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
             modifier = Modifier.weight(1f),
         )
         DisclosureChevron(expanded = false)
