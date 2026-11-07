@@ -30,7 +30,9 @@ import java.lang.ref.WeakReference
 internal object FrameLog {
     const val LAUNCH_WINDOW_MS = 60_000L
     private const val LAUNCH_FRAMES = 60 * 144
-    private const val LAUNCH_MARKS = 600
+    // Room for a recording that starts inside the window: its playback
+    // sampler alone adds ten events a second.
+    private const val LAUNCH_MARKS = 2_000
     // Three minutes at 144 Hz.
     private const val RECORDING_FRAMES = 180 * 144
 

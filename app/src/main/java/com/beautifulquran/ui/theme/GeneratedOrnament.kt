@@ -780,8 +780,9 @@ private class FieldWeaveElement(
         (other.field === field || other.field == field) &&
         other.ink == ink && other.embossLight == embossLight
 
-    override fun hashCode(): Int = (System.identityHashCode(field) * 31 + ink.hashCode()) * 31 +
-        embossLight.hashCode()
+    // Structural, like equals: a caller may pass an equal copy each
+    // recomposition (the Mushaf band's rescaled field).
+    override fun hashCode(): Int = (field.hashCode() * 31 + ink.hashCode()) * 31 + embossLight.hashCode()
 
     override fun InspectorInfo.inspectableProperties() {
         name = "generatedFieldWeave"

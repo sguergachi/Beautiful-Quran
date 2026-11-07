@@ -53,10 +53,17 @@ class FrameRing(val capacity: Int) {
         val i = size++
         this.startNanos[i] = startNanos
         this.firstDraw[i] = firstDraw
-        val values = intArrayOf(
-            totalUs, delayUs, inputUs, animationUs, layoutUs, drawUs, syncUs, commandUs, swapUs, gpuUs, deadlineUs,
-        )
-        for (f in 0 until FIELD_COUNT) fields[f][i] = values[f]
+        fields[0][i] = totalUs
+        fields[1][i] = delayUs
+        fields[2][i] = inputUs
+        fields[3][i] = animationUs
+        fields[4][i] = layoutUs
+        fields[5][i] = drawUs
+        fields[6][i] = syncUs
+        fields[7][i] = commandUs
+        fields[8][i] = swapUs
+        fields[9][i] = gpuUs
+        fields[10][i] = deadlineUs
     }
 
     @Synchronized
