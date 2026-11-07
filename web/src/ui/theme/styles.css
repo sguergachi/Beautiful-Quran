@@ -4107,14 +4107,16 @@ button.ayah-mark {
   margin-bottom: 1.5rem;
 }
 
-/* Letterspaced, low-ink label — never competes with the reading. */
+/* Letterspaced small-caps label, semibold on the secondary rung so sections
+   scan at a glance (#897) — still below row names, never competes with the
+   reading. */
 .settings-section h2 {
   font-size: calc(12px * 1.15);
   letter-spacing: 2px;
   text-transform: uppercase;
   font-feature-settings: 'kern' 1, 'c2sc' 1, 'onum' 1, 'ss09' 1;
-  color: var(--ink-rung-muted);
-  font-weight: 500;
+  color: var(--ink-rung-secondary);
+  font-weight: 600;
   margin: 0 0 4px;
   font-family: var(--font-body);
 }

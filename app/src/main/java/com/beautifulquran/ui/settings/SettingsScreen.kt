@@ -60,6 +60,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -1337,15 +1338,17 @@ internal fun Section(text: String) {
     Spacer(Modifier.height(10.dp))
 }
 
-/** Letterspaced, low-ink label — a whisper that never competes with the
- * reading (docs/DESIGN.md). */
+/** Letterspaced small-caps label. SemiBold on the secondary ink rung so the
+ * sections can be found at a glance (#897) — still below row names and never
+ * competing with the reading (docs/DESIGN.md). */
 @Composable
 internal fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelSmall.forCaps(),
         letterSpacing = 2.sp,
-        color = QuranTheme.ink.muted,
+        fontWeight = FontWeight.SemiBold,
+        color = QuranTheme.ink.secondary,
     )
 }
 

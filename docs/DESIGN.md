@@ -1043,6 +1043,9 @@ not the app's.
   in place to Resume (right edge), Delete to its left. Fetch verbs are green;
   settle and delete are quiet ink. Never size a destructive verb up
   to the name.
+  Section labels (Settings, Customize, Download manager) are SemiBold on the
+  `secondary` ink rung so they scan at a glance (#897); they stay below row
+  names and never reach scripture weight.
 - **Product stage** (`Alpha`): the same letterspaced labelSmall whisper as a
   settings section label, sitting next to the product name on the home
   masthead and the settings colophon. Never a chip, pill, or badge with a
