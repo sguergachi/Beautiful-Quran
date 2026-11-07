@@ -265,7 +265,8 @@ internal fun SettingsScreen(
 
             Spacer(Modifier.height(36.dp))
 
-            ReciterHeader(total = reciters.size, onClick = onOpenReciters)
+            SectionLabel("Reciter")
+            Spacer(Modifier.height(10.dp))
             favoriteReciters.forEach { reciter ->
                 ReciterChoiceRow(
                     reciter = reciter,
@@ -276,6 +277,7 @@ internal fun SettingsScreen(
             if (favoriteReciters.isEmpty()) {
                 Caption("No favorites yet — keep them from the full list.")
             }
+            AllRecitersRow(onClick = onOpenReciters)
 
             Spacer(Modifier.height(20.dp))
             NavigateRow(
@@ -613,25 +615,26 @@ private fun Colophon(
 
 // ── Selection vocabulary ───────────────────────────────────────────────────
 
-/** The Reciter heading is also the door to the full list: tap the title row
- * for all voices, pick a favourite from the rows beneath it. */
+/** The last option in the favourites list: the full catalogue. It stands in the
+ * names' column (the nuqta's width left empty) with a chevron, so it reads as
+ * one more choice that opens a page instead of selecting a voice. */
 @Composable
-private fun ReciterHeader(total: Int, onClick: () -> Unit) {
+private fun AllRecitersRow(onClick: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 44.dp)
-            .quietClickable(role = Role.Button, onClick = onClick),
+            .quietClickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 8.dp),
     ) {
-        SectionLabel("Reciter")
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.width(LocalNuqtaParams.current.sizeDp.dp + 16.dp))
         Text(
-            text = "All $total",
-            style = MaterialTheme.typography.labelSmall,
-            color = QuranTheme.ink.muted,
+            text = "All reciters",
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+            color = QuranTheme.ink.secondary,
+            modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.width(4.dp))
         DisclosureChevron(expanded = false)
     }
 }

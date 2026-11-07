@@ -3886,21 +3886,15 @@ button.ayah-mark {
   cursor: pointer;
 }
 
-/* The Reciter heading doubles as the link to every voice. */
-.settings-reciter-head {
-  min-height: 44px;
-  gap: 4px;
+/* "All reciters" closes the favourites list: same column as the voice names
+   (nuqta width + 16px gap), chevron at the edge. */
+.settings-all-reciters {
+  padding-inline-start: calc(1.4375rem + 16px);
 }
 
-.settings-reciter-head h2 {
+.settings-all-reciters .settings-nav-label {
   flex: 1;
-  margin: 0;
-}
-
-.settings-reciter-all {
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--ink-rung-muted);
+  color: var(--ink-rung-secondary);
 }
 
 .settings-nav-copy {
