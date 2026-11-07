@@ -1037,7 +1037,7 @@ not the app's.
   scripture, translation, names, facts, captions — stays serif. Do not "fix"
   the sans slots back to the serif.
   Settings rows and the Download manager share one scale: **17 / 26**
-  bodyLarge for names, **12 / 16** labelSmall for facts and every verb
+  bodyLarge in **Medium** for names (#897 — regular read too light as a list title), **12 / 16** labelSmall for facts and every verb
   (Download, Resume, Pause, Delete, Keep). Reciter verbs sit 16 dp
   after the facts. Chapter verbs trail in a reserved slot; Pause flips
   in place to Resume (right edge), Delete to its left. Fetch verbs are green;

@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.settings
 
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -132,6 +133,7 @@ internal fun ReciterChoiceRow(
             Text(
                 text = reciter.name,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha),
             )
             if (reciter.style != "Murattal") {

@@ -373,6 +373,7 @@ private fun DeveloperSection(
                 context.startActivity(android.content.Intent(context, com.beautifulquran.ui.reader.PaperInkStudyActivity::class.java))
             }.padding(vertical = 8.dp),
             style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.primary,
         )
         Caption("Al-Fatihah 1:1–3 with a repeat. Compare inside-out and bottom-up ink filling.")
@@ -434,6 +435,7 @@ private fun DeveloperSection(
     Text(
         text = "Replay feature guides",
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable {
@@ -460,6 +462,7 @@ private fun DeveloperSection(
             else -> "Log export"
         },
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(enabled = !logExport.preparing, onClick = onLogExport)
@@ -477,6 +480,7 @@ private fun DeveloperSection(
         Text(
             text = "Share latest log",
             style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
             modifier = Modifier.fillMaxWidth().quietClickable(onClick = onShareLogExport).padding(vertical = 8.dp),
             color = MaterialTheme.colorScheme.primary,
         )
@@ -486,6 +490,7 @@ private fun DeveloperSection(
         Text(
             text = "Share last crash",
             style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
             modifier = Modifier
                 .fillMaxWidth()
                 .quietClickable { com.beautifulquran.CrashTrace.share(context) }
@@ -499,6 +504,7 @@ private fun DeveloperSection(
     Text(
         text = "Timings Lab",
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(onClick = onOpenTimingsLab)
@@ -511,6 +517,7 @@ private fun DeveloperSection(
     Text(
         text = "Tarjīʿ Lab",
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(onClick = onOpenTarjiLab)
@@ -526,6 +533,7 @@ private fun DeveloperSection(
     Text(
         text = "Ornaments Lab",
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(onClick = onOpenOrnamentsLab)
@@ -538,6 +546,7 @@ private fun DeveloperSection(
     Text(
         text = "Component kit",
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(onClick = onOpenComponentKit)
@@ -628,6 +637,7 @@ private fun NavigateRow(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
@@ -669,6 +679,7 @@ internal fun SelectRow(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha),
             )
             if (note != null) {
@@ -711,6 +722,7 @@ internal fun ToggleRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
@@ -1225,6 +1237,7 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?, timings: Runtim
     Text(
         text = "Quran Foundation word & QCF cache",
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.onSurface,
     )
     if (cache == null) {
@@ -1267,6 +1280,7 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?, timings: Runtim
             "Force Quran cache update"
         },
         style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(

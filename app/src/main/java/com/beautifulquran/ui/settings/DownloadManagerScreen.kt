@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.settings
 
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -725,6 +726,7 @@ private fun ChapterRow(
             Text(
                 text = row.surah.nameTransliteration,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
