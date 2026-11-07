@@ -397,7 +397,12 @@ export function SettingsScreen({
         </button>
         <h1>Settings</h1>
         <section className="settings-section">
-          <h2>Reciter</h2>
+          {/* The heading is also the door to the full list; favourites sit beneath it. */}
+          <button type="button" className="settings-nav settings-reciter-head" onClick={() => setPage('reciters')}>
+            <h2>Reciter</h2>
+            <span className="settings-reciter-all">All {reciters.length}</span>
+            <DisclosureChevron expanded={false} />
+          </button>
           <ReciterChoices
             reciters={favoriteReciters}
             selectedId={s.reciterId}
@@ -406,13 +411,6 @@ export function SettingsScreen({
           {favoriteReciters.length === 0 ? (
             <p className="settings-caption">No favorites yet — keep them from the full list.</p>
           ) : null}
-          <button type="button" className="settings-nav" onClick={() => setPage('reciters')}>
-            <span className="settings-nav-copy">
-              <span className="settings-nav-label">All reciters</span>
-              <span className="settings-nav-note">{reciters.length} reciters total</span>
-            </span>
-            <DisclosureChevron expanded={false} />
-          </button>
         </section>
 
         {/* Android: Customize follows reciter selection, without another heading. */}

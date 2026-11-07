@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -264,8 +265,7 @@ internal fun SettingsScreen(
 
             Spacer(Modifier.height(36.dp))
 
-            SectionLabel("Reciter")
-            Spacer(Modifier.height(10.dp))
+            ReciterHeader(total = reciters.size, onClick = onOpenReciters)
             favoriteReciters.forEach { reciter ->
                 ReciterChoiceRow(
                     reciter = reciter,
@@ -275,13 +275,7 @@ internal fun SettingsScreen(
             }
             if (favoriteReciters.isEmpty()) {
                 Caption("No favorites yet — keep them from the full list.")
-                Spacer(Modifier.height(8.dp))
             }
-            NavigateRow(
-                label = "All reciters",
-                note = "${reciters.size} reciters total",
-                onClick = onOpenReciters,
-            )
 
             Spacer(Modifier.height(20.dp))
             NavigateRow(
@@ -618,6 +612,29 @@ private fun Colophon(
 }
 
 // ── Selection vocabulary ───────────────────────────────────────────────────
+
+/** The Reciter heading is also the door to the full list: tap the title row
+ * for all voices, pick a favourite from the rows beneath it. */
+@Composable
+private fun ReciterHeader(total: Int, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 44.dp)
+            .quietClickable(role = Role.Button, onClick = onClick),
+    ) {
+        SectionLabel("Reciter")
+        Spacer(Modifier.weight(1f))
+        Text(
+            text = "All $total",
+            style = MaterialTheme.typography.labelSmall,
+            color = QuranTheme.ink.muted,
+        )
+        Spacer(Modifier.width(4.dp))
+        DisclosureChevron(expanded = false)
+    }
+}
 
 /** Opens a sub-page on this same sheet — label, quiet summary, chevron. */
 @Composable

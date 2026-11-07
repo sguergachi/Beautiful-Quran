@@ -3886,6 +3886,23 @@ button.ayah-mark {
   cursor: pointer;
 }
 
+/* The Reciter heading doubles as the link to every voice. */
+.settings-reciter-head {
+  min-height: 44px;
+  gap: 4px;
+}
+
+.settings-reciter-head h2 {
+  flex: 1;
+  margin: 0;
+}
+
+.settings-reciter-all {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-rung-muted);
+}
+
 .settings-nav-copy {
   display: flex;
   flex-direction: column;
