@@ -195,6 +195,11 @@ class MainActivity : ComponentActivity() {
         var splashPending = true
         installSplashScreen().setKeepOnScreenCondition { splashPending }
         enableEdgeToEdge()
+        // 3-button navigation: without this Android lays a grey contrast scrim
+        // over the bar. Drop it so the bar is transparent and the theme's
+        // paper (colorScheme.background) shows straight through.
+        window.isNavigationBarContrastEnforced = false
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
         super.onCreate(savedInstanceState)
         // The entrance cover is always dark. The sheet theme sets its own icon
         // appearance once Compose has its persisted settings.
