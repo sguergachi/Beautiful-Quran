@@ -11,6 +11,8 @@ import android.util.Log
 import androidx.core.content.FileProvider
 import com.beautifulquran.ui.reader.InkEngine
 import com.beautifulquran.data.Settings
+import com.beautifulquran.domain.FrameTimeline
+import com.beautifulquran.domain.TimedMark
 import java.io.File
 import java.util.concurrent.Executors
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,8 +67,11 @@ internal object LogExport {
             "startedAtEpochMs" to System.currentTimeMillis().toString(),
             "startedAtNanos" to startedAtNanos.toString(),
             "limitMs" to MAX_DURATION_MS.toString(),
+            "processAgeAtStartMs" to ((startedAtNanos - FrameLog.processStartNanos) / 1_000_000).toString(),
+            "refreshHz" to FrameLog.refreshHz.toString(),
         )
         mutableState.value = LogExportState(recording = true, hasLog = latest != null)
+        FrameLog.startRecording()
         DevProfiling.recordEvent("log-start")
         settingsWatch = scope.launch {
             (app as QuranApp).settings.settings.map(::readerSettings).distinctUntilChanged().collect {
@@ -84,6 +89,10 @@ internal object LogExport {
         settingsWatch = null
         DevProfiling.recordEvent("log-stop reason=$reason")
         val snapshot = DevProfiling.stopLogCapture()
+        val recordedFrames = FrameLog.stopRecording()
+        val launchFrames = FrameLog.launchTimeline()
+        val launchEvents = FrameLog.launchEvents()
+        val logStartNanos = startedAtNanos
         val details = metadata + contextMetadata(context).mapKeys { "end ${it.key}" } + linkedMapOf(
             "durationMs" to ((System.nanoTime() - startedAtNanos) / 1_000_000).toString(),
             "stopReason" to reason,
@@ -93,7 +102,7 @@ internal object LogExport {
             try {
                 val directory = File(context.cacheDir, "share").apply { mkdirs() }
                 val file = File(directory, "bq-log-${System.currentTimeMillis()}.txt")
-                file.writeText(snapshot.report(details))
+                file.writeText(snapshot.report(details, performance(recordedFrames, launchFrames, launchEvents, snapshot.marks, logStartNanos)))
                 directory.listFiles().orEmpty()
                     .filter { it.name.startsWith("bq-log-") && it.extension == "txt" }
                     .sortedByDescending { it.lastModified() }.drop(3).forEach { it.delete() }
@@ -111,6 +120,39 @@ internal object LogExport {
                 }
             }
         }
+    }
+
+    /**
+     * Frame timings: the recording window, then the process's launch window
+     * (its first minute), which holds a cold launch and first chapter open
+     * even when Log export was only pressed afterwards.
+     */
+    private fun performance(
+        recorded: FrameTimeline?,
+        launch: FrameTimeline,
+        launchEvents: List<TimedMark>,
+        recordedMarks: List<String>,
+        logStartNanos: Long,
+    ): List<String> {
+        val hz = FrameLog.refreshHz
+        val lines = ArrayList<String>()
+        if (recorded != null) {
+            lines += recorded.report(
+                title = "during this log (s since log start)",
+                originNanos = logStartNanos,
+                refreshHz = hz,
+                marks = recordedMarks.mapNotNull(FrameTimeline::parseMark),
+            )
+            lines += ""
+        }
+        lines += launch.report(
+            title = "launch: the first ${FrameLog.LAUNCH_WINDOW_MS / 1000} s of this process " +
+                "(s since process start; log started at +${"%.3f".format(java.util.Locale.ROOT, (logStartNanos - FrameLog.processStartNanos) / 1e9)}s)",
+            originNanos = FrameLog.processStartNanos,
+            refreshHz = hz,
+            marks = launchEvents,
+        )
+        return lines
     }
 
     /** Keep the last export available if the chooser was dismissed or a receiver failed. */

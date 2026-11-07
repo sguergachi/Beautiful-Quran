@@ -296,6 +296,16 @@ class ReaderFocusController internal constructor(
             return
         }
 
+        if (!animate) {
+            // Instant settle (continue-listening open): force the item into
+            // layout when needed, then snap by the exact remaining pixels.
+            // No doorstep first: that is a run-up for a glide, and here it
+            // only composed and measured a screen of verses nobody sees.
+            val delta = measureGlideDelta(itemIndex, viewportHeight) ?: return
+            if (delta != 0) listState.scrollBy(delta.toFloat())
+            return
+        }
+
         // Recitation-follow / non-preRoll: soft glide, with a simple doorstep
         // when the target is far beyond the measured window.
         if (FocusEngine.shouldTeleport(
@@ -311,14 +321,6 @@ class ReaderFocusController internal constructor(
             listState.scrollToItem(
                 doorstep.coerceIn(0, (totalCount - 1).coerceAtLeast(0)),
             )
-        }
-
-        if (!animate) {
-            // Instant settle (continue-listening open): force the item into
-            // layout when needed, then snap by the exact remaining pixels.
-            val delta = measureGlideDelta(itemIndex, viewportHeight) ?: return
-            if (delta != 0) listState.scrollBy(delta.toFloat())
-            return
         }
 
         // Continuous re-aim — same path as the hand-jump residual. Critical

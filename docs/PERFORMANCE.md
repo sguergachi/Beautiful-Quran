@@ -379,6 +379,68 @@ was tried and dropped: on a desktop RTX 3080 through Skia's GL backend it saved
 nothing, because the eight taps' cost sits at contours, which must keep them,
 not in flat stroke interiors.
 
+### 4a′. Sheets composite from a texture while they move
+
+During a page turn the sheet swinging away (`rotationY`) and the sheet rising
+beneath it (scale 0.985 → 1) draw their content flat into an offscreen layer,
+and only that texture is tilted or scaled (`cachedWhileMoving` in
+`MainActivity`). At rest the content draws directly as before.
+
+Drawing through a perspective matrix is a different GPU program for every kind
+of draw on the sheet, and every scale the rising sheet passes through
+re-rasterises each glyph on it. A release trace of a cold launch (emulator,
+2026-11-07) put ~90 ms of shader compiles (14 programs) and ~50 ms of glyph
+uploads into the first frame of the first chapter open, a 172 ms UI / 180 ms
+render-thread frame; later opens in the same process found the programs warm.
+With the cache the worst frame of that open fell to ~31–47 ms over three runs,
+compiles to 8–9 (~35 ms), and a turn costs one quad per sheet per frame while
+its content is still. The phone keeps compiled programs on disk only until the
+app is updated, so every new install's first open paid the full cost.
+
+Only the content is cached: the sheet's own layer keeps the transform and
+elevation shadow, and the cast beside it (`paperDropShadow`) spills past the
+sheet's edge, which an offscreen layer on the sheet would clip. The remaining
+first-open compiles are not perspective draws (path-atlas, mesh and rect
+programs on the main framebuffer) and were not chased further.
+
+### 4a″. Opening onto a verse lays it out once
+
+Continue, a bookmark or a search hit opens the reader mid-chapter. The list
+is put on that verse before its first layout (`requestScrollToItem` from a
+`SideEffect` as the content arrives), and the instant settle
+(`ReaderFocusController`, `animate = false`) snaps from there without the
+glide's doorstep. Before, the list first laid out the chapter's opening, then
+the settle forced two synchronous remeasures (`scrollToItem` to a doorstep,
+then to the verse) between frames, in the middle of the page turn. A Pixel 10
+log export showed it as a 113 ms frame, 88 ms of it main-thread delay. Emulator
+A/B (Continue to 2:150): forced layout outside frames 58–66 → ~1 ms; the
+verse's page is composed once, in the tap frame, before the sheet moves.
+
+### 4a‴. The entrance cover under a moving phone
+
+The gilding follows the phone's tilt, so in the hand the sheen changes almost
+every frame. Two things made each change expensive, both invisible on an
+emulator whose accelerometer never moves (simulate one with `adb emu sensor
+set acceleration x:y:z` in a loop):
+
+- `TooledGold` recorded its relief and gold leaf into plain graphics layers.
+  A sheen step re-renders the leaf box, which replayed the leaf and, via the
+  damaged box around it, the relief — thousands of path points that Skia
+  rasterised into frame-sized CPU masks each time (ten ~928×2018 uploads and
+  ~24 texture allocations a frame). Relief and leaf are now `Offscreen`
+  graphics layers of their own, and the box around them no longer needs one.
+- `generatedFieldWeave` used `drawWithCache`, whose lambda is new on every
+  recomposition of the caller: each cover phase change (wash ending, du'a,
+  opening) or chapter-opening recomposition dropped the cache and
+  re-rendered the four full-screen weave paths (~60 ms render-thread frame).
+  It is now a modifier node that compares equal across recompositions.
+
+Emulator, release, swaying accelerometer: the closed cover went from 12–15
+frames per half second (p50 34 ms) to 30/30 (16.7 ms) nearly throughout,
+the opening's first-frame spike from ~70 to ~30 ms, at +3.6 MB GPU memory
+(105 → 108 MB). A Pixel 10 log export had shown the same phase at ~58 fps on
+its 120 Hz panel with 17–39 ms of render-thread command issue a frame.
+
 ### 4b. Transient progressive vellum
 
 The contextual guide's progressive vellum is developer-gated and transient.

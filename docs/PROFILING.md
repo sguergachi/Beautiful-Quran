@@ -197,6 +197,21 @@ Recording is bounded to 6,000 samples, 24,000 highlight frames and 12,000 named
 events, with truncation counts reported. Encoding and file writing run off the
 main thread. Only the three newest log files are retained in the share cache.
 
+Every export ends with **frame timing**, measured by the platform per frame
+(`FrameMetrics`, via `FrameLog`): for the recording, and for the **launch
+window**, the first 60 s of the process, which is recorded without being asked
+so a cold launch and its first chapter open are in the export even when Log
+export is only pressed afterwards. Each section gives percentiles and missed
+deadlines, one line per page turn (`stackSettleStart` to 400 ms after
+`stackSettleEnd`), the slowest frames split into UI thread (delay, input,
+animation/recomposition, layout, draw), render thread (sync, command issue —
+where shader compiles and glyph uploads land — swap) and GPU, each with the
+event just before it, then every frame as one CSV line. To capture a slow cold
+open: force-stop the app, launch it and open the chapter within a minute, then
+go to Settings and tap **Log export** twice (start, then stop and share); the
+launch window is kept for the life of the process. Outside the launch window
+and a recording nothing listens to frames.
+
 1. Enable Developer by tapping the app mark three times.
 2. Tap **Log export**, return to the reader, and reproduce the discrepancy.
 3. Include natural verse transitions, a first-word tap, or a reciter change

@@ -12,13 +12,21 @@ data class DiagnosticLog(
             "highlight-sync-trace-begin", highlight.encodeForReplay(), "highlight-sync-trace-end",
         )
 
-    /** One readable text attachment with exact timing inputs embedded for deterministic replay. */
-    fun report(metadata: Map<String, String>): String = buildString {
+    /**
+     * One readable text attachment with exact timing inputs embedded for
+     * deterministic replay. [performance] (frame timings) follows the replay
+     * block, so replay readers that stop at its end delimiter are unaffected.
+     */
+    fun report(metadata: Map<String, String>, performance: List<String> = emptyList()): String = buildString {
         appendLine("Beautiful Quran log export")
         metadata.forEach { (key, value) -> appendLine("$key: $value") }
         appendLine("Clock samples describe app playback and rendering; no microphone audio is recorded.")
         appendLine()
         appendLine("== events and highlight replay ==")
         encodedLines().forEach(::appendLine)
+        if (performance.isNotEmpty()) {
+            appendLine()
+            performance.forEach(::appendLine)
+        }
     }
 }

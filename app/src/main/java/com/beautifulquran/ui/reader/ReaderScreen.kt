@@ -879,6 +879,25 @@ fun ReaderScreen(
     val lastAyahNumber = remember(readerItems) {
         readerItems.count { it is LazyItem.AyahItem }.coerceAtLeast(1)
     }
+    // An open onto a verse mid-chapter (Continue, a bookmark, a search hit)
+    // puts the list on that verse before its first layout. Left at the top,
+    // the list first composed and measured the chapter's opening — header
+    // art, basmalah, first verses — that nobody sees, then the settle below
+    // forced two synchronous remeasures to reach the verse, all in the middle
+    // of the page turn (a 113 ms frame on a Pixel 10, 2026-11-07). The settle
+    // still owns the exact anchor; it now finds the verse already laid out.
+    val prePositioned = remember { booleanArrayOf(false) }
+    val prePositionIndex = startAyah
+        ?.takeIf {
+            !prePositioned[0] && !didInitialScroll && !mushafMode && requestedJumpAyah == 0 &&
+                it in 1..(uiState.content?.ayahs?.size ?: 0)
+        }
+        ?.let { itemIndexOfAyah[it] }
+    if (prePositionIndex != null) {
+        prePositioned[0] = true
+        // After this composition applies, before the list's first measure.
+        SideEffect { listState.requestScrollToItem(prePositionIndex) }
+    }
     // Bottom reading band above the player bar / edge fade. Used as the focus
     // engine's bottom guard (verse anchors never park lines there) and as the
     // word-follow band (active words are lifted clear of it). Top band margin

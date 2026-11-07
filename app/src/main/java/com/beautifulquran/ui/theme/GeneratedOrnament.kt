@@ -18,12 +18,18 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.layer.CompositingStrategy as LayerCompositing
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.node.invalidateDraw
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -229,17 +235,22 @@ internal fun TooledGold(
     build: State<Float> = CompleteBuild,
 ) {
     GildingDemand(sheen)
-    val relief = rememberGraphicsLayer()
-    val leaf = rememberGraphicsLayer()
+    // Each its own persistent texture. The sheen re-renders the leaf box
+    // below on every step of a moving phone, which damages the box around
+    // it: drawn as plain recorded layers, the relief and leaf replayed their
+    // thousands of points each time, and Skia rasterised a frame-sized path
+    // mask for each on the CPU (a hand-held launch, emulator 2026-11-07: ten
+    // ~928x2018 masks and ~24 texture allocations a frame, the closed cover
+    // at ~25 fps). Cached, a sheen step is two texture draws per figure.
+    val relief = rememberGraphicsLayer().apply { compositingStrategy = LayerCompositing.Offscreen }
+    val leaf = rememberGraphicsLayer().apply { compositingStrategy = LayerCompositing.Offscreen }
     Box(
-        modifier
-            .gildingLayer()
-            // Offscreen so the whole tooled figure renders once into a
-            // persistent layer and every later composite is a texture blit:
-            // replaying the box's display list re-executes the recorded
-            // relief and leaf layers — the band's thousands of points —
-            // on the render thread, on every frame the surface is damaged.
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
+        // No offscreen layer of its own: replaying this box on a damaged
+        // frame used to re-execute the relief and leaf — the band's thousands
+        // of points — so the whole figure was cached here. With relief and
+        // leaf now persistent textures, a replay is two texture draws, and a
+        // third frame-sized texture per figure would only cost GPU memory.
+        modifier.gildingLayer(),
     ) {
         // Replays the relief once [record] fills it; empty — so nothing —
         // before that, and its own draw never runs again afterwards: the
@@ -743,8 +754,77 @@ fun Modifier.generatedFieldWeave(
     ink: Color,
     embossLight: Color,
 ): Modifier = clipToBounds()
-    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-    .drawWithCache {
+    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+    .then(FieldWeaveElement(field, ink, embossLight))
+
+/**
+ * The weave as a modifier node that compares equal across recompositions.
+ *
+ * Why not `drawWithCache`: its lambda is a new instance on every recomposition
+ * of the caller, so Compose saw a changed modifier, dropped the cache, rebuilt
+ * the four giant paths and re-rendered the offscreen layer — a ~60 ms render
+ * thread frame (emulator) each time the entrance cover or a chapter opening
+ * recomposed (the wash ending, the du'a beginning, the cover opening). Now the
+ * paths and layer survive anything but a new field, colours or size.
+ */
+private class FieldWeaveElement(
+    val field: FieldSpec,
+    val ink: Color,
+    val embossLight: Color,
+) : ModifierNodeElement<FieldWeaveNode>() {
+    override fun create() = FieldWeaveNode(field, ink, embossLight)
+
+    override fun update(node: FieldWeaveNode) = node.update(field, ink, embossLight)
+
+    override fun equals(other: Any?): Boolean = other is FieldWeaveElement &&
+        (other.field === field || other.field == field) &&
+        other.ink == ink && other.embossLight == embossLight
+
+    // Structural, like equals: a caller may pass an equal copy each
+    // recomposition (the Mushaf band's rescaled field).
+    override fun hashCode(): Int = (field.hashCode() * 31 + ink.hashCode()) * 31 + embossLight.hashCode()
+
+    override fun InspectorInfo.inspectableProperties() {
+        name = "generatedFieldWeave"
+    }
+}
+
+private class FieldWeaveNode(
+    private var field: FieldSpec,
+    private var ink: Color,
+    private var embossLight: Color,
+) : Modifier.Node(), DrawModifierNode {
+    private var builtFor: Size = Size.Unspecified
+    private var builtDensity = 0f
+    private var weaves: List<Path> = emptyList()
+    private var styles: List<Stroke> = emptyList()
+
+    fun update(field: FieldSpec, ink: Color, embossLight: Color) {
+        val fieldChanged = field !== this.field && field != this.field
+        if (!fieldChanged && ink == this.ink && embossLight == this.embossLight) return
+        this.field = field
+        this.ink = ink
+        this.embossLight = embossLight
+        if (fieldChanged) builtFor = Size.Unspecified
+        invalidateDraw()
+    }
+
+    override fun ContentDrawScope.draw() {
+        if (size != builtFor || density != builtDensity) {
+            build()
+            builtFor = size
+            builtDensity = density
+        }
+        for (i in weaves.indices) {
+            translate(-0.6f, -0.6f) {
+                drawPath(weaves[i], embossLight, style = styles[i])
+            }
+            drawPath(weaves[i], ink, style = styles[i])
+        }
+        drawContent()
+    }
+
+    private fun ContentDrawScope.build() {
         // Tile one cell past every edge so the weave reads continuous at the
         // bounds, then clip so neighbouring sections never paint over each other
         // (the Lab's stacked previews depend on this).
@@ -752,13 +832,13 @@ fun Modifier.generatedFieldWeave(
         val pxPerUnit = fittedWidth.toFloat().dp.toPx() / field.cellW.toFloat()
         val cellW = (field.cellW * pxPerUnit).toFloat()
         val cellH = (field.cellH * pxPerUnit).toFloat()
-        val weaves = listOf(Path(), Path())
+        val built = listOf(Path(), Path())
         var y = -cellH
         while (y < size.height + cellH) {
             var x = -cellW
             while (x < size.width + cellW) {
                 for (s in field.strokes) {
-                    val weave = weaves[if (s.weight == StrokeWeight.Rule) 0 else 1]
+                    val weave = built[if (s.weight == StrokeWeight.Rule) 0 else 1]
                     s.points.forEachIndexed { i, p ->
                         val px = x + (p.x * pxPerUnit).toFloat()
                         val py = y + (p.y * pxPerUnit).toFloat()
@@ -770,16 +850,10 @@ fun Modifier.generatedFieldWeave(
             }
             y += cellH
         }
-        val styles = listOf(Stroke(width = 0.6.dp.toPx()), Stroke(width = 0.33.dp.toPx()))
-        onDrawBehind {
-            for (i in weaves.indices) {
-                translate(-0.6f, -0.6f) {
-                    drawPath(weaves[i], embossLight, style = styles[i])
-                }
-                drawPath(weaves[i], ink, style = styles[i])
-            }
-        }
+        weaves = built
+        styles = listOf(Stroke(width = 0.6.dp.toPx()), Stroke(width = 0.33.dp.toPx()))
     }
+}
 
 /**
  * A rosette drawn as line-work in one ink, with no gilt brush and no emboss —
