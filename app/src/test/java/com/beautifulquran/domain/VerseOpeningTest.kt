@@ -10,15 +10,26 @@ import org.junit.Test
 class VerseOpeningTest {
 
     @Test
-    fun `only a hizb opening seeks to the voice`() {
+    fun `only a long hizb opening changes the audio entry`() {
         assertTrue(isHizbStop("۞وَأَيُّوبَ إِذۡ نَادَىٰ"))
         assertFalse(isHizbStop("وَمِنَ ٱلشَّيَٰطِينِ مَن يَغُوصُونَ"))
-        // Hani 4:148. Click at 1951, speech at 4283.
+        // Hani 4:148. Click at 1951, measured highlight gate at 4283.
         val nisa148 = listOf(Segment(1, 1_951, 4_790), Segment(2, 4_790, 5_510))
         val silence = listOf(AudibleSilence(0, 4_283))
-        assertEquals(4_283L, hizbOpeningSeekMs(true, 0L, nisa148, silence))
-        assertNull(hizbOpeningSeekMs(true, 4_300L, nisa148, silence))
-        assertNull(hizbOpeningSeekMs(false, 0L, nisa148, silence))
+        assertEquals(3_933L, hizbOpeningStartMs(true, nisa148, silence))
+        // Sound begins at 3991 ms in the MP3, before the highlight mark.
+        assertTrue(hizbOpeningStartMs(true, nisa148, silence)!! < 3_991L)
+        assertNull(hizbOpeningStartMs(false, nisa148, silence))
+    }
+
+    @Test
+    fun `an opening keeps its attack and small pauses play through`() {
+        // Hani 4:58: a source fragment at zero, then quiet until 5559 ms.
+        val verse = listOf(Segment(1, 5_600, 7_080))
+        assertEquals(5_250L, hizbOpeningStartMs(true, verse, emptyList()))
+        assertNull(hizbOpeningStartMs(true, emptyList(), emptyList()))
+        // A normal breath is not a long hizb pause.
+        assertNull(hizbOpeningStartMs(true, listOf(Segment(1, 800, 1_500)), emptyList()))
     }
 
     @Test

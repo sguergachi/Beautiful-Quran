@@ -33,6 +33,8 @@ import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.AssistantIntents
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
+import com.beautifulquran.domain.hizbOpeningStartMs
+import com.beautifulquran.domain.silenceSkipAllowed
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -54,6 +56,7 @@ class PlaybackService : MediaLibraryService() {
     private var mediaSession: MediaLibrarySession? = null
     private var prefetcher: AudioPrefetcher? = null
     private var assistantAudioResume: AssistantAudioResume? = null
+    private val hizbStarts = mutableMapOf<String, Long>()
 
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     override fun onCreate() {
@@ -80,7 +83,13 @@ class PlaybackService : MediaLibraryService() {
         // PreloadConfiguration only looks ahead one item.
         @Suppress("UnstableApiUsage")
         val player = ExoPlayer.Builder(this, tarjiRenderersFactory(this))
-            .setMediaSourceFactory(DefaultMediaSourceFactory(playerDataSource))
+            .setMediaSourceFactory(
+                HizbMediaSource.Factory(
+                    DefaultMediaSourceFactory(playerDataSource),
+                    openingMs = { hizbStarts[it.mediaId] ?: 0L },
+                    enabled = { (application as QuranApp).player.skipSilenceGaps },
+                ),
+            )
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -293,10 +302,12 @@ class PlaybackService : MediaLibraryService() {
             controller: MediaSession.ControllerInfo,
             mediaItems: List<MediaItem>,
         ): ListenableFuture<List<MediaItem>> {
-            if (mediaItems.all { it.localConfiguration?.uri != null }) {
-                return Futures.immediateFuture(mediaItems)
+            return serviceScope.future {
+                if (mediaItems.all { it.localConfiguration?.uri != null }) {
+                    prepareHizbOpenings(mediaItems)
+                    mediaItems
+                } else requestedQueue(mediaItems.firstOrNull()).items
             }
-            return serviceScope.future { requestedQueue(mediaItems.firstOrNull()).items }
         }
 
         override fun onPlaybackResumption(
@@ -305,7 +316,7 @@ class PlaybackService : MediaLibraryService() {
             isForPlayback: Boolean,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = serviceScope.future {
             val queue = requestedQueue(null)
-            MediaSession.MediaItemsWithStartPosition(queue.items, queue.startIndex, 0L)
+            MediaSession.MediaItemsWithStartPosition(queue.items, queue.startIndex, C.TIME_UNSET)
         }
 
         override fun onSetMediaItems(
@@ -315,14 +326,14 @@ class PlaybackService : MediaLibraryService() {
             startIndex: Int,
             startPositionMs: Long,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
-            if (mediaItems.isNotEmpty() && mediaItems.all { it.localConfiguration?.uri != null }) {
-                return Futures.immediateFuture(
-                    MediaSession.MediaItemsWithStartPosition(mediaItems, startIndex, startPositionMs),
-                )
-            }
             return serviceScope.future {
-                val queue = requestedQueue(mediaItems.firstOrNull())
-                MediaSession.MediaItemsWithStartPosition(queue.items, queue.startIndex, 0L)
+                if (mediaItems.isNotEmpty() && mediaItems.all { it.localConfiguration?.uri != null }) {
+                    prepareHizbOpenings(mediaItems)
+                    MediaSession.MediaItemsWithStartPosition(mediaItems, startIndex, startPositionMs)
+                } else {
+                    val queue = requestedQueue(mediaItems.firstOrNull())
+                    MediaSession.MediaItemsWithStartPosition(queue.items, queue.startIndex, C.TIME_UNSET)
+                }
             }
         }
     }
@@ -336,7 +347,29 @@ class PlaybackService : MediaLibraryService() {
         val reciter = reciters.firstOrNull { it.id == app.settings.settings.value.reciterId }
             ?: reciters.first()
         app.settings.updateListeningPosition(surah.id, ayah)
-        return recitationQueue(surah, reciter, ayah, startWithBasmalah = ayah == 1)
+        return recitationQueue(surah, reciter, ayah, startWithBasmalah = ayah == 1).also {
+            prepareHizbOpenings(it.items)
+        }
+    }
+
+    /** Resolve openings before preparing audio, including notification/assistant queues. */
+    private suspend fun prepareHizbOpenings(items: List<MediaItem>) {
+        val app = application as QuranApp
+        val reciters = app.repository.reciters().associateBy { it.id }
+        val chapters = items.mapNotNull { PlayerController.parseMediaId(it.mediaId) }
+            .distinctBy { it.reciterId to it.surahId }
+        for (chapter in chapters) {
+            if (!silenceSkipAllowed(reciters[chapter.reciterId]?.style.orEmpty())) continue
+            val timings = app.repository.defaultTimings(chapter.reciterId, chapter.surahId)
+            for (ayah in app.repository.hizbAyahs(chapter.surahId)) {
+                val id = PlayerController.mediaId(chapter.surahId, ayah, chapter.reciterId)
+                val start = hizbOpeningStartMs(
+                    true, timings[ayah].orEmpty(),
+                    app.player.audibleSilence(chapter.reciterId, chapter.surahId, ayah),
+                )
+                if (start == null) hizbStarts.remove(id) else hizbStarts[id] = start
+            }
+        }
     }
 
     private fun requestedVerse(item: MediaItem?, surahs: List<Surah>): Pair<Surah, Int> {

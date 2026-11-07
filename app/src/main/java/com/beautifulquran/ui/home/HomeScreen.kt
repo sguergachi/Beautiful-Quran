@@ -74,6 +74,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -100,6 +101,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import android.os.Build
+import android.os.SystemClock
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.input.key.type
@@ -121,8 +123,12 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.animation.core.Animatable
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNot
 import kotlinx.coroutines.flow.first
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
 import androidx.compose.ui.res.stringResource
 import com.beautifulquran.R
 import com.beautifulquran.data.model.Surah
@@ -231,6 +237,9 @@ fun HomeScreen(
     coverSheetVisible: Boolean = true,
     /** A reader turn has committed, so its parked place should be revealed on return. */
     readerVisitActive: Boolean = false,
+    /** Actual chapter identity and unobscured, prepared reader visibility. */
+    readingChapterId: Int = 0,
+    readerReadingActive: Boolean = false,
     /** The returning chapter sheet is close enough to prepare its entering ribbon lane. */
     chapterRibbonReady: Boolean = true,
     /** Number of saved verses; zero removes the Home-page ribbon entirely. */
@@ -272,6 +281,27 @@ fun HomeScreen(
     var searchBounds by remember { mutableStateOf<Rect?>(null) }
     var searchPaneBounds by remember { mutableStateOf<Rect?>(null) }
     val listState = rememberLazyListState()
+    // The list is the app's home: a restart — after a crash as much as a cold
+    // launch — opens on the chapter that was last under the thumb, not the top.
+    LaunchedEffect(listState) {
+        val (index, offset) = viewModel.chapterListAnchor() ?: return@LaunchedEffect
+        if (listState.firstVisibleItemIndex != 0 || listState.firstVisibleItemScrollOffset != 0) {
+            return@LaunchedEffect
+        }
+        snapshotFlow { listState.layoutInfo.totalItemsCount }.first { it > 0 }
+        listState.scrollToItem(index.coerceIn(0, listState.layoutInfo.totalItemsCount - 1), offset)
+    }
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            Triple(
+                listState.isScrollInProgress,
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+            )
+        }
+            .filterNot { (scrolling, _, _) -> scrolling }
+            .collect { (_, index, offset) -> viewModel.rememberChapterListAnchor(index, offset) }
+    }
     val searchPaneVisible = searchFocused && uiState.query.isEmpty()
     val density = LocalDensity.current
     val imeBottom = WindowInsets.ime.getBottom(density).toFloat()
@@ -585,8 +615,48 @@ fun HomeScreen(
 
     BackHandler(enabled = searchFocused) { focusManager.clearFocus() }
 
-    // The pinning lesson: offered once, on a settled sheet with nothing
-    // pinned yet, around the fully visible row of the chapter being read.
+    // Only a qualifying long read reached by hand-scrolling the chapter list
+    // can offer pinning. Visibility boundaries account for time without a ticker.
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val readingForPinTip = readerReadingActive && lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    DisposableEffect(readingChapterId, readingForPinTip, chapterRibbonReady) {
+        viewModel.observePinTipVisit(readingChapterId, readingForPinTip, chapterRibbonReady, SystemClock.elapsedRealtime())
+        onDispose {
+            viewModel.pausePinTipReading(SystemClock.elapsedRealtime())
+        }
+    }
+    val titleScope = rememberCoroutineScope()
+    val pinTipChapter by viewModel.pinTipChapter.collectAsStateWithLifecycle()
+    val pinTipDiagnostic by viewModel.pinTipDiagnostic.collectAsStateWithLifecycle()
+    val diagnosticContext = LocalContext.current
+    LaunchedEffect(pinTipDiagnostic) {
+        pinTipDiagnostic?.let {
+            android.widget.Toast.makeText(diagnosticContext, it, android.widget.Toast.LENGTH_LONG).show()
+            viewModel.pinTipDiagnosticShown()
+        }
+    }
+    // The lesson points at the chapter that was read, wherever the reading
+    // place is: dwell in the reader never moves Continue (only listening does).
+    val pinTipRowKey = pinTipChapter?.let(::chapterKey)
+    // The row is placed from the list's own layout info, not captured from the
+    // row: the target can be any visible row, and a row cannot be asked to
+    // report once the guide is already up.
+    var pinListBounds by remember { mutableStateOf<Rect?>(null) }
+    fun pinTipRowRectNow(): Rect? {
+        val key = pinTipRowKey ?: return null
+        val bounds = pinListBounds ?: return null
+        val item = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key } ?: return null
+        return Rect(bounds.left, bounds.top + item.offset, bounds.right, bounds.top + item.offset + item.size)
+    }
+    val pinTipRowVisible by remember(pinTipRowKey) {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            pinTipRowKey != null && info.visibleItemsInfo.firstOrNull { it.key == pinTipRowKey }?.let { item ->
+                item.offset >= info.viewportStartOffset &&
+                    item.offset + item.size <= info.viewportEndOffset
+            } == true
+        }
+    }
     var pinTipOpen by remember { mutableStateOf(false) }
     var pinTipRendered by remember { mutableStateOf(false) }
     fun closePinTip() {
@@ -595,13 +665,42 @@ fun HomeScreen(
     }
     // Layout facts read through derivedStateOf: the place row's bounds move
     // on every scroll frame and must not recompose the sheet (PERFORMANCE.md).
-    val placeRowMeasured by remember { derivedStateOf { continueRowRect != null } }
+    val placeRowMeasured by remember { derivedStateOf { pinListBounds != null } }
     val listScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
     // Never during a scroll: it would open and be put away by that same
     // scroll, spent without being seen.
     val pinTipEligible = coverSheetVisible && chapterRibbonReady && !searchActive &&
-        uiState.pinned.isEmpty() && continueRowVisible && !docking && !undocking &&
+        pinTipChapter != null && uiState.pinned.isEmpty() && pinTipRowVisible &&
+        !docking && !undocking &&
         !transportOnScreen && placeRowMeasured && !listScrolling
+    // The chapter that earned the lesson may be nowhere near the list's last
+    // position (Continue and search open it from anywhere): bring its row into
+    // view, in the upper part of the screen, so the lesson has a row to point at.
+    // Not keyed on the row's visibility: it turns true as the scroll brings the row
+    // into view, which would cancel the scroll before it reaches its resting place.
+    LaunchedEffect(pinTipChapter, coverSheetVisible, chapterRibbonReady, searchActive) {
+        val chapter = pinTipChapter ?: return@LaunchedEffect
+        if (pinTipRowVisible || !coverSheetVisible || !chapterRibbonReady || searchActive) return@LaunchedEffect
+        if (uiState.pinned.isNotEmpty() || !viewModel.shouldShowPinTip()) return@LaunchedEffect
+        val index = uiState.surahs.indexOfFirst { it.id == chapter }
+        if (index < 0) return@LaunchedEffect
+        delay(500)
+        // The row's top lands about a quarter of the way down the list, in the
+        // upper part of the screen, where the vellum and its copy have room.
+        val inset = (listState.layoutInfo.viewportSize.height * 0.22f).toInt()
+        listState.animateScrollToItem(index, scrollOffset = -inset)
+    }
+    // Developer-only: a qualified visit that the Chapters sheet then refuses to show.
+    LaunchedEffect(pinTipChapter, pinTipEligible) {
+        if (pinTipChapter == null || pinTipEligible || !viewModel.shouldShowPinTip()) return@LaunchedEffect
+        delay(1500)
+        android.widget.Toast.makeText(
+            diagnosticContext,
+            "Pin guide qualified but blocked: pinned=${uiState.pinned.size} rowVisible=$pinTipRowVisible " +
+                "search=$searchActive transport=$transportOnScreen scrolling=$listScrolling",
+            android.widget.Toast.LENGTH_LONG,
+        ).show()
+    }
     LaunchedEffect(pinTipEligible) {
         if (!pinTipEligible) return@LaunchedEffect
         delay(600)
@@ -616,7 +715,7 @@ fun HomeScreen(
     // Leaving Chapters by any route (a row, the rosette, the ribbon, a swipe)
     // puts the lesson away, so it never holds the stack or Back from behind
     // the reader.
-    LaunchedEffect(coverSheetVisible) {
+    LaunchedEffect(coverSheetVisible, searchActive) {
         if (!coverSheetVisible && pinTipOpen) closePinTip()
     }
     LaunchedEffect(pinTipOpen, pinTipRendered) {
@@ -687,7 +786,10 @@ fun HomeScreen(
                         enter = fadeIn(tween(180)) + expandVertically(tween(220)),
                         exit = fadeOut(tween(140)) + shrinkVertically(tween(200)),
                     ) {
-                        HomeHeader(onOpenSettings = onOpenSettings)
+                        HomeHeader(
+                            onOpenSettings = onOpenSettings,
+                            onTitleClick = { titleScope.launch { listState.animateScrollToItem(0) } },
+                        )
                     }
                     // The same breath stands in for the receded masthead so
                     // the bar keeps its spot over the list's first ink.
@@ -813,6 +915,7 @@ fun HomeScreen(
                     modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .onGloballyPositioned { pinListBounds = it.boundsInWindow() }
                     .verticalFadingEdges(
                         color = MaterialTheme.colorScheme.background,
                         // The feather under the search field. It is the list's
@@ -1093,20 +1196,6 @@ fun HomeScreen(
                         },
                 )
             }
-            // The pinning lesson, composed only while it shows: the place row's
-            // bounds change every scroll frame and are read here only then.
-            if (pinTipOpen || pinTipRendered) continueRowRect?.let { row ->
-                PinChapterTip(
-                    visible = pinTipOpen,
-                    target = with(density) {
-                        DpOffset((row.center.x - boxLeft).toDp(), (row.center.y - boxTop).toDp())
-                    },
-                    bodyBelow = pinTipBodyBelow(row.center.y - boxTop, boxHeight),
-                    onDismiss = ::closePinTip,
-                    onRenderedChange = { pinTipRendered = it },
-                    modifier = Modifier.zIndex(3f),
-                )
-            }
             // Dock flights: a live copy of the pill travels between its
             // resting seat and the chapter row — resizing, squaring its
             // corners, settling every inset onto the row, then fading to
@@ -1157,6 +1246,28 @@ fun HomeScreen(
                     }
                 }
             }
+            // The pinning lesson is the sheet's topmost layer: composed
+            // last, above the dock flight, the bottom stack, the search
+            // pane and the bookmarks ribbon, so nothing on the sheet can
+            // draw over its vellum, copy or Got it pill. Composed only
+            // while it shows: the place row's bounds change every scroll
+            // frame and are read here only then.
+            if (pinTipOpen || pinTipRendered) pinTipRowRectNow()?.let { row ->
+                PinChapterTip(
+                    visible = pinTipOpen,
+                    target = with(density) {
+                        DpOffset(
+                            (row.left - boxLeft).toDp() + HomeRibbonLane + HomeNumberColumn / 2,
+                            (row.center.y - boxTop).toDp() + padding.calculateTopPadding(),
+                        )
+                    },
+                    onDismiss = ::closePinTip,
+                    onRenderedChange = { pinTipRendered = it },
+                    modifier = Modifier
+                        .zIndex(10f)
+                        .reachUpThroughTopInset(padding.calculateTopPadding()),
+                )
+            }
         }
     }
 }
@@ -1164,6 +1275,7 @@ fun HomeScreen(
 @Composable
 private fun HomeHeader(
     onOpenSettings: () -> Unit,
+    onTitleClick: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -1184,6 +1296,8 @@ private fun HomeHeader(
                         lineHeight = 40.sp,
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
+                    // The masthead is the way back to the top of the list.
+                    modifier = Modifier.quietClickable(role = Role.Button, onClick = onTitleClick),
                 )
             }
             Spacer(Modifier.height(24.dp))

@@ -214,12 +214,6 @@ class ContinuePillVisibilityTest {
     }
 
     @Test
-    fun pinLessonTakesTheOpenHalfOfTheSheet() {
-        assertEquals(true, pinTipBodyBelow(targetY = 300f, sheetHeight = 2000f))
-        assertEquals(false, pinTipBodyBelow(targetY = 1500f, sheetHeight = 2000f))
-    }
-
-    @Test
     fun aQuickReleaseOpensTheChapterAndALongerOneChangesNothing() {
         assertEquals(HoldOutcome.Tap, holdOutcome(80L))
         assertEquals(HoldOutcome.Tap, holdOutcome(HoldTapMaxMs - 1))

@@ -168,6 +168,18 @@ class HomeViewModel(
     private val expandedSurahIds = MutableStateFlow<Set<Int>>(emptySet())
     private val wordSearchLoading = MutableStateFlow(false)
     private var searchWarmup: Job? = null
+    private val pinLesson = PinChapterLesson()
+    private val _pinTipChapter = MutableStateFlow<Int?>(null)
+    /** The qualifying visit's chapter, published only after returning to Chapters. */
+    val pinTipChapter: StateFlow<Int?> = _pinTipChapter
+
+    /** Developer-only: why the pinning guide did or did not qualify, shown as a toast. */
+    private val _pinTipDiagnostic = MutableStateFlow<String?>(null)
+    val pinTipDiagnostic: StateFlow<String?> = _pinTipDiagnostic
+    internal fun pinTipDiagnosticShown() { _pinTipDiagnostic.value = null }
+    private fun diagnose(message: String) {
+        if (settings.settings.value.developerModeEnabled) _pinTipDiagnostic.value = message
+    }
 
     val uiState: StateFlow<HomeUiState> =
         combine(
@@ -293,7 +305,36 @@ class HomeViewModel(
             !settings.isEducationDismissed(EducationMoment.PIN_CHAPTER)
     }
 
-    fun dismissPinTip() = settings.dismissEducation(EducationMoment.PIN_CHAPTER)
+    /** Where the list was left, so a restart opens on the same chapter. */
+    internal fun chapterListAnchor(): Pair<Int, Int>? = settings.chapterListAnchor()
+
+    internal fun rememberChapterListAnchor(index: Int, offset: Int) =
+        settings.rememberChapterListAnchor(index, offset)
+
+    internal fun observePinTipVisit(chapterId: Int, reading: Boolean, onChapters: Boolean, nowMs: Long) {
+        if (!shouldShowPinTip()) {
+            pinLesson.dismiss()
+            _pinTipChapter.value = null
+            return
+        }
+        pinLesson.observe(chapterId, reading, onChapters, nowMs)
+        pinLesson.takeEndedVisitSeconds()?.let { seconds ->
+            val pinned = uiState.value.pinned.size
+            diagnose(
+                "Pin guide: read ${seconds}s (needs >60s), chapter $chapterId, " +
+                    "$pinned pinned" + if (pinLesson.offeredChapter != null) " — qualifies" else " — not enough time",
+            )
+        }
+        _pinTipChapter.value = pinLesson.offeredChapter
+    }
+
+    internal fun pausePinTipReading(nowMs: Long) = pinLesson.pauseReading(nowMs)
+
+    fun dismissPinTip() {
+        settings.dismissEducation(EducationMoment.PIN_CHAPTER)
+        pinLesson.dismiss()
+        _pinTipChapter.value = null
+    }
 
     fun togglePlayPause() = player.togglePlayPause()
 

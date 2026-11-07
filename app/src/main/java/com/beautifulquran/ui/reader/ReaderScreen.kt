@@ -1890,18 +1890,25 @@ fun ReaderScreen(
                                 nameTransliteration = shown.nameTransliteration,
                                 ayahCount = shown.ayahCount,
                                 sheen = sheen,
-                                modifier = Modifier.graphicsLayer {
-                                    val t = if (followsHeader) {
-                                        FastOutSlowInEasing.transform(headerExit.value)
-                                    } else {
-                                        1f
-                                    }
-                                    alpha = topTitleAlpha * t
-                                    translationY = (1f - t) * arrivalLift
-                                    val scale = 0.9f + 0.1f * t
-                                    scaleX = scale
-                                    scaleY = scale
-                                },
+                                modifier = Modifier
+                                    // The bar's name is a way back to the top of the chapter.
+                                    .quietClickable(
+                                        enabled = !mushafMode && topTitleAlpha > 0.5f && scrolledPastHeader,
+                                        role = Role.Button,
+                                        onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                                    )
+                                    .graphicsLayer {
+                                        val t = if (followsHeader) {
+                                            FastOutSlowInEasing.transform(headerExit.value)
+                                        } else {
+                                            1f
+                                        }
+                                        alpha = topTitleAlpha * t
+                                        translationY = (1f - t) * arrivalLift
+                                        val scale = 0.9f + 0.1f * t
+                                        scaleX = scale
+                                        scaleY = scale
+                                    },
                             )
                         }
                     }

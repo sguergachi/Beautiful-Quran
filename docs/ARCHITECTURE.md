@@ -61,6 +61,32 @@ release acceptance check.
    no navigation library at all (the four sheets are a hand-rolled paper
    stack in `MainActivity`). Every dependency earns its place.
 
+### Hizb audio openings
+
+Murattal recordings at a ۞ may contain a long opening pause, sometimes with
+a fragment before it (Hani 4:58). The playback service resolves these entries
+from reviewed default timings before preparing the queue. `HizbMediaSource`
+changes only the timeline's default entry position, so automatic advance,
+verse restart and repeats enter there before any opening PCM plays. Duration,
+word timings, explicit word seeks and the file clock stay intact. The reader
+does not poll and seek after playback has begun; that exposed fragments and
+could interrupt or replay an attack.
+
+The entry is known before preparation too: `HizbMediaSource` supplies its own
+initial timeline instead of Media3's placeholder. With the placeholder, a
+verse played directly (or seeked to before its file is prepared) starts at 0
+and `MaskingMediaSource` moves it to the default entry on preparation without
+reporting a discontinuity. The UI then saw 0 → 3933 ms unannounced, and the
+highlight clock's settle guard snapped the first words full.
+
+The entry leaves 350 ms before the first-word voice mark and requires at least
+500 ms of removable opening. A highlight mark is not an audio edit: Hani 4:148's
+quiet table says 4283 ms, while the current EveryAyah MP3 has sound from about
+3991 ms (`ffmpeg -af silencedetect=noise=-40dB:d=0.08`). The pre-roll preserves
+that attack. Ordinary verses, Mujawwad and Muallim retain their full openings;
+Timings Lab disables the default entry adjustment so its complete file remains
+available. No timing asset is rewritten by this playback policy.
+
 > **Quran Foundation Content API.** Android and web use authenticated
 > Production Content Sync through a narrow Cloudflare Worker. QF credentials
 > remain server-side; the clients retain only local content and an opaque

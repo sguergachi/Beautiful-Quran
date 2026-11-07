@@ -391,6 +391,21 @@ feather masks, preserving the real scripture and ribbon outside it. Android
 11–12 uses a smooth gradient fallback. Idle reading creates neither guide
 shader layers nor draw cost.
 
+The pigment field owns a cached `Offscreen` layer, separate from the pulsing
+target and lesson copy. Without it, the pulse keeps replaying the full-screen
+shader even after the pigment settles. Progress, geometry and tuning changes
+still repaint the field; a settled guide only composites its texture. The
+transient RGBA cache costs about 9.9 MiB at 1080×2400 or 17.6 MiB at 1440×3200
+and disappears with the guide. Cache the field alone: caching the whole guide
+would invalidate it on every target pulse.
+
+A 2026-11-03 Skia/GL check on an RTX 3080 compared 120 synchronized draws per
+path: direct pigment versus its cached texture took median 0.56 versus 0.073 ms
+at 1080×2400, and 0.95 versus 0.087 ms at 1440×3200. Composites were
+pixel-identical at progress 0, 0.25, 0.5, 0.75 and 1. These isolate host GPU
+cost, not Android frame rates. Device verification was blocked by the T3
+device connection repeatedly refusing the shell connection after reconnect.
+
 ### 4c. Layout reads confined to derived state and coroutines
 
 `LazyListState.layoutInfo` changes on every scroll frame, so reading it in

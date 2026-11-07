@@ -824,6 +824,16 @@ class QuranRepository(
         )
     }
 
+    /** Verse openings marked ۞, for playback entry rather than word timing edits. */
+    suspend fun hizbAyahs(surahId: Int): Set<Int> = withContext(Dispatchers.IO) {
+        database.db.rawQuery(
+            "SELECT ayah_number FROM ayahs WHERE surah_id = ? AND instr(text_uthmani, '۞') > 0",
+            arrayOf(surahId.toString()),
+        ).use { cursor ->
+            buildSet { while (cursor.moveToNext()) add(cursor.getInt(0)) }
+        }
+    }
+
     private data class DefaultTimingRows(
         val segments: Map<Int, List<Segment>>,
         val audioOnsets: Map<Int, Long>,

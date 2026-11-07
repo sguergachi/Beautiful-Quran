@@ -3305,7 +3305,9 @@ button.ayah-mark {
   font-size: 16px;
   line-height: 1;
   text-align: center;
-  color: var(--green-ink);
+  /* Chrome furniture grey, like the transport and tune controls (Android:
+     QuranTheme.ink.furniture); the accent would stand out as a second colour. */
+  color: var(--ink-muted);
 }
 
 .player-bar .reciter-btn::before {

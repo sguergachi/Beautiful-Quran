@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.ShaderBrush
@@ -156,7 +157,10 @@ private fun ShaderInkSpillField(
 ) {
     val shader = remember { RuntimeShader(VellumFieldShader) }
     val brush = remember(shader) { ShaderBrush(shader) }
-    Canvas(modifier) {
+    // The target pulse keeps requesting frames after the spill settles. Cache
+    // the pigment alone so those frames sample a texture instead of rerunning
+    // the full-screen shader. Progress and tuning still invalidate its pixels.
+    Canvas(modifier.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
         val tuning = ContextualGuideStyle.tuning
         val spotlight = Offset(spotlightCenter.x.toPx(), spotlightCenter.y.toPx())
         val body = Offset(bodyCenter.x.toPx(), bodyCenter.y.toPx())
@@ -307,9 +311,12 @@ private const val VellumFieldFunctions = """
         float tail = 1.0 - 0.68 * smoother(clamp((cross - 0.72) / 0.28, 0.0, 1.0));
         float silhouette = rise * tail;
         float taper = verticalTaper * (1.0 - silhouette);
-        float lessonDistance = (cross - targetCross) / 0.17;
-        float lessonReservoir = verticalTaper * 0.85
-            * exp(-lessonDistance * lessonDistance);
+        // A narrow triangular reach: straight shoulders meeting at a tip on the
+        // target, so the vellum points at it. The diffusion below, not the
+        // geometry, keeps the veil soft.
+        float lessonDistance = (cross - targetCross) / 0.10;
+        float lessonPoint = max(1.0 - abs(lessonDistance) * 0.5, 0.0);
+        float lessonReservoir = verticalTaper * 1.15 * lessonPoint;
         // A single diffusion profile has no solid/feather junction to expose.
         // Its midpoint follows only the lesson; the button contour is separate.
         float bodyFloor = body.x + featherWidth * 0.08;
