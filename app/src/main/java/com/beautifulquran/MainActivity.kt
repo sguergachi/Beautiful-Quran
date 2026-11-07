@@ -201,6 +201,8 @@ class MainActivity : ComponentActivity() {
         window.isNavigationBarContrastEnforced = false
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
         super.onCreate(savedInstanceState)
+        // Frame timings for the log export: the launch window, and any recording.
+        FrameLog.attach(window)
         // The entrance cover is always dark. The sheet theme sets its own icon
         // appearance once Compose has its persisted settings.
         WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -399,6 +401,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        FrameLog.detach(window)
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -1736,7 +1743,9 @@ private fun PaperPage(
             .fillMaxSize()
             .paperLayerTransform(layer, stackPosition, settingsLayer),
     ) {
-        content()
+        Box(Modifier.fillMaxSize().cachedWhileMoving(layer, stackPosition, settingsLayer)) {
+            content()
+        }
         // The cast is its own layer beside the sheet's content. Drawn on the
         // sheet itself, its read of the live position re-recorded every word
         // and ornament on the page for each frame of a turn.
@@ -1806,6 +1815,51 @@ private fun Modifier.paperLayerTransform(
             scaleY = 0.985f + 0.015f * reveal
         }
     }
+}
+
+/**
+ * While a sheet moves — swinging away on its hinge, or settling up from
+ * beneath the sheet that swings — its content is drawn flat into a texture
+ * and only that texture is tilted or scaled, instead of every word and
+ * ornament on it being redrawn through the moving transform on each frame.
+ *
+ * Why: drawing through the turn's `rotationY` is a different GPU program for
+ * every kind of draw on the sheet (text, rects, path atlas, meshes, bitmaps),
+ * none of which the flat sheet at rest ever needed, and every scale the sheet
+ * beneath passes through re-rasterises each glyph on it. A release trace of a
+ * cold launch (emulator, 2026-11-07) put ~90 ms of shader compiles and ~50 ms
+ * of glyph uploads into the first frame of the first chapter open — Chapters
+ * swinging away over the reader rising beneath — on top of a glyph upload in
+ * most frames of every turn. A later open in the same process found the
+ * programs warm and ran smooth. Flat into a texture, a sheet reuses what
+ * drawing it at rest already compiled and rasterised, and each frame of a
+ * turn is one quad per sheet until something on that sheet changes.
+ *
+ * Only the content is cached. The sheet's own layer keeps its transform and
+ * shadow, and the cast beside it ([paperDropShadow]) spills past the sheet's
+ * edge, where an offscreen layer on the sheet itself would clip it. At rest,
+ * parked fully turned away, or lying under a sheet that is not moving, the
+ * content draws directly as before. Mirrors [paperLayerTransform].
+ */
+private fun Modifier.cachedWhileMoving(
+    layer: PaperLayer,
+    stackPosition: () -> Float,
+    settingsLayer: Int,
+): Modifier = graphicsLayer {
+    val p = stackPosition()
+    val s = settingsLayer.toFloat()
+    fun within(from: Float, to: Float) = p > from && p < to
+    val moving = when (layer) {
+        PaperLayer.Bookmarks -> within(-1f, 0f)
+        PaperLayer.Cover -> within(0f, 1f)
+        // Rises from under Chapters, then swings away to Settings.
+        PaperLayer.Ayah -> within(0f, 1f) || within(1f, 2f)
+        // Rises from under whichever sheet lies directly on it, then swings
+        // away to a detail sheet.
+        PaperLayer.Settings -> within(s - 1f, s) || within(s, s + 1f)
+        PaperLayer.Detail -> within(s, s + 1f)
+    }
+    compositingStrategy = if (moving) CompositingStrategy.Offscreen else CompositingStrategy.Auto
 }
 
 // An unplayed bar is a strip of the reader sheet and shares its reveal.

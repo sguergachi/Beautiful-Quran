@@ -114,10 +114,14 @@ object DevProfiling {
 
     private fun recordMark(label: String) {
         val at = System.currentTimeMillis()
+        val atNanos = System.nanoTime()
+        FrameLog.launchMark(label, atNanos)
         synchronized(markLock) {
             val start = captureStart.get()
             if (start != null) {
-                markLines += String.format("%+.3fs atNanos=%d  %s", (at - start) / 1000.0, System.nanoTime(), label)
+                markLines += String.format(
+                    java.util.Locale.ROOT, "%+.3fs atNanos=%d  %s", (at - start) / 1000.0, atNanos, label,
+                )
                 if (markLines.size > maxMarks) {
                     markLines.removeAt(0)
                     droppedMarks++
@@ -156,7 +160,7 @@ object DevProfiling {
 
     /** Low-cost capture-only event; does not create a system-trace counter or logcat entry. */
     internal fun recordEvent(label: String) {
-        if (captureStart.get() != null) recordMark(label)
+        if (captureStart.get() != null || FrameLog.inLaunchWindow()) recordMark(label)
     }
 
     /** Local, bounded sample-clock replay data attached only to an explicit performance capture. */
@@ -504,11 +508,16 @@ object DevProfiling {
 
     /**
      * Wall-clock milestone for logcat, the system trace, and an open
-     * capture's report. A release build with no capture open does nothing:
-     * it logs and records only once the developer has asked it to.
+     * capture's report. A release build with no capture open only keeps it
+     * for the log export's launch window ([FrameLog]), first minute only;
+     * it logs and traces only once the developer has asked it to.
      */
     fun mark(label: String) {
-        if (!BuildConfig.DEBUG && captureStart.get() == null) return
+        if (!BuildConfig.DEBUG && captureStart.get() == null) {
+            // The log export's launch window keeps the first minute's events.
+            FrameLog.launchMark(label)
+            return
+        }
         Log.i(Tag, label)
         recordMark(label)
         Trace.setCounter("BQ:$label", 1)

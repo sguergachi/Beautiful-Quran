@@ -379,6 +379,30 @@ was tried and dropped: on a desktop RTX 3080 through Skia's GL backend it saved
 nothing, because the eight taps' cost sits at contours, which must keep them,
 not in flat stroke interiors.
 
+### 4a′. Sheets composite from a texture while they move
+
+During a page turn the sheet swinging away (`rotationY`) and the sheet rising
+beneath it (scale 0.985 → 1) draw their content flat into an offscreen layer,
+and only that texture is tilted or scaled (`cachedWhileMoving` in
+`MainActivity`). At rest the content draws directly as before.
+
+Drawing through a perspective matrix is a different GPU program for every kind
+of draw on the sheet, and every scale the rising sheet passes through
+re-rasterises each glyph on it. A release trace of a cold launch (emulator,
+2026-11-07) put ~90 ms of shader compiles (14 programs) and ~50 ms of glyph
+uploads into the first frame of the first chapter open, a 172 ms UI / 180 ms
+render-thread frame; later opens in the same process found the programs warm.
+With the cache the worst frame of that open fell to ~31–47 ms over three runs,
+compiles to 8–9 (~35 ms), and a turn costs one quad per sheet per frame while
+its content is still. The phone keeps compiled programs on disk only until the
+app is updated, so every new install's first open paid the full cost.
+
+Only the content is cached: the sheet's own layer keeps the transform and
+elevation shadow, and the cast beside it (`paperDropShadow`) spills past the
+sheet's edge, which an offscreen layer on the sheet would clip. The remaining
+first-open compiles are not perspective draws (path-atlas, mesh and rect
+programs on the main framebuffer) and were not chased further.
+
 ### 4b. Transient progressive vellum
 
 The contextual guide's progressive vellum is developer-gated and transient.
