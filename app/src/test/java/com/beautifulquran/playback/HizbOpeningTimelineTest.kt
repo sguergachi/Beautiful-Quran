@@ -4,6 +4,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.source.SinglePeriodTimeline
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HizbOpeningTimelineTest {
@@ -38,5 +39,24 @@ class HizbOpeningTimelineTest {
         assertEquals(0L, timeline.getWindow(0, window).defaultPositionUs)
         listening = true
         assertEquals(5_250_000L, timeline.getWindow(0, window).defaultPositionUs)
+    }
+
+    @Test
+    fun `an unprepared item already enters at the opening`() {
+        // Without this the player starts at 0 and Media3 moves it to the
+        // opening on preparation without a discontinuity (Hani 4:148 snap).
+        val unprepared = unpreparedProgressiveTimeline(MediaItem.EMPTY)
+        val timeline = HizbOpeningTimeline(unprepared, 3_933L) { true }
+        val window = timeline.getWindow(0, Timeline.Window(), /* defaultPositionProjectionUs= */ 1L)
+        assertEquals(3_933_000L, window.defaultPositionUs)
+        assertTrue(window.isPlaceholder)
+        // The period is the one ProgressiveMediaSource reports once prepared.
+        assertEquals(recording().getUidOfPeriod(0), timeline.getUidOfPeriod(0))
+    }
+
+    @Test
+    fun `the lab's unprepared entry stays at zero`() {
+        val timeline = HizbOpeningTimeline(unpreparedProgressiveTimeline(MediaItem.EMPTY), 3_933L) { false }
+        assertEquals(0L, timeline.getWindow(0, Timeline.Window(), /* defaultPositionProjectionUs= */ 1L).defaultPositionUs)
     }
 }

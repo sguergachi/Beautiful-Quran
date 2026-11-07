@@ -72,6 +72,13 @@ word timings, explicit word seeks and the file clock stay intact. The reader
 does not poll and seek after playback has begun; that exposed fragments and
 could interrupt or replay an attack.
 
+The entry is known before preparation too: `HizbMediaSource` supplies its own
+initial timeline instead of Media3's placeholder. With the placeholder, a
+verse played directly (or seeked to before its file is prepared) starts at 0
+and `MaskingMediaSource` moves it to the default entry on preparation without
+reporting a discontinuity. The UI then saw 0 → 3933 ms unannounced, and the
+highlight clock's settle guard snapped the first words full.
+
 The entry leaves 350 ms before the first-word voice mark and requires at least
 500 ms of removable opening. A highlight mark is not an audio edit: Hani 4:148's
 quiet table says 4283 ms, while the current EveryAyah MP3 has sound from about
