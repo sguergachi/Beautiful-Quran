@@ -1051,10 +1051,11 @@ not the app's.
   name — Reciters, Customize, Download manager, Acknowledgements — are one rung
   (`muted`), and the footer version is a fact too (`labelSmall`). A leaf's
   opening sentence under its title (`LeafIntro`) is read, so it takes
-  `bodyMedium` 15 / 22 in `muted`, never a 12 sp caption. Reciter styles
-  (Mujawwad, Muallim) are facts: 12 / 16 `muted`, on the name's baseline after
-  it — never a second line, so every voice row has the same pitch (48 dp on the
-  full list, where the star's target is the row; 42 dp on Settings).
+  `bodyMedium` 15 / 22 in `muted`, never a 12 sp caption. On the Reciters
+  leaf every voice names its style (Murattal, Mujawwad, Muallim) on a second
+  line, 12 / 16 `muted`, so all rows share one height (58 dp; the star's 48 dp
+  target overhangs the text block). Never inline after the name. Settings'
+  favourites show no style and stay one line (42 dp).
   Acknowledgements: titles are row names (17 / 26 Medium), bodies are read
   citations (`bodyMedium` 15 / 22 `muted`). Download manager: reciter names are
   row names too; its storage line sits under the title like a leaf intro

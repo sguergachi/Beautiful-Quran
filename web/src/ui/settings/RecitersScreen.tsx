@@ -25,7 +25,9 @@ export function ReciterChoices({ reciters, selectedId, onSelect, favorites, onTo
         return {
           value: String(reciter.id),
           label: reciter.name,
-          description: style,
+          // The full list names every voice's style on a second line (Murattal
+          // included) so rows share one height; Settings' favourites stay one line.
+          description: onToggleFavorite ? reciter.style : undefined,
           trailing: onToggleFavorite ? (
             <button
               type="button"
