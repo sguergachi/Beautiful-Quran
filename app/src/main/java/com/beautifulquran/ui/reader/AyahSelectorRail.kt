@@ -4,6 +4,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -241,29 +242,8 @@ private suspend fun settleDialWheel(
  */
 internal val AyahRailTickSpacing = 17.dp
 
-/**
- * How far the page fades into paper while the ayah wheel is open: the text
- * stays as a faint ghost for context, and the wheel's ticks and labels read on
- * near-clean paper.
- */
-internal const val AyahRailVeilStrength = 0.8f
-
-/** Gradient stops in the feather where the rail's clean paper melts into the veil. */
+/** Gradient stops in the feather where the rail's clean paper melts into the page. */
 private const val WashFeatherSteps = 10
-
-/**
- * The paper veil under the open ayah wheel: the theme's own paper laid over
- * the whole screen, never a dark scrim. One fade, shared by every layer that
- * carries it — the reader's page and bars, and the pinned player bar the root
- * hosts — so the screen fades as one sheet, not in parts.
- */
-@Composable
-internal fun rememberAyahRailDimAlpha(expanded: Boolean): State<Float> =
-    animateFloatAsState(
-        targetValue = if (expanded) AyahRailVeilStrength else 0f,
-        animationSpec = tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-        label = "railDimAlpha",
-    )
 
 @Composable
 internal fun AyahSelectorRail(
@@ -289,8 +269,6 @@ internal fun AyahSelectorRail(
     /** Ayah numbers where the reader prostrates — the ۩, last. */
     sajdaAyahs: Set<Int> = emptySet(),
     chromeAlpha: () -> Float,
-    /** The screen's paper veil ([rememberAyahRailDimAlpha]), read at draw. */
-    veilAlpha: () -> Float = { 0f },
     /** Plain boolean for the touch-target gate, so composition never reads the
      * animated [chromeAlpha] (which would recompose the rail on every fade
      * frame). The gesture handler still consults [chromeAlpha] at touch time. */
@@ -304,6 +282,13 @@ internal fun AyahSelectorRail(
 ) {
     val mirrored = side == AyahSelectorSide.RIGHT
     var expanded by remember { mutableStateOf(false) }
+    // The clean paper under the open wheel's labels fades on its own short
+    // tween, read only at draw.
+    val washAlpha = animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = tween(240, easing = FastOutSlowInEasing),
+        label = "railWashAlpha",
+    )
     // Owned Animatable rather than animateFloatAsState so the commit sequence
     // can await the collapse and keep the wheel anchored on the chosen ayah
     // the whole way out.
@@ -485,18 +470,17 @@ internal fun AyahSelectorRail(
                 },
         ) {
             val expand = expansion.value
-            // Under the wheel's labels the veil deepens to clean paper: the
+            // Under the open wheel's labels the page fades to clean paper: the
             // ticks, numbers and annotations reach in over the verse text, and
             // small type can't read across Arabic strokes, so the text there
-            // recedes fully, easing back to the screen's veil beyond. The same
-            // paper and the same fade value as the veil, so the two are one
-            // sheet that arrives and leaves together, never a separate panel.
-            val veil = (veilAlpha() / AyahRailVeilStrength).coerceIn(0f, 1f)
-            if (veil > 0.004f) {
+            // recedes fully and returns along a long feather. Only this edge
+            // fades; the rest of the screen is left as it is.
+            val wash = washAlpha.value
+            if (wash > 0.004f) {
                 // Solid across the labels (the longest, "p. N ۞ JUZ N", ends
                 // near 120dp), then a long smoothstep feather to nothing: no
                 // visible edge where the clean paper starts to thin, and none
-                // where it meets the veil.
+                // where it meets the page.
                 val solidWidth = 125.dp.toPx()
                 val washWidth = 300.dp.toPx()
                 val edgeX = if (mirrored) size.width else 0f
@@ -505,11 +489,11 @@ internal fun AyahSelectorRail(
                 val stops = Array(WashFeatherSteps + 1) { i ->
                     val t = i / WashFeatherSteps.toFloat()
                     val eased = 1f - t * t * (3f - 2f * t)
-                    (solidStop + (1f - solidStop) * t) to paper.copy(alpha = veil * eased)
+                    (solidStop + (1f - solidStop) * t) to paper.copy(alpha = wash * eased)
                 }
                 drawRect(
                     brush = Brush.horizontalGradient(
-                        colorStops = arrayOf(0f to paper.copy(alpha = veil)) + stops,
+                        colorStops = arrayOf(0f to paper.copy(alpha = wash)) + stops,
                         startX = edgeX,
                         endX = farX,
                     ),

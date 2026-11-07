@@ -1741,17 +1741,10 @@ fun ReaderScreen(
             }
         }
     }
-    // Hoisted out of the Scaffold content so the dim under the open wheel can
-    // also cover the bars the content slot does not reach.
+    // Hoisted out of the Scaffold content so a tap on the bars, which the
+    // content slot does not reach, can close the open wheel too.
     var ayahSelectorExpanded by remember { mutableStateOf(false) }
     var ayahSelectorDismissRequests by remember { mutableIntStateOf(0) }
-    val railDimAlpha = rememberAyahRailDimAlpha(ayahSelectorExpanded)
-    // Read in composition only at the dim's edges (on, off); the alpha itself
-    // is read in the draw phase, so the 240ms fade recomposes nothing.
-    val railDimShown by remember {
-        derivedStateOf { ayahSelectorExpanded || railDimAlpha.value > 0.004f }
-    }
-    val railVeil = MaterialTheme.colorScheme.background
     // Back closes the wheel before it leaves the reader. Registered after the
     // root's stack handlers, so it wins while the wheel is open.
     BackHandler(enabled = ayahSelectorExpanded) { ayahSelectorDismissRequests += 1 }
@@ -2117,27 +2110,18 @@ fun ReaderScreen(
     Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        // Each bar carries its own share of the wheel's dim, drawn over it in
-        // the draw phase, so the dim is part of the bar it covers rather than
-        // a strip measured to match it.
         topBar = {
-            AyahWheelDimHost(
-                shown = railDimShown,
+            AyahWheelDismissHost(
                 expanded = ayahSelectorExpanded,
-                alpha = { railDimAlpha.value },
-                paper = railVeil,
                 onDismiss = { ayahSelectorDismissRequests += 1 },
                 content = readerTopBar,
             )
         },
         bottomBar = {
-            AyahWheelDimHost(
-                // A pinned bar is hosted (and dimmed) by the root; this slot
-                // only holds its height, so dimming it would dim the bar twice.
-                shown = railDimShown && !playbackPinned,
-                expanded = ayahSelectorExpanded,
-                alpha = { railDimAlpha.value },
-                paper = railVeil,
+            AyahWheelDismissHost(
+                // A pinned bar is hosted (and its taps caught) by the root;
+                // this slot only holds its height.
+                expanded = ayahSelectorExpanded && !playbackPinned,
                 onDismiss = { ayahSelectorDismissRequests += 1 },
                 content = readerBottomBar,
             )
@@ -3632,29 +3616,17 @@ fun ReaderScreen(
                     )
                 }
             }
-            // While the wheel is open the whole screen fades into paper under
-            // it: the ticks and numbers reach in over the text, and the text
-            // recedes to a ghost so they read on clean paper. Never a dark
-            // scrim, and one even sheet — no local panel beside the rail. This
-            // is the page's share; each Scaffold bar veils itself
-            // (AyahWheelDimHost), and the root veils a pinned player bar. The
-            // veil fades with the wheel and stops absorbing taps the moment it
-            // starts leaving.
-            if (railDimShown) {
+            // While the wheel is open a tap anywhere off it closes the wheel
+            // (committing the verse under the finger) instead of reaching the
+            // page. Nothing is drawn: only the rail's own edge fades to paper.
+            // Each Scaffold bar catches its taps itself (AyahWheelDismissHost),
+            // and the root catches a pinned player bar's.
+            if (ayahSelectorExpanded) {
                 Box(
                     Modifier
                         .matchParentSize()
                         .zIndex(0.5f)
-                        .drawBehind { drawRect(railVeil, alpha = railDimAlpha.value) }
-                        .then(
-                            if (ayahSelectorExpanded) {
-                                Modifier.absorbPointerEvents {
-                                    ayahSelectorDismissRequests += 1
-                                }
-                            } else {
-                                Modifier
-                            },
-                        ),
+                        .absorbPointerEvents { ayahSelectorDismissRequests += 1 },
                 )
             }
             val latestActiveAyahForRail by rememberUpdatedState(activeAyah)
@@ -3693,7 +3665,6 @@ fun ReaderScreen(
                     juzStarts = railJuzStarts,
                     sajdaAyahs = railSajdaAyahs,
                     chromeAlpha = { topBarAlpha.value },
-                    veilAlpha = { railDimAlpha.value },
                     interactive = !recitingActive,
                     onJumpToAyah = { ayah ->
                         dispatch(
@@ -3930,29 +3901,19 @@ private fun rememberSurahSearchState(): SurahSearchState {
 }
 
 /**
- * A Scaffold bar with its share of the open ayah wheel's paper veil drawn
- * over it. [shown] changes only at the veil's edges; [alpha] is read in the draw phase.
- * While the wheel is open, a tap on the bar closes the wheel instead of
- * reaching the bar's controls.
+ * A Scaffold bar that, while the ayah wheel is open, closes the wheel on a tap
+ * instead of passing it to the bar's controls.
  */
 @Composable
-private fun AyahWheelDimHost(
-    shown: Boolean,
+private fun AyahWheelDismissHost(
     expanded: Boolean,
-    alpha: () -> Float,
-    paper: Color,
     onDismiss: () -> Unit,
     content: @Composable () -> Unit,
 ) {
     Box {
         content()
-        if (shown) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .drawBehind { drawRect(paper, alpha = alpha()) }
-                    .then(if (expanded) Modifier.absorbPointerEvents { onDismiss() } else Modifier),
-            )
+        if (expanded) {
+            Box(Modifier.matchParentSize().absorbPointerEvents { onDismiss() })
         }
     }
 }

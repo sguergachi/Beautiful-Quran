@@ -103,7 +103,6 @@ import com.beautifulquran.ui.reader.ReaderScreen
 import com.beautifulquran.ui.reader.pinnedBarTurn
 import com.beautifulquran.ui.reader.pinnedBarReveal
 import com.beautifulquran.ui.reader.pinnedChapterBarZIndex
-import com.beautifulquran.ui.reader.rememberAyahRailDimAlpha
 import com.beautifulquran.ui.reader.showPinnedChapterBar
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
@@ -1518,16 +1517,12 @@ private fun PaperStackApp(
         }
 
         // The pinned player bar sits above the reader stack, outside the
-        // reader's own veil; give it the same share of paper under the open
-        // ayah wheel so the whole screen fades, not all but the bar.
+        // reader's own tap catcher; while the ayah wheel is open a tap on it
+        // closes the wheel instead of reaching the transport.
         // Only while the reader is the settled sheet: a wheel left open as the
-        // stack moves away must never leave Home's transport dimmed and dead.
-        val wheelDimsPinnedBar = ayahSelectorExpanded && settledLayer == AYAH_LAYER
-        val pinnedBarDimAlpha = rememberAyahRailDimAlpha(wheelDimsPinnedBar)
-        // Composition reads only the dim's edges; the alpha is read at draw.
-        val pinnedBarDimFading by remember { derivedStateOf { pinnedBarDimAlpha.value > 0.004f } }
-        if (playbackPinned && (wheelDimsPinnedBar || pinnedBarDimFading)) {
-            val paper = MaterialTheme.colorScheme.background
+        // stack moves away must never leave Home's transport dead.
+        val wheelCoversPinnedBar = ayahSelectorExpanded && settledLayer == AYAH_LAYER
+        if (playbackPinned && wheelCoversPinnedBar) {
             Box(
                 Modifier
                     .align(Alignment.BottomCenter)
@@ -1541,14 +1536,7 @@ private fun PaperStackApp(
                         coverSession = pinnedPlayback.coverSession,
                         stackHeightPx = { stackHeightPx.intValue },
                     )
-                    .drawBehind { drawRect(paper, alpha = pinnedBarDimAlpha.value) }
-                    .then(
-                        if (wheelDimsPinnedBar) {
-                            Modifier.absorbPointerEvents { ayahWheelDismissSignal += 1 }
-                        } else {
-                            Modifier
-                        },
-                    ),
+                    .absorbPointerEvents { ayahWheelDismissSignal += 1 },
             )
         }
 

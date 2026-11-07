@@ -1585,19 +1585,15 @@ the verse number does — always at about four-fifths of the number's own ink, s
 the aside is never louder than the figure — and turns gold on the selected
 verse. The verse numbers themselves thicken toward the finger (medium far out,
 semibold a few rows away, bold at the focus), and the ۞ and ۩ signs are centred
-on the row by their ink so they sit at the words' x-height. While the wheel is open the whole screen fades into
-paper under it — the theme's own paper laid over everything at four-fifths,
-never a dark scrim — so the verse text recedes to a faint ghost and the small
-ticks, numbers and annotations read on clean paper rather than across the
-Arabic strokes they reach over. Under the rail's labels the same paper
-deepens to clean (solid about 125dp in, across the longest label, then a
-long smoothstep feather back to the veil by 300dp, so no edge shows), driven by the very same fade value, so veil and rail paper are one
-sheet that arrives and leaves together — never a panel on its own timing. The veil
-covers the entire screen — the page, the top bar and the player bar (including
-the pinned one the root hosts) — and only the rail itself stays sharp. Each
-bar veils itself and the veil's alpha is read only at draw, so the fade
-recomposes nothing; a tap anywhere on the veil, the pinned bar included,
-closes the wheel, and so does Back, before it would leave the reader. A surah
+on the row by their ink so they sit at the words' x-height. While the wheel is open the page under its labels fades to
+clean paper — the theme's own paper, never a dark scrim — so the small ticks,
+numbers and annotations read on paper rather than across the Arabic strokes
+they reach over. It holds solid about 125dp in, across the longest label, then
+feathers away on a long smoothstep to nothing by 300dp, so no edge shows. The
+rest of the screen is left untouched: no veil or dim over the page or the
+bars. The fade is read only at draw. A tap anywhere off the wheel — the page,
+the top bar or the player bar, the pinned one included — closes it, and so
+does Back, before it would leave the reader. A surah
 with fewer verses than the rail has height keeps its ladder of ticks centred
 on the rail; the focal point travels along it rather than the ladder sliding
 to the top or bottom.
