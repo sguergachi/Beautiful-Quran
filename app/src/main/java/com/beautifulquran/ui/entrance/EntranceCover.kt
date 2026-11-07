@@ -404,7 +404,7 @@ fun EntranceCover(
                 )
                 .semantics {
                     contentDescription = if (contentReady) {
-                        "The Noble Quran — touch to open"
+                        "Beautiful Quran — touch to open"
                     } else {
                         loadLabel
                     }
@@ -495,7 +495,7 @@ fun EntranceCover(
                 )
                 Spacer(Modifier.height(30.dp))
                 Text(
-                    text = "القرآن الكريم",
+                    text = "القرآن الجميل",
                     fontFamily = HafsFontFamily,
                     fontSize = 40.sp,
                     lineHeight = 1.6.em,
@@ -511,7 +511,7 @@ fun EntranceCover(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "The Noble Quran",
+                    text = "Beautiful Quran",
                     style = MaterialTheme.typography.titleLarge,
                     letterSpacing = 3.sp,
                     color = CoverParchment.copy(alpha = 0.58f),

@@ -520,7 +520,7 @@ export function EntranceCover({
       className="entrance"
       role="dialog"
       aria-modal="true"
-      aria-label={error ? "The book couldn't be opened" : 'The Noble Quran'}
+      aria-label={error ? "The book couldn't be opened" : 'Beautiful Quran'}
       aria-busy={showLoading || undefined}
     >
       <div
@@ -558,7 +558,7 @@ export function EntranceCover({
             ? "The book couldn't be opened"
             : showLoading
               ? loadLabel || 'Opening the book…'
-              : 'The Noble Quran — touch to open'
+              : 'Beautiful Quran — touch to open'
         }
       >
         {/* The board's outside. Its own layer, so the inside can face the
@@ -592,10 +592,10 @@ export function EntranceCover({
           />
           <div className="entrance-titles">
             <p ref={titleArRef} className="entrance-title-ar" lang="ar" dir="rtl">
-              القرآن الكريم
+              القرآن الجميل
             </p>
             <p ref={titleEnRef} className="entrance-title-en">
-              The Noble Quran
+              Beautiful Quran
             </p>
           </div>
           <div className="entrance-air entrance-air--mid" />
