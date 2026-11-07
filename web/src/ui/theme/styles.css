@@ -3886,8 +3886,9 @@ button.ayah-mark {
   cursor: pointer;
 }
 
-/* Under the favourites: Home search's "Show N more" link, started in the
-   names' column (nuqta width + 16px gap). */
+/* Under the favourites: Home search's "Show N more" voice, started in the
+   names' column (nuqta width + 16px gap). Quiet ink, not accent: green text
+   would compete with the selected voice's nuqta. */
 .settings-show-all-reciters {
   display: flex;
   align-items: center;
@@ -3898,7 +3899,7 @@ button.ayah-mark {
   padding: 0.75rem 0 0.75rem calc(1.4375rem + 16px);
   text-align: start;
   font-size: 0.95rem;
-  color: color-mix(in srgb, var(--accent) 90%, transparent);
+  color: var(--ink-rung-muted);
   cursor: pointer;
 }
 

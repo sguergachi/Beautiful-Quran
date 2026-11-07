@@ -615,11 +615,11 @@ private fun Colophon(
 
 // ── Selection vocabulary ───────────────────────────────────────────────────
 
-/** Under the favourites: a link, not another option. Home search's "Show N
- * more" treatment (sans labelLarge in green ink), started in the names' column
- * so it reads as belonging to the list without posing as a voice. It opens a
- * leaf, so a chevron follows the words in the same green ("See all ›") — at
- * the right edge it floated across an empty gap, away from the link. */
+/** Under the favourites: a link, not another option. Sans labelLarge (Home
+ * search's "Show N more" voice) started in the names' column, so it belongs to
+ * the list without posing as a voice. Quiet ink with the page rows' green
+ * chevron right after the words: green text would compete with the selected
+ * voice's nuqta, the one thing in this section that should hold the eye. */
 @Composable
 private fun ShowAllRecitersLink(total: Int, onClick: () -> Unit) {
     Row(
@@ -636,9 +636,9 @@ private fun ShowAllRecitersLink(total: Int, onClick: () -> Unit) {
         Text(
             text = "Show all $total reciters",
             style = MaterialTheme.typography.labelLarge,
-            color = QuranTheme.accents.greenInk,
+            color = QuranTheme.ink.muted,
         )
-        DisclosureChevron(expanded = false, tint = QuranTheme.accents.greenInk)
+        DisclosureChevron(expanded = false)
     }
 }
 
