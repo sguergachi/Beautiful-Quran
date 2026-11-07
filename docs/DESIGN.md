@@ -1919,8 +1919,9 @@ that detail underneath for a forward swipe to reopen. Main Settings
 shows only favorite voices, unselected ones on the `secondary` ink rung (live
 choices, never a disabled-looking fade), then a "Show all 13 reciters" link in
 Home search's "Show N more" voice (sans labelLarge, green ink), started in the
-names' column with the page rows' right-edge chevron, that opens the
-Reciters leaf. The Reciters leaf always
+names' column and followed directly by a chevron in the same green (not at the
+right edge, where it floated away from the words), that opens the Reciters
+leaf. The Reciters leaf always
 keeps the complete catalog accessible and uses a qalam nuqta for the selected
 voice plus quiet gold stars for favorites. The original seven voices begin as
 favorites when this preference does not exist, preserving the old main leaf;

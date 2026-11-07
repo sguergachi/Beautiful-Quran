@@ -3891,7 +3891,8 @@ button.ayah-mark {
 .settings-show-all-reciters {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 2px;
   width: 100%;
   min-height: 44px;
   padding: 0.75rem 0 0.75rem calc(1.4375rem + 16px);
