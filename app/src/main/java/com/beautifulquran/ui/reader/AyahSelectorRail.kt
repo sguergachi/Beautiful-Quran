@@ -248,6 +248,9 @@ internal val AyahRailTickSpacing = 17.dp
  */
 internal const val AyahRailVeilStrength = 0.8f
 
+/** Gradient stops in the feather where the rail's clean paper melts into the veil. */
+private const val WashFeatherSteps = 10
+
 /**
  * The paper veil under the open ayah wheel: the theme's own paper laid over
  * the whole screen, never a dark scrim. One fade, shared by every layer that
@@ -490,15 +493,23 @@ internal fun AyahSelectorRail(
             // sheet that arrives and leaves together, never a separate panel.
             val veil = (veilAlpha() / AyahRailVeilStrength).coerceIn(0f, 1f)
             if (veil > 0.004f) {
-                val washWidth = 200.dp.toPx()
+                // Solid across the labels (the longest, "p. N ۞ JUZ N", ends
+                // near 120dp), then a long smoothstep feather to nothing: no
+                // visible edge where the clean paper starts to thin, and none
+                // where it meets the veil.
+                val solidWidth = 125.dp.toPx()
+                val washWidth = 300.dp.toPx()
                 val edgeX = if (mirrored) size.width else 0f
                 val farX = if (mirrored) size.width - washWidth else washWidth
-                val solid = paper.copy(alpha = veil)
+                val solidStop = solidWidth / washWidth
+                val stops = Array(WashFeatherSteps + 1) { i ->
+                    val t = i / WashFeatherSteps.toFloat()
+                    val eased = 1f - t * t * (3f - 2f * t)
+                    (solidStop + (1f - solidStop) * t) to paper.copy(alpha = veil * eased)
+                }
                 drawRect(
                     brush = Brush.horizontalGradient(
-                        0f to solid,
-                        0.72f to solid,
-                        1f to paper.copy(alpha = 0f),
+                        colorStops = arrayOf(0f to paper.copy(alpha = veil)) + stops,
                         startX = edgeX,
                         endX = farX,
                     ),
