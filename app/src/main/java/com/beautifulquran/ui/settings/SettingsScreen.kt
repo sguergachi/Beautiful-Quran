@@ -277,7 +277,7 @@ internal fun SettingsScreen(
             if (favoriteReciters.isEmpty()) {
                 Caption("No favorites yet — keep them from the full list.")
             }
-            AllRecitersRow(onClick = onOpenReciters)
+            ShowAllRecitersLink(total = reciters.size, onClick = onOpenReciters)
 
             Spacer(Modifier.height(20.dp))
             NavigateRow(
@@ -615,30 +615,24 @@ private fun Colophon(
 
 // ── Selection vocabulary ───────────────────────────────────────────────────
 
-/** The last option in the favourites list: the full catalogue. It stands in the
- * names' column (the nuqta's width left empty) with a chevron, so it reads as
- * one more choice that opens a page instead of selecting a voice. Its type is
- * an unselected voice's, exactly — only the chevron tells them apart. */
+/** Under the favourites: a link, not another option. Home search's "Show N
+ * more" treatment (sans labelLarge in green ink), started in the names' column
+ * so it reads as belonging to the list without posing as a voice. */
 @Composable
-private fun AllRecitersRow(onClick: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+private fun ShowAllRecitersLink(total: Int, onClick: () -> Unit) {
+    Text(
+        text = "Show all $total reciters",
+        style = MaterialTheme.typography.labelLarge,
+        color = QuranTheme.accents.greenInk,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(role = Role.Button, onClick = onClick)
-            .padding(vertical = 8.dp),
-    ) {
-        Spacer(Modifier.width(LocalNuqtaParams.current.sizeDp.dp + 16.dp))
-        Text(
-            text = "All reciters",
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            // The same ink as an unselected voice name (ReciterChoiceRow).
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-            modifier = Modifier.weight(1f),
-        )
-        DisclosureChevron(expanded = false)
-    }
+            .padding(
+                start = LocalNuqtaParams.current.sizeDp.dp + 16.dp,
+                top = 12.dp,
+                bottom = 12.dp,
+            ),
+    )
 }
 
 /** Opens a sub-page on this same sheet — label, quiet summary, chevron. */

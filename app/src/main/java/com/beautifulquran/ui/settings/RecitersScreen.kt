@@ -1,7 +1,7 @@
 package com.beautifulquran.ui.settings
 
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import com.beautifulquran.ui.theme.QuranTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
@@ -115,7 +116,12 @@ internal fun ReciterChoiceRow(
     onToggleFavorite: (() -> Unit)? = null,
 ) {
     val view = LocalView.current
-    val textAlpha by animateFloatAsState(if (selected) 1f else 0.55f, label = "reciterInk")
+    // Unselected voices sit on the secondary rung, not a 55 % fade: they are
+    // live choices and must not read as disabled (#897).
+    val nameInk by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.onSurface else QuranTheme.ink.secondary,
+        label = "reciterInk",
+    )
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -134,7 +140,7 @@ internal fun ReciterChoiceRow(
                 text = reciter.name,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha),
+                color = nameInk,
             )
             if (reciter.style != "Murattal") {
                 Text(

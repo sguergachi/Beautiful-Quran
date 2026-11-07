@@ -3886,18 +3886,22 @@ button.ayah-mark {
   cursor: pointer;
 }
 
-/* "All reciters" closes the favourites list: same column as the voice names
-   (nuqta width + 16px gap), chevron at the edge. */
-.settings-all-reciters {
-  padding-inline-start: calc(1.4375rem + 16px);
+/* Under the favourites: Home search's "Show N more" link, started in the
+   names' column (nuqta width + 16px gap). */
+.settings-show-all-reciters {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.75rem 0 0.75rem calc(1.4375rem + 16px);
+  text-align: start;
+  font-size: 0.95rem;
+  color: color-mix(in srgb, var(--accent) 90%, transparent);
+  cursor: pointer;
 }
 
-/* Same type as an unselected voice name (.paper-choice-label). */
-.settings-all-reciters .settings-nav-label {
-  flex: 1;
-  color: color-mix(in srgb, var(--ink) 55%, transparent);
-  font-size: 17px;
-  line-height: 26px;
+/* Unselected voices are live choices: the secondary rung, not a 55% fade. */
+.reciter-choices .paper-choice-label {
+  color: var(--ink-rung-secondary);
 }
 
 .settings-nav-copy {

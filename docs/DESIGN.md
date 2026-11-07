@@ -1916,8 +1916,10 @@ Settings, **Reciters**, **Customize**, and **Download manager** are consecutive
 leaves in the physical paper stack. Their rows turn to the requested detail leaf, and
 the back chevron or a rightward swipe returns to main Settings while leaving
 that detail underneath for a forward swipe to reopen. Main Settings
-shows only favorite voices, closed by one last option — "All reciters" with a
-chevron, standing in the names' column — that opens the Reciters leaf. The Reciters leaf always
+shows only favorite voices, unselected ones on the `secondary` ink rung (live
+choices, never a disabled-looking fade), then a "Show all 13 reciters" link in
+Home search's "Show N more" voice (sans labelLarge, green ink), started in the
+names' column, that opens the Reciters leaf. The Reciters leaf always
 keeps the complete catalog accessible and uses a qalam nuqta for the selected
 voice plus quiet gold stars for favorites. The original seven voices begin as
 favorites when this preference does not exist, preserving the old main leaf;

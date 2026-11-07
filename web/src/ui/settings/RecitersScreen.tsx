@@ -14,6 +14,7 @@ type ReciterChoicesProps = {
 /** Android's voice rows: a nuqta selects; a separate star keeps a favorite. */
 export function ReciterChoices({ reciters, selectedId, onSelect, favorites, onToggleFavorite }: ReciterChoicesProps) {
   return (
+    <div className="reciter-choices">
     <PaperChoiceList
       aria-label="Reciter"
       value={String(selectedId)}
@@ -51,6 +52,7 @@ export function ReciterChoices({ reciters, selectedId, onSelect, favorites, onTo
       })}
       onChange={(id) => onSelect(Number(id))}
     />
+    </div>
   )
 }
 

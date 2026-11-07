@@ -406,10 +406,9 @@ export function SettingsScreen({
           {favoriteReciters.length === 0 ? (
             <p className="settings-caption">No favorites yet — keep them from the full list.</p>
           ) : null}
-          {/* The last option: the full catalogue, in the names' column. */}
-          <button type="button" className="settings-nav settings-all-reciters" onClick={() => setPage('reciters')}>
-            <span className="settings-nav-label">All reciters</span>
-            <DisclosureChevron expanded={false} />
+          {/* A link under the favourites, in Home search's "Show N more" voice. */}
+          <button type="button" className="settings-show-all-reciters" onClick={() => setPage('reciters')}>
+            Show all {reciters.length} reciters
           </button>
         </section>
 
