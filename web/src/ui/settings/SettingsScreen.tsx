@@ -396,7 +396,7 @@ export function SettingsScreen({
           <BackChevron />
         </button>
         <h1>Settings</h1>
-        <section className="settings-section">
+        <section className="settings-section settings-section-reciter">
           <h2>Reciter</h2>
           <ReciterChoices
             reciters={favoriteReciters}

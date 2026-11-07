@@ -279,7 +279,10 @@ internal fun SettingsScreen(
             }
             ShowAllRecitersLink(total = reciters.size, onClick = onOpenReciters)
 
-            Spacer(Modifier.height(20.dp))
+            // The reciter section stands apart from the page rows by the same
+            // visible air as the colophon below Acknowledgements (76 dp ink to
+            // ink on screen), so the sheet has one large break, used twice.
+            Spacer(Modifier.height(48.dp))
             NavigateRow(
                 label = "Customize",
                 note = customizeSummary(settings),

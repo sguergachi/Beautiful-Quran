@@ -4117,6 +4117,12 @@ button.ayah-mark {
   margin-bottom: 20px;
 }
 
+/* The reciter section stands apart from the page rows by the same air as the
+   colophon below Acknowledgements (Android: 48dp spacer, 76dp ink to ink). */
+.settings-section-reciter {
+  margin-bottom: 48px;
+}
+
 .settings-section-toggles {
   display: flex;
   flex-direction: column;
