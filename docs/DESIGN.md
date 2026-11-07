@@ -1051,9 +1051,10 @@ not the app's.
   name — Reciters, Customize, Download manager, Acknowledgements — are one rung
   (`muted`), and the footer version is a fact too (`labelSmall`). A leaf's
   opening sentence under its title (`LeafIntro`) is read, so it takes
-  `bodyMedium` 15 / 22 in `muted`, never a 12 sp caption. Reciter style
-  subtitles (Mujawwad, Muallim) are facts: 12 / 16 `muted`, hanging under the
-  name while the nuqta and star stay centred on the name's line.
+  `bodyMedium` 15 / 22 in `muted`, never a 12 sp caption. Reciter styles
+  (Mujawwad, Muallim) are facts: 12 / 16 `muted`, on the name's baseline after
+  it — never a second line, so every voice row has the same pitch (48 dp on the
+  full list, where the star's target is the row; 42 dp on Settings).
 - **Product stage** (`Alpha`): the same letterspaced labelSmall whisper as a
   settings section label, sitting next to the product name on the home
   masthead and the settings colophon. Never a chip, pill, or badge with a

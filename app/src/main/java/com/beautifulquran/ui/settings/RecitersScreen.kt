@@ -32,6 +32,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import com.beautifulquran.ui.theme.QuranTheme
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.Layout
@@ -124,10 +126,10 @@ internal fun ReciterChoiceRow(
         if (selected) MaterialTheme.colorScheme.onSurface else QuranTheme.ink.secondary,
         label = "reciterInk",
     )
-    // Nuqta and star centre on the name as it is actually measured; a
-    // Mujawwad / Muallim subtitle hangs directly under the name instead of
-    // pulling the marks off the name's line (#897). A Row centred the marks on
-    // name + subtitle; a fixed leading guessed the name box and missed.
+    // Every voice is one line so the list keeps an even pitch (#897): a
+    // Mujawwad / Muallim style rides on the name's baseline as a small muted
+    // word instead of a second line that made those rows taller. Nuqta and
+    // star centre on the name as it is actually measured.
     // On the full list the star's 48 dp target already gives the row its air;
     // padding on top of it set names 64 dp apart, looser than Settings' 42.
     val hasStar = favorite != null && onToggleFavorite != null
@@ -147,14 +149,17 @@ internal fun ReciterChoiceRow(
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
                 color = nameInk,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.layoutId(NameSlot),
             )
             if (reciter.style != "Murattal") {
                 Text(
                     text = reciter.style,
                     style = MaterialTheme.typography.labelSmall,
-                    // A fact under a name: the same rung as Settings' row notes.
+                    // A fact beside a name: the same rung as Settings' row notes.
                     color = QuranTheme.ink.muted,
+                    maxLines = 1,
                     modifier = Modifier.layoutId(StyleSlot),
                 )
             }
@@ -198,22 +203,28 @@ internal fun ReciterChoiceRow(
     ) { measurables, constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val gap = 16.dp.roundToPx()
+        val styleGap = 6.dp.roundToPx()
         val nuqta = measurables.first { it.layoutId == NuqtaSlot }.measure(loose)
         val star = measurables.firstOrNull { it.layoutId == StarSlot }?.measure(loose)
-        val textWidth = (constraints.maxWidth - nuqta.width - gap - (star?.width ?: 0)).coerceAtLeast(0)
-        val textConstraints = Constraints(maxWidth = textWidth)
-        val name = measurables.first { it.layoutId == NameSlot }.measure(textConstraints)
-        val style = measurables.firstOrNull { it.layoutId == StyleSlot }?.measure(textConstraints)
+        // The star's 48 dp target draws its 22 dp glyph at the right edge; text
+        // may run into the empty left of that target (12 dp clear of the glyph)
+        // so the longest names keep their style without truncating.
+        val starReserve = if (star != null) (22 + 12).dp.roundToPx() else 0
+        val textWidth = (constraints.maxWidth - nuqta.width - gap - starReserve).coerceAtLeast(0)
+        val style = measurables.firstOrNull { it.layoutId == StyleSlot }
+            ?.measure(Constraints(maxWidth = textWidth))
+        val nameWidth = (textWidth - (style?.let { it.width + styleGap } ?: 0)).coerceAtLeast(0)
+        val name = measurables.first { it.layoutId == NameSlot }.measure(Constraints(maxWidth = nameWidth))
         val slot = maxOf(name.height, nuqta.height, star?.height ?: 0)
         val nameY = (slot - name.height) / 2
-        val styleY = nameY + name.height
-        // A subtitle gets the same air below it that the name has above, so
-        // it never crowds the next voice.
-        val height = if (style == null) slot else maxOf(slot, styleY + style.height + nameY)
-        layout(constraints.maxWidth, height) {
+        layout(constraints.maxWidth, slot) {
+            val textX = nuqta.width + gap
             nuqta.place(0, (slot - nuqta.height) / 2)
-            name.place(nuqta.width + gap, nameY)
-            style?.place(nuqta.width + gap, styleY)
+            name.place(textX, nameY)
+            style?.place(
+                textX + name.width + styleGap,
+                nameY + name[FirstBaseline] - style[FirstBaseline],
+            )
             star?.place(constraints.maxWidth - star.width, (slot - star.height) / 2)
         }
     }

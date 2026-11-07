@@ -3913,29 +3913,31 @@ button.ayah-mark {
   color: var(--ink-rung-muted);
 }
 
-/* Nuqta, name and star centre on the name's line; a subtitle hangs below
-   instead of pulling the marks off it. The slot is the star's 48px target on
-   the full list, the name's 26px leading on Settings (Android ReciterChoiceRow). */
-.reciter-choices .paper-choice-row,
-.reciter-choices .paper-choice-select {
-  align-items: flex-start;
+/* Every voice is one line so the list keeps an even pitch: a style (Mujawwad,
+   Muallim) rides on the name's baseline as a small muted word, not a second
+   line that made those rows taller (Android ReciterChoiceRow). */
+.reciter-choices .paper-choice-copy {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
 }
 
-.reciter-choices .ink-nuqta {
-  margin-top: calc((26px - 1.4375rem) / 2);
+.reciter-choices .paper-choice-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.reciter-choices:has(.reciter-favorite) .ink-nuqta {
-  margin-top: calc((48px - 1.4375rem) / 2);
+.reciter-choices .paper-choice-desc {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
-.reciter-choices:has(.reciter-favorite) .paper-choice-copy {
-  padding-top: 11px;
-}
-
-/* A subtitle gets the same air below it that the name has above. */
-.reciter-choices:has(.reciter-favorite) .paper-choice-copy:has(.paper-choice-desc) {
-  padding-bottom: 11px;
+/* The star's 48px target draws its glyph at the right edge; let text run into
+   the empty left of it (12px clear of the glyph) so long names keep their style. */
+.reciter-choices .paper-choice-trailing {
+  margin-inline-start: -14px;
 }
 
 /* The star's 48px target already gives a full-list row its air; the list's
