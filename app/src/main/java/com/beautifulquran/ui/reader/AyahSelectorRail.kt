@@ -38,9 +38,10 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerInputChange
@@ -171,6 +172,19 @@ internal fun juzStartByAyah(ayahs: List<Ayah>): Map<Int, Int> = buildMap {
     }
 }
 
+/** The prostration sign in Uthmani text (۩). */
+private const val SAJDA_MARKER = '\u06E9'
+
+/**
+ * Ayah numbers at which the reader prostrates — those whose text carries the
+ * mushaf's own ۩, read from the text exactly as the ḥizb sign is.
+ */
+internal fun sajdaAyahs(ayahs: List<Ayah>): Set<Int> = buildSet {
+    for (ayah in ayahs) {
+        if (SAJDA_MARKER in ayah.text) add(ayah.number)
+    }
+}
+
 /**
  * Ayah numbers that carry a rubʿ al-ḥizb mark (۞) — the same marker the
  * playback silence-skip reads. The expanded wheel marks these with a small
@@ -228,6 +242,9 @@ private suspend fun settleDialWheel(
  */
 internal val AyahRailTickSpacing = 17.dp
 
+/** The scrim's strength over the page while the ayah wheel is open. */
+internal const val AyahRailDimStrength = 0.5f
+
 /**
  * How far the screen dims under the open ayah wheel (theme scrim, fades with
  * the wheel). Shared by every layer that carries the dim — the reader's page
@@ -237,7 +254,7 @@ internal val AyahRailTickSpacing = 17.dp
 @Composable
 internal fun rememberAyahRailDimAlpha(expanded: Boolean): State<Float> =
     animateFloatAsState(
-        targetValue = if (expanded) 0.5f else 0f,
+        targetValue = if (expanded) AyahRailDimStrength else 0f,
         animationSpec = tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing),
         label = "railDimAlpha",
     )
@@ -252,18 +269,18 @@ internal fun AyahSelectorRail(
     placeAyah: Int? = null,
     /** Ayah numbers bookmarked in this surah — ruby ticks on the collapsed stack. */
     bookmarkedAyahs: Set<Int> = emptySet(),
-    /** Ayah number → mushaf page where a new page opens — a faded
-     *  "p. N" label trailing the tick's label on the expanded wheel. */
+    /*
+     * Wayfinding marks trail the verse number on the expanded wheel, always in
+     * this order: "p. N", then ۞, then "JUZ N" (a middle dot stands in for the
+     * ۞ when a juzʾ verse has none), then ۩.
+     */
+    /** Ayah number → mushaf page where a new page opens — "p. N", first. */
     pageStarts: Map<Int, Int> = emptyMap(),
-    /** Ayah numbers carrying a rubʿ al-ḥizb mark (۞) — the ۞
-     *  sign trailing the tick's label on the expanded wheel, before any
-     *  "p. N" label on the same verse. */
+    /** Ayah numbers carrying a rubʿ al-ḥizb mark — the ۞, after the page. */
     hizbAyahs: Set<Int> = emptySet(),
-    /** Ayah number → juzʾ where a juzʾ opens — a faded "Juz N" trailing the
-     *  tick's label, ahead of the ḥizb sign. */
+    /** Ayah number → juzʾ where a juzʾ opens — "JUZ N", after the ۞. */
     juzStarts: Map<Int, Int> = emptyMap(),
-    /** Ayah numbers where the reader prostrates — the ۩ sign after the ḥizb
-     *  sign, before any "p. N" label. */
+    /** Ayah numbers where the reader prostrates — the ۩, last. */
     sajdaAyahs: Set<Int> = emptySet(),
     chromeAlpha: () -> Float,
     /** Plain boolean for the touch-target gate, so composition never reads the
@@ -388,13 +405,14 @@ internal fun AyahSelectorRail(
     }
     val accents = LocalQuranAccents.current
     val onSurface = MaterialTheme.colorScheme.onSurface
-    // The paper as it looks under the page dim, leaning toward the scrim, so the
-    // wash behind the labels reads as the same sheet and not a lighter panel.
-    val paper = lerp(
-        MaterialTheme.colorScheme.background,
-        MaterialTheme.colorScheme.scrim,
-        0.18f,
-    )
+    // The paper exactly as it looks under the page dim (the scrim at the dim's
+    // full strength), so the wash behind the labels is the same sheet the text
+    // recedes into, not a lighter panel standing on it.
+    // Blended the way the dim itself is drawn (scrim at that alpha, over the
+    // paper, in sRGB). Colour lerp mixes perceptually and lands visibly darker.
+    val scrim = MaterialTheme.colorScheme.scrim
+    val paper = scrim.copy(alpha = scrim.alpha * AyahRailDimStrength)
+        .compositeOver(MaterialTheme.colorScheme.background)
     val currentPlaceGreen = MaterialTheme.colorScheme.primary
     // Classic retains the rail's original system serif figures.
     val fontResolver = LocalFontFamilyResolver.current
@@ -447,7 +465,14 @@ internal fun AyahSelectorRail(
             // dash stack (vertically centered), not the full edge strip —
             // letting ayah text above/below and beside the stack receive taps.
             .width(92.dp)
-            .graphicsLayer { alpha = chromeAlpha() },
+            // Modulated, not composited offscreen: the wheel's wash and its
+            // longer labels draw well past this 92dp box, and an offscreen
+            // layer (what any alpha below 1 gets by default) would crop them
+            // at its edge for the whole chrome fade.
+            .graphicsLayer {
+                alpha = chromeAlpha()
+                compositingStrategy = CompositingStrategy.ModulateAlpha
+            },
     ) {
         Canvas(
             Modifier
@@ -634,6 +659,9 @@ internal fun AyahSelectorRail(
                 val maxBarThickness = 4.dp.toPx()
                 val holdProgress = commitProgress.value
 
+                // Shared by every mark's ink measurement; one per frame, not
+                // one per mark per tick.
+                val markBounds = android.graphics.Rect()
                 for (ayah in first..last) {
                     val offset = ayah - selectedPosition
                     val y = anchorY + offset * tickSpacing
@@ -757,7 +785,7 @@ internal fun AyahSelectorRail(
                     // Draws [text] with its ink starting [markGap] past the trail
                     // and moves the trail to the end of that ink.
                     fun putMark(text: String, paint: Paint, baselineDrop: Float, centerInk: Boolean = false) {
-                        val bounds = android.graphics.Rect()
+                        val bounds = markBounds
                         paint.getTextBounds(text, 0, text.length, bounds)
                         val advance = paint.measureText(text)
                         val start = trailX + markGap

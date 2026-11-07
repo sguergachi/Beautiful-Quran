@@ -2,7 +2,6 @@ package com.beautifulquran.ui.reader
 
 import androidx.compose.ui.geometry.Offset
 import com.beautifulquran.data.model.Ayah
-import com.beautifulquran.domain.sajdaAyahsOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -100,11 +99,12 @@ class AyahSelectorRailTest {
     }
 
     @Test
-    fun sajdaAyahsOf_listsTheProstrationVerses() {
-        assertEquals(setOf(206), sajdaAyahsOf(7))
-        assertEquals(setOf(18, 77), sajdaAyahsOf(22))
-        assertEquals(emptySet<Int>(), sajdaAyahsOf(2))
-        assertEquals(15, (1..114).sumOf { sajdaAyahsOf(it).size })
+    fun sajdaAyahs_marksVersesCarryingTheProstrationSign() {
+        val ayahs = listOf(
+            ayah(205, page = 0, text = "وَٱذْكُر رَّبَّكَ"),
+            ayah(206, page = 0, text = "وَلَهُۥ يَسْجُدُونَ ۩"),
+        )
+        assertEquals(setOf(206), sajdaAyahs(ayahs))
     }
 
     private fun ayah(number: Int, page: Int, text: String = "", surahId: Int = 1) = Ayah(

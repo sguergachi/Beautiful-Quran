@@ -47,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -599,6 +600,9 @@ private fun PaperStackApp(
     var readerSession by rememberSaveable { mutableIntStateOf(0) }
     var settledLayer by rememberSaveable { mutableIntStateOf(COVER_LAYER) }
     var ayahSelectorExpanded by remember { mutableStateOf(false) }
+    // A tap on dim the root owns (over the pinned player bar) asks the reader to
+    // close its wheel, as a tap anywhere else on the dimmed screen does.
+    var ayahWheelDismissSignal by remember { mutableIntStateOf(0) }
     /** True while a verse annotation editor is open in the reader sheet. */
     var readerAnnotationEditing by remember { mutableStateOf(false) }
     /** True while a verse annotation editor is open in the bookmarks index. */
@@ -1332,6 +1336,7 @@ private fun PaperStackApp(
                             selectedSearchText = null
                         },
                         onAyahSelectorExpandedChange = { ayahSelectorExpanded = it },
+                        ayahWheelDismissSignal = ayahWheelDismissSignal,
                         onEditingAnnotationChange = { readerAnnotationEditing = it },
                         onOpenRootViewer = { sid, a, word -> onWordLongPress(sid, a, word) },
                         onRootReturnUserMoved = { onRootReturnUserMovedLatest.value() },
@@ -1499,16 +1504,35 @@ private fun PaperStackApp(
         // The pinned player bar sits above the reader stack, outside the
         // reader's own dim; give it the same share of the pass under the
         // open ayah wheel so the whole screen dims, not all but the bar.
-        val pinnedBarDimAlpha = rememberAyahRailDimAlpha(ayahSelectorExpanded)
-        if (playbackPinned && (ayahSelectorExpanded || pinnedBarDimAlpha.value > 0.01f)) {
+        // Only while the reader is the settled sheet: a wheel left open as the
+        // stack moves away must never leave Home's transport dimmed and dead.
+        val wheelDimsPinnedBar = ayahSelectorExpanded && settledLayer == AYAH_LAYER
+        val pinnedBarDimAlpha = rememberAyahRailDimAlpha(wheelDimsPinnedBar)
+        // Composition reads only the dim's edges; the alpha is read at draw.
+        val pinnedBarDimFading by remember { derivedStateOf { pinnedBarDimAlpha.value > 0.004f } }
+        if (playbackPinned && (wheelDimsPinnedBar || pinnedBarDimFading)) {
+            val scrim = MaterialTheme.colorScheme.scrim
             Box(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .height(pinnedPlaybackHeight)
                     .zIndex(pinnedChapterBarZIndex(pinnedPlayback.coverSession) + 0.01f)
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = pinnedBarDimAlpha.value))
-                    .absorbPointerEvents(),
+                    // Rides with the bar it covers, or the two part company
+                    // whenever the stack moves.
+                    .pinnedBarRidesReader(
+                        stackPosition = stackPositionProvider,
+                        coverSession = pinnedPlayback.coverSession,
+                        stackHeightPx = { stackHeightPx.intValue },
+                    )
+                    .drawBehind { drawRect(scrim, alpha = pinnedBarDimAlpha.value) }
+                    .then(
+                        if (wheelDimsPinnedBar) {
+                            Modifier.absorbPointerEvents { ayahWheelDismissSignal += 1 }
+                        } else {
+                            Modifier
+                        },
+                    ),
             )
         }
 

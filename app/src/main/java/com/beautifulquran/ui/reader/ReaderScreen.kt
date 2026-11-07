@@ -1,6 +1,5 @@
 package com.beautifulquran.ui.reader
 
-import com.beautifulquran.domain.sajdaAyahsOf
 import com.beautifulquran.domain.EnglishTypography
 import android.app.Activity
 import android.content.Context
@@ -87,10 +86,12 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -257,6 +258,8 @@ fun ReaderScreen(
     /** Opens the previous chapter from a top-of-chapter overscroll pull. */
     onOpenPreviousChapter: (surahId: Int) -> Unit = {},
     onAyahSelectorExpandedChange: (Boolean) -> Unit = {},
+    /** Bumped by the root when a tap lands on dim it owns (the pinned player bar). */
+    ayahWheelDismissSignal: Int = 0,
     /** Reports whether a verse annotation editor is open, so the paper stack
      *  can hold its page turn while the reader is writing. */
     onEditingAnnotationChange: (Boolean) -> Unit = {},
@@ -1743,14 +1746,31 @@ fun ReaderScreen(
     var ayahSelectorExpanded by remember { mutableStateOf(false) }
     var ayahSelectorDismissRequests by remember { mutableIntStateOf(0) }
     val railDimAlpha = rememberAyahRailDimAlpha(ayahSelectorExpanded)
-    // The Scaffold's bar extents, read back from the content slot so the dim
-    // strips on the root match the real top and bottom bars.
-    var scaffoldBarInsets by remember { mutableStateOf(PaddingValues()) }
-    ProvideHighlightTimeline(viewModel.highlightSyncState) {
-    Box(Modifier.fillMaxSize()) {
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = topBar@{
+    // Read in composition only at the dim's edges (on, off); the alpha itself
+    // is read in the draw phase, so the 240ms fade recomposes nothing.
+    val railDimShown by remember {
+        derivedStateOf { ayahSelectorExpanded || railDimAlpha.value > 0.004f }
+    }
+    val railScrim = MaterialTheme.colorScheme.scrim
+    // Back closes the wheel before it leaves the reader. Registered after the
+    // root's stack handlers, so it wins while the wheel is open.
+    BackHandler(enabled = ayahSelectorExpanded) { ayahSelectorDismissRequests += 1 }
+    // The rail is composed only with content, outside the Mushaf and outside a
+    // note being written. Whenever it cannot be, the wheel is closed too, or the
+    // hoisted flag would leave the bars dimmed with no rail to clear it.
+    val railComposable = uiState.content != null && !mushafMode && editingAnnotationAyah == 0
+    LaunchedEffect(railComposable) {
+        if (!railComposable) ayahSelectorExpanded = false
+    }
+    // Outside the content slot, so a reset while content is away (above) still
+    // reaches the root.
+    LaunchedEffect(ayahSelectorExpanded) {
+        onAyahSelectorExpandedChange(ayahSelectorExpanded)
+    }
+    LaunchedEffect(ayahWheelDismissSignal) {
+        if (ayahWheelDismissSignal > 0 && ayahSelectorExpanded) ayahSelectorDismissRequests += 1
+    }
+    val readerTopBar: @Composable () -> Unit = topBar@{
             if (mushafMode) return@topBar
             if (editingAnnotationAyah != 0) {
                 // Reclaim the app bar while writing, but keep ink below a
@@ -2039,8 +2059,8 @@ fun ReaderScreen(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
             )
-        },
-        bottomBar = bottomBar@{
+        }
+    val readerBottomBar: @Composable () -> Unit = bottomBar@{
             if (mushafMode) return@bottomBar
             Column {
                 // Errors take the reciter name's place in the bar (see
@@ -2085,6 +2105,35 @@ fun ReaderScreen(
                     )
                 }
             }
+        }
+    ProvideHighlightTimeline(viewModel.highlightSyncState) {
+    Box(Modifier.fillMaxSize()) {
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        // Each bar carries its own share of the wheel's dim, drawn over it in
+        // the draw phase, so the dim is part of the bar it covers rather than
+        // a strip measured to match it.
+        topBar = {
+            AyahWheelDimHost(
+                shown = railDimShown,
+                expanded = ayahSelectorExpanded,
+                alpha = { railDimAlpha.value },
+                scrim = railScrim,
+                onDismiss = { ayahSelectorDismissRequests += 1 },
+                content = readerTopBar,
+            )
+        },
+        bottomBar = {
+            AyahWheelDimHost(
+                // A pinned bar is hosted (and dimmed) by the root; this slot
+                // only holds its height, so dimming it would dim the bar twice.
+                shown = railDimShown && !playbackPinned,
+                expanded = ayahSelectorExpanded,
+                alpha = { railDimAlpha.value },
+                scrim = railScrim,
+                onDismiss = { ayahSelectorDismissRequests += 1 },
+                content = readerBottomBar,
+            )
         },
     ) { padding ->
         val content = uiState.content
@@ -2141,18 +2190,6 @@ fun ReaderScreen(
             return@Scaffold
         }
 
-        SideEffect {
-            val top = padding.calculateTopPadding()
-            val bottom = padding.calculateBottomPadding()
-            if (scaffoldBarInsets.calculateTopPadding() != top ||
-                scaffoldBarInsets.calculateBottomPadding() != bottom
-            ) {
-                scaffoldBarInsets = PaddingValues(top = top, bottom = bottom)
-            }
-        }
-        LaunchedEffect(ayahSelectorExpanded) {
-            onAyahSelectorExpandedChange(ayahSelectorExpanded)
-        }
         LaunchedEffect(editingAnnotationAyah) {
             if (editingAnnotationAyah != 0) ayahSelectorExpanded = false
             dispatch(ReaderInteractionEvent.SetAnnotating(editingAnnotationAyah != 0))
@@ -3591,18 +3628,15 @@ fun ReaderScreen(
             // While the wheel is open the whole screen dims under it: the
             // ticks and numbers reach in over the text, and a local shadow
             // would fight the glyphs they cross. This is the page's share;
-            // the bars outside the content slot carry the rest (root strips
-            // below, and the pinned player bar in MainActivity). The dim
-            // fades with the wheel and stops absorbing taps the moment it
-            // starts leaving.
-            if (ayahSelectorExpanded || railDimAlpha.value > 0.01f) {
+            // each Scaffold bar dims itself (AyahWheelDimHost), and the root
+            // dims a pinned player bar. The dim fades with the wheel and stops
+            // absorbing taps the moment it starts leaving.
+            if (railDimShown) {
                 Box(
                     Modifier
                         .matchParentSize()
                         .zIndex(0.5f)
-                        .background(
-                            MaterialTheme.colorScheme.scrim.copy(alpha = railDimAlpha.value),
-                        )
+                        .drawBehind { drawRect(railScrim, alpha = railDimAlpha.value) }
                         .then(
                             if (ayahSelectorExpanded) {
                                 Modifier.absorbPointerEvents {
@@ -3636,7 +3670,7 @@ fun ReaderScreen(
             val railPageStarts = remember(content.surah.id) { pageStartByAyah(content.ayahs) }
             val railHizbAyahs = remember(content.surah.id) { hizbAyahs(content.ayahs) }
             val railJuzStarts = remember(content.surah.id) { juzStartByAyah(content.ayahs) }
-            val railSajdaAyahs = remember(content.surah.id) { sajdaAyahsOf(content.surah.id) }
+            val railSajdaAyahs = remember(content.surah.id) { sajdaAyahs(content.ayahs) }
             if (!mushafMode && editingAnnotationAyah == 0) {
                 AyahSelectorRail(
                     ayahCount = content.surah.ayahCount,
@@ -3666,6 +3700,9 @@ fun ReaderScreen(
                     },
                     onExpandedChange = { expanded ->
                         ayahSelectorExpanded = expanded
+                        // Told now, not on the next LaunchedEffect pass, so the
+                        // root's dim over a pinned bar starts on the same frame.
+                        onAyahSelectorExpandedChange(expanded)
                         if (expanded && ayahRailTipOpen) {
                             viewModel.dismissAyahRailTip()
                             ayahRailTipOpen = false
@@ -3713,37 +3750,6 @@ fun ReaderScreen(
 
         }
     }
-
-        // The dim's share over the top and player bars, which the content
-        // slot does not reach. Same colour and alpha as the page's dim, so
-        // the three read as one pass across the screen; the rail sits in the
-        // content slot between the strips, so it stays bright.
-        if (!mushafMode && (ayahSelectorExpanded || railDimAlpha.value > 0.01f)) {
-            val barDim = MaterialTheme.colorScheme.scrim.copy(alpha = railDimAlpha.value)
-            val dismissModifier = if (ayahSelectorExpanded) {
-                Modifier.absorbPointerEvents { ayahSelectorDismissRequests += 1 }
-            } else {
-                Modifier
-            }
-            Box(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(scaffoldBarInsets.calculateTopPadding())
-                    .zIndex(0.5f)
-                    .background(barDim)
-                    .then(dismissModifier),
-            )
-            Box(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(scaffoldBarInsets.calculateBottomPadding())
-                    .zIndex(0.5f)
-                    .background(barDim)
-                    .then(dismissModifier),
-            )
-        }
 
         // Opaque bar over the status-bar strip while reciting, so the verse
         // scrolling up never shows beneath the notch/camera. Held steady
@@ -3911,4 +3917,32 @@ private fun rememberSurahSearchState(): SurahSearchState {
     val query = rememberSaveable { mutableStateOf("") }
     val index = rememberSaveable { mutableIntStateOf(0) }
     return remember { SurahSearchState(active, query, index) }
+}
+
+/**
+ * A Scaffold bar with its share of the open ayah wheel's dim drawn over it.
+ * [shown] changes only at the dim's edges; [alpha] is read in the draw phase.
+ * While the wheel is open, a tap on the bar closes the wheel instead of
+ * reaching the bar's controls.
+ */
+@Composable
+private fun AyahWheelDimHost(
+    shown: Boolean,
+    expanded: Boolean,
+    alpha: () -> Float,
+    scrim: Color,
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box {
+        content()
+        if (shown) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .drawBehind { drawRect(scrim, alpha = alpha()) }
+                    .then(if (expanded) Modifier.absorbPointerEvents { onDismiss() } else Modifier),
+            )
+        }
+    }
 }

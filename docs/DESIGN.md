@@ -1589,7 +1589,10 @@ themselves a wash of paper holds solid and eases out about 200dp in from the
 rail, so the small ticks, numbers and annotations read on clean paper rather
 than across the Arabic strokes they reach over. The dim covers
 the entire screen — the page, the top bar and the player bar (including the
-pinned one the root hosts) — and only the rail itself stays bright. A surah
+pinned one the root hosts) — and only the rail itself stays bright. Each bar
+dims itself and the dim's alpha is read only at draw, so the fade recomposes
+nothing; a tap anywhere on the dim, the pinned bar included, closes the wheel,
+and so does Back, before it would leave the reader. A surah
 with fewer verses than the rail has height keeps its ladder of ticks centred
 on the rail; the focal point travels along it rather than the ladder sliding
 to the top or bottom.
