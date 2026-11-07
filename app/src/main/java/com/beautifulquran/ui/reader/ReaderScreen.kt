@@ -1751,7 +1751,7 @@ fun ReaderScreen(
     val railDimShown by remember {
         derivedStateOf { ayahSelectorExpanded || railDimAlpha.value > 0.004f }
     }
-    val railScrim = MaterialTheme.colorScheme.scrim
+    val railVeil = MaterialTheme.colorScheme.background
     // Back closes the wheel before it leaves the reader. Registered after the
     // root's stack handlers, so it wins while the wheel is open.
     BackHandler(enabled = ayahSelectorExpanded) { ayahSelectorDismissRequests += 1 }
@@ -2118,7 +2118,7 @@ fun ReaderScreen(
                 shown = railDimShown,
                 expanded = ayahSelectorExpanded,
                 alpha = { railDimAlpha.value },
-                scrim = railScrim,
+                paper = railVeil,
                 onDismiss = { ayahSelectorDismissRequests += 1 },
                 content = readerTopBar,
             )
@@ -2130,7 +2130,7 @@ fun ReaderScreen(
                 shown = railDimShown && !playbackPinned,
                 expanded = ayahSelectorExpanded,
                 alpha = { railDimAlpha.value },
-                scrim = railScrim,
+                paper = railVeil,
                 onDismiss = { ayahSelectorDismissRequests += 1 },
                 content = readerBottomBar,
             )
@@ -3625,18 +3625,20 @@ fun ReaderScreen(
                     )
                 }
             }
-            // While the wheel is open the whole screen dims under it: the
-            // ticks and numbers reach in over the text, and a local shadow
-            // would fight the glyphs they cross. This is the page's share;
-            // each Scaffold bar dims itself (AyahWheelDimHost), and the root
-            // dims a pinned player bar. The dim fades with the wheel and stops
-            // absorbing taps the moment it starts leaving.
+            // While the wheel is open the whole screen fades into paper under
+            // it: the ticks and numbers reach in over the text, and the text
+            // recedes to a ghost so they read on clean paper. Never a dark
+            // scrim, and one even sheet — no local panel beside the rail. This
+            // is the page's share; each Scaffold bar veils itself
+            // (AyahWheelDimHost), and the root veils a pinned player bar. The
+            // veil fades with the wheel and stops absorbing taps the moment it
+            // starts leaving.
             if (railDimShown) {
                 Box(
                     Modifier
                         .matchParentSize()
                         .zIndex(0.5f)
-                        .drawBehind { drawRect(railScrim, alpha = railDimAlpha.value) }
+                        .drawBehind { drawRect(railVeil, alpha = railDimAlpha.value) }
                         .then(
                             if (ayahSelectorExpanded) {
                                 Modifier.absorbPointerEvents {
@@ -3920,8 +3922,8 @@ private fun rememberSurahSearchState(): SurahSearchState {
 }
 
 /**
- * A Scaffold bar with its share of the open ayah wheel's dim drawn over it.
- * [shown] changes only at the dim's edges; [alpha] is read in the draw phase.
+ * A Scaffold bar with its share of the open ayah wheel's paper veil drawn
+ * over it. [shown] changes only at the veil's edges; [alpha] is read in the draw phase.
  * While the wheel is open, a tap on the bar closes the wheel instead of
  * reaching the bar's controls.
  */
@@ -3930,7 +3932,7 @@ private fun AyahWheelDimHost(
     shown: Boolean,
     expanded: Boolean,
     alpha: () -> Float,
-    scrim: Color,
+    paper: Color,
     onDismiss: () -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -3940,7 +3942,7 @@ private fun AyahWheelDimHost(
             Box(
                 Modifier
                     .matchParentSize()
-                    .drawBehind { drawRect(scrim, alpha = alpha()) }
+                    .drawBehind { drawRect(paper, alpha = alpha()) }
                     .then(if (expanded) Modifier.absorbPointerEvents { onDismiss() } else Modifier),
             )
         }

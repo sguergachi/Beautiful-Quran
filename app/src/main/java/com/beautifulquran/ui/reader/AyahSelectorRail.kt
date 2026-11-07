@@ -37,11 +37,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerInputChange
@@ -242,19 +240,23 @@ private suspend fun settleDialWheel(
  */
 internal val AyahRailTickSpacing = 17.dp
 
-/** The scrim's strength over the page while the ayah wheel is open. */
-internal const val AyahRailDimStrength = 0.5f
+/**
+ * How far the page fades into paper while the ayah wheel is open: the text
+ * stays as a faint ghost for context, and the wheel's ticks and labels read on
+ * near-clean paper.
+ */
+internal const val AyahRailVeilStrength = 0.8f
 
 /**
- * How far the screen dims under the open ayah wheel (theme scrim, fades with
- * the wheel). Shared by every layer that carries the dim — the reader's page
- * and bars, and the pinned player bar the root hosts — so the whole screen
- * dims in one step, not in separate ones that could drift apart.
+ * The paper veil under the open ayah wheel: the theme's own paper laid over
+ * the whole screen, never a dark scrim. One fade, shared by every layer that
+ * carries it — the reader's page and bars, and the pinned player bar the root
+ * hosts — so the screen fades as one sheet, not in parts.
  */
 @Composable
 internal fun rememberAyahRailDimAlpha(expanded: Boolean): State<Float> =
     animateFloatAsState(
-        targetValue = if (expanded) AyahRailDimStrength else 0f,
+        targetValue = if (expanded) AyahRailVeilStrength else 0f,
         animationSpec = tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing),
         label = "railDimAlpha",
     )
@@ -405,14 +407,6 @@ internal fun AyahSelectorRail(
     }
     val accents = LocalQuranAccents.current
     val onSurface = MaterialTheme.colorScheme.onSurface
-    // The paper exactly as it looks under the page dim (the scrim at the dim's
-    // full strength), so the wash behind the labels is the same sheet the text
-    // recedes into, not a lighter panel standing on it.
-    // Blended the way the dim itself is drawn (scrim at that alpha, over the
-    // paper, in sRGB). Colour lerp mixes perceptually and lands visibly darker.
-    val scrim = MaterialTheme.colorScheme.scrim
-    val paper = scrim.copy(alpha = scrim.alpha * AyahRailDimStrength)
-        .compositeOver(MaterialTheme.colorScheme.background)
     val currentPlaceGreen = MaterialTheme.colorScheme.primary
     // Classic retains the rail's original system serif figures.
     val fontResolver = LocalFontFamilyResolver.current
@@ -465,8 +459,8 @@ internal fun AyahSelectorRail(
             // dash stack (vertically centered), not the full edge strip —
             // letting ayah text above/below and beside the stack receive taps.
             .width(92.dp)
-            // Modulated, not composited offscreen: the wheel's wash and its
-            // longer labels draw well past this 92dp box, and an offscreen
+            // Modulated, not composited offscreen: the wheel's longer labels
+            // draw well past this 92dp box, and an offscreen
             // layer (what any alpha below 1 gets by default) would crop them
             // at its edge for the whole chrome fade.
             .graphicsLayer {
@@ -484,29 +478,6 @@ internal fun AyahSelectorRail(
                 },
         ) {
             val expand = expansion.value
-            if (expand > 0.01f) {
-                // A wash of paper behind the wheel's labels. The ticks, numbers
-                // and annotations reach in over the verse text, and no amount
-                // of dimming makes small italic read across Arabic strokes; so
-                // the text itself recedes into the paper under them, holding
-                // solid across the labels and easing out beyond. Whole-page dim
-                // still carries the rest of the screen.
-                val washWidth = 200.dp.toPx()
-                val edgeX = if (mirrored) size.width else 0f
-                val farX = if (mirrored) size.width - washWidth else washWidth
-                val solid = paper.copy(alpha = 0.92f * expand)
-                drawRect(
-                    brush = Brush.horizontalGradient(
-                        0f to solid,
-                        0.72f to solid,
-                        1f to paper.copy(alpha = 0f),
-                        startX = edgeX,
-                        endX = farX,
-                    ),
-                    topLeft = Offset(minOf(edgeX, farX), 0f),
-                    size = Size(washWidth, size.height),
-                )
-            }
             // The right-side rail is the left layout mirrored across the rail's
             // own width: bar rects flip so their hidden cap lands under the far
             // edge, and numbers hang off the inner end instead.

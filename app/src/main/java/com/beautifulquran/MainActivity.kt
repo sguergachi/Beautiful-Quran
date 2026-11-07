@@ -1502,8 +1502,8 @@ private fun PaperStackApp(
         }
 
         // The pinned player bar sits above the reader stack, outside the
-        // reader's own dim; give it the same share of the pass under the
-        // open ayah wheel so the whole screen dims, not all but the bar.
+        // reader's own veil; give it the same share of paper under the open
+        // ayah wheel so the whole screen fades, not all but the bar.
         // Only while the reader is the settled sheet: a wheel left open as the
         // stack moves away must never leave Home's transport dimmed and dead.
         val wheelDimsPinnedBar = ayahSelectorExpanded && settledLayer == AYAH_LAYER
@@ -1511,7 +1511,7 @@ private fun PaperStackApp(
         // Composition reads only the dim's edges; the alpha is read at draw.
         val pinnedBarDimFading by remember { derivedStateOf { pinnedBarDimAlpha.value > 0.004f } }
         if (playbackPinned && (wheelDimsPinnedBar || pinnedBarDimFading)) {
-            val scrim = MaterialTheme.colorScheme.scrim
+            val paper = MaterialTheme.colorScheme.background
             Box(
                 Modifier
                     .align(Alignment.BottomCenter)
@@ -1525,7 +1525,7 @@ private fun PaperStackApp(
                         coverSession = pinnedPlayback.coverSession,
                         stackHeightPx = { stackHeightPx.intValue },
                     )
-                    .drawBehind { drawRect(scrim, alpha = pinnedBarDimAlpha.value) }
+                    .drawBehind { drawRect(paper, alpha = pinnedBarDimAlpha.value) }
                     .then(
                         if (wheelDimsPinnedBar) {
                             Modifier.absorbPointerEvents { ayahWheelDismissSignal += 1 }

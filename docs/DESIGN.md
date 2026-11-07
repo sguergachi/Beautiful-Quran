@@ -1583,16 +1583,17 @@ the verse number does — always at about four-fifths of the number's own ink, s
 the aside is never louder than the figure — and turns gold on the selected
 verse. The verse numbers themselves thicken toward the finger (medium far out,
 semibold a few rows away, bold at the focus), and the ۞ and ۩ signs are centred
-on the row by their ink so they sit at the words' x-height. While the wheel is open the whole page dims to
-half ink under it (the theme scrim, fading with the wheel); behind the labels
-themselves a wash of paper holds solid and eases out about 200dp in from the
-rail, so the small ticks, numbers and annotations read on clean paper rather
-than across the Arabic strokes they reach over. The dim covers
-the entire screen — the page, the top bar and the player bar (including the
-pinned one the root hosts) — and only the rail itself stays bright. Each bar
-dims itself and the dim's alpha is read only at draw, so the fade recomposes
-nothing; a tap anywhere on the dim, the pinned bar included, closes the wheel,
-and so does Back, before it would leave the reader. A surah
+on the row by their ink so they sit at the words' x-height. While the wheel is open the whole screen fades into
+paper under it — the theme's own paper laid over everything at four-fifths,
+never a dark scrim — so the verse text recedes to a faint ghost and the small
+ticks, numbers and annotations read on clean paper rather than across the
+Arabic strokes they reach over. It is one even sheet with one fade: no
+separate panel or wash beside the rail, so nothing arrives in parts. The veil
+covers the entire screen — the page, the top bar and the player bar (including
+the pinned one the root hosts) — and only the rail itself stays sharp. Each
+bar veils itself and the veil's alpha is read only at draw, so the fade
+recomposes nothing; a tap anywhere on the veil, the pinned bar included,
+closes the wheel, and so does Back, before it would leave the reader. A surah
 with fewer verses than the rail has height keeps its ladder of ticks centred
 on the rail; the focal point travels along it rather than the ladder sliding
 to the top or bottom.
