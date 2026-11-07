@@ -65,7 +65,7 @@ export function RecitersScreen({ onBack, ...choices }: ReciterChoicesProps & { o
       </button>
       <h1>Reciters</h1>
       <p className="settings-caption reciters-caption">
-        Choose a voice. Star favorites to keep them on the main Settings leaf.
+        Choose a voice. Star favorites for Settings.
       </p>
       {/* No "All reciters" label: the title already says it. */}
       <section className="settings-section">

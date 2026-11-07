@@ -3933,6 +3933,17 @@ button.ayah-mark {
   padding-top: 11px;
 }
 
+/* A subtitle gets the same air below it that the name has above. */
+.reciter-choices:has(.reciter-favorite) .paper-choice-copy:has(.paper-choice-desc) {
+  padding-bottom: 11px;
+}
+
+/* The star's 48px target already gives a full-list row its air; the list's
+   own padding on top set names 64px apart (Android: 48dp rows). */
+.reciter-choices:has(.reciter-favorite) .paper-choice-row {
+  padding-block: 0;
+}
+
 .settings-nav-copy {
   display: flex;
   flex-direction: column;

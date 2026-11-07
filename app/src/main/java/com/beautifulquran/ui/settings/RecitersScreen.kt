@@ -90,7 +90,7 @@ internal fun RecitersPage(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.height(10.dp))
-                LeafIntro("Choose a voice. Star favorites to keep them on the main Settings leaf.")
+                LeafIntro("Choose a voice. Star favorites for Settings.")
                 // No "All reciters" label: the title already says it.
                 Spacer(Modifier.height(24.dp))
             }
@@ -128,6 +128,9 @@ internal fun ReciterChoiceRow(
     // Mujawwad / Muallim subtitle hangs directly under the name instead of
     // pulling the marks off the name's line (#897). A Row centred the marks on
     // name + subtitle; a fixed leading guessed the name box and missed.
+    // On the full list the star's 48 dp target already gives the row its air;
+    // padding on top of it set names 64 dp apart, looser than Settings' 42.
+    val hasStar = favorite != null && onToggleFavorite != null
     Layout(
         modifier = Modifier
             .fillMaxWidth()
@@ -136,7 +139,7 @@ internal fun ReciterChoiceRow(
                 if (!selected) view.paperSelectHaptic()
                 onSelect()
             }
-            .padding(vertical = 8.dp),
+            .padding(vertical = if (hasStar) 0.dp else 8.dp),
         content = {
             Box(Modifier.layoutId(NuqtaSlot)) { InkNuqta(selected = selected) }
             Text(
@@ -204,7 +207,9 @@ internal fun ReciterChoiceRow(
         val slot = maxOf(name.height, nuqta.height, star?.height ?: 0)
         val nameY = (slot - name.height) / 2
         val styleY = nameY + name.height
-        val height = maxOf(slot, styleY + (style?.height ?: 0))
+        // A subtitle gets the same air below it that the name has above, so
+        // it never crowds the next voice.
+        val height = if (style == null) slot else maxOf(slot, styleY + style.height + nameY)
         layout(constraints.maxWidth, height) {
             nuqta.place(0, (slot - nuqta.height) / 2)
             name.place(nuqta.width + gap, nameY)
