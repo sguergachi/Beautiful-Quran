@@ -1043,9 +1043,13 @@ not the app's.
   in place to Resume (right edge), Delete to its left. Fetch verbs are green;
   settle and delete are quiet ink. Never size a destructive verb up
   to the name.
-  Section labels (Settings, Customize, Download manager) are SemiBold on the
-  `secondary` ink rung so they scan at a glance (#897); they stay below row
-  names and never reach scripture weight.
+  Section labels (Settings, Customize, Download manager) are tracked caps in
+  `labelMedium` (13 / 17 — one step above the 12 / 16 facts they head),
+  SemiBold, on the `secondary` ink rung, so they scan at a glance (#897); they
+  stay below row names and never reach scripture weight. Every label sits 10 dp
+  above its first row (`Section`: 32 dp above, 10 dp below). Facts under a row
+  name — Reciters, Customize, Download manager, Acknowledgements — are one rung
+  (`muted`), and the footer version is a fact too (`labelSmall`).
 - **Product stage** (`Alpha`): the same letterspaced labelSmall whisper as a
   settings section label, sitting next to the product name on the home
   masthead and the settings colophon. Never a chip, pill, or badge with a

@@ -265,7 +265,7 @@ internal fun SettingsScreen(
             Spacer(Modifier.height(36.dp))
 
             SectionLabel("Reciter")
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(10.dp))
             favoriteReciters.forEach { reciter ->
                 ReciterChoiceRow(
                     reciter = reciter,
@@ -291,27 +291,11 @@ internal fun SettingsScreen(
             )
 
             Spacer(Modifier.height(20.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .quietClickable { onOpenDownloads() }
-                    .padding(vertical = 8.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = "Download manager",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = usage?.let(::formatUsage) ?: "…",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = QuranTheme.ink.quiet,
-                    )
-                }
-                DisclosureChevron(expanded = false)
-            }
+            NavigateRow(
+                label = "Download manager",
+                note = usage?.let(::formatUsage) ?: "…",
+                onClick = { onOpenDownloads() },
+            )
 
             Spacer(Modifier.height(20.dp))
             NavigateRow(
@@ -378,7 +362,7 @@ private fun DeveloperSection(
     var educationRearmed by remember { mutableStateOf(false) }
 
     SectionLabel("Developer")
-    Spacer(Modifier.height(2.dp))
+    Spacer(Modifier.height(4.dp))
     Caption("Tools for testing work in progress.")
 
     if (Build.VERSION.SDK_INT >= 33) {
@@ -387,15 +371,14 @@ private fun DeveloperSection(
             "Paper ink study",
             Modifier.fillMaxWidth().quietClickable {
                 context.startActivity(android.content.Intent(context, com.beautifulquran.ui.reader.PaperInkStudyActivity::class.java))
-            }.padding(vertical = 6.dp),
+            }.padding(vertical = 8.dp),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.primary,
         )
         Caption("Al-Fatihah 1:1–3 with a repeat. Compare inside-out and bottom-up ink filling.")
     }
 
-    Spacer(Modifier.height(20.dp))
-    SectionLabel("English type")
+    Section("English type")
     BookTypeface.entries.forEach { face ->
         SelectRow(
             label = face.label,
@@ -405,8 +388,7 @@ private fun DeveloperSection(
     }
     Caption("Readers get Junicode, set to Garamond's size, measure and colour. The earlier EB Garamond stays for comparison.")
 
-    Spacer(Modifier.height(20.dp))
-    SectionLabel("Scroll Arabic")
+    Section("Scroll Arabic")
     ScrollArabicFace.entries.forEach { face ->
         SelectRow(
             label = face.label,
@@ -416,8 +398,7 @@ private fun DeveloperSection(
     }
     Caption("Readers get Hafs. The others are set to Hafs's letter height; verse marks stay in Hafs, and Mushaf leaves keep their own faces.")
 
-    Spacer(Modifier.height(20.dp))
-    SectionLabel("Chapter banner")
+    Section("Chapter banner")
     MushafBannerStyle.entries.forEach { style ->
         SelectRow(
             label = style.label,
@@ -460,7 +441,7 @@ private fun DeveloperSection(
                 viewModel.settings.update { it.copy(educationGuidesEnabled = true) }
                 educationRearmed = true
             }
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption(
@@ -482,7 +463,7 @@ private fun DeveloperSection(
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(enabled = !logExport.preparing, onClick = onLogExport)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption(
@@ -496,7 +477,7 @@ private fun DeveloperSection(
         Text(
             text = "Share latest log",
             style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.fillMaxWidth().quietClickable(onClick = onShareLogExport).padding(vertical = 6.dp),
+            modifier = Modifier.fillMaxWidth().quietClickable(onClick = onShareLogExport).padding(vertical = 8.dp),
             color = MaterialTheme.colorScheme.primary,
         )
     }
@@ -508,7 +489,7 @@ private fun DeveloperSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .quietClickable { com.beautifulquran.CrashTrace.share(context) }
-                .padding(vertical = 6.dp),
+                .padding(vertical = 8.dp),
             color = MaterialTheme.colorScheme.primary,
         )
         Caption("The app stopped unexpectedly. Share what killed it.")
@@ -521,7 +502,7 @@ private fun DeveloperSection(
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(onClick = onOpenTimingsLab)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption("Edit word-level timing marks; also opens from a word long-press.")
@@ -533,7 +514,7 @@ private fun DeveloperSection(
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(onClick = onOpenTarjiLab)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption(
@@ -548,7 +529,7 @@ private fun DeveloperSection(
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(onClick = onOpenOrnamentsLab)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption("Explore, design, and save seeds for the procedural star-and-cross ornament generator.")
@@ -560,7 +541,7 @@ private fun DeveloperSection(
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(onClick = onOpenComponentKit)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary,
     )
     Caption("Tune the nuqta, ink check and brush circle live, one component per page.")
@@ -621,7 +602,7 @@ private fun Colophon(
                 append("Version ${BuildConfig.VERSION_NAME}")
                 if (developerModeEnabled) append(" · developer mode")
             },
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             color = QuranTheme.ink.quiet,
         )
     }
@@ -1296,7 +1277,7 @@ private fun MushafRuntimeCacheStatus(cache: RuntimeMushafCache?, timings: Runtim
                     timings.refresh()
                 },
             )
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         color = MaterialTheme.colorScheme.primary.copy(
             alpha = if (status.phase == RuntimeCachePhase.REFRESHING) 0.4f else 1f,
         ),
@@ -1345,7 +1326,7 @@ internal fun Section(text: String) {
 internal fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall.forCaps(),
+        style = MaterialTheme.typography.labelMedium.forCaps(),
         letterSpacing = 2.sp,
         fontWeight = FontWeight.SemiBold,
         color = QuranTheme.ink.secondary,
