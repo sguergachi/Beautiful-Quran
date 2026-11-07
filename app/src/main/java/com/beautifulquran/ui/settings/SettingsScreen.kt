@@ -617,13 +617,12 @@ private fun Colophon(
 
 /** Under the favourites: a link, not another option. Home search's "Show N
  * more" treatment (sans labelLarge in green ink), started in the names' column
- * so it reads as belonging to the list without posing as a voice. */
+ * so it reads as belonging to the list without posing as a voice. It opens a
+ * leaf, so it carries the same right-edge chevron as every other page row. */
 @Composable
 private fun ShowAllRecitersLink(total: Int, onClick: () -> Unit) {
-    Text(
-        text = "Show all $total reciters",
-        style = MaterialTheme.typography.labelLarge,
-        color = QuranTheme.accents.greenInk,
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .quietClickable(role = Role.Button, onClick = onClick)
@@ -632,7 +631,15 @@ private fun ShowAllRecitersLink(total: Int, onClick: () -> Unit) {
                 top = 12.dp,
                 bottom = 12.dp,
             ),
-    )
+    ) {
+        Text(
+            text = "Show all $total reciters",
+            style = MaterialTheme.typography.labelLarge,
+            color = QuranTheme.accents.greenInk,
+            modifier = Modifier.weight(1f),
+        )
+        DisclosureChevron(expanded = false)
+    }
 }
 
 /** Opens a sub-page on this same sheet — label, quiet summary, chevron. */

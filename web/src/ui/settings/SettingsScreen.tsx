@@ -408,7 +408,8 @@ export function SettingsScreen({
           ) : null}
           {/* A link under the favourites, in Home search's "Show N more" voice. */}
           <button type="button" className="settings-show-all-reciters" onClick={() => setPage('reciters')}>
-            Show all {reciters.length} reciters
+            <span>Show all {reciters.length} reciters</span>
+            <DisclosureChevron expanded={false} />
           </button>
         </section>
 

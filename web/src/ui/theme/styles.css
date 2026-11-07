@@ -3889,7 +3889,9 @@ button.ayah-mark {
 /* Under the favourites: Home search's "Show N more" link, started in the
    names' column (nuqta width + 16px gap). */
 .settings-show-all-reciters {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   width: 100%;
   min-height: 44px;
   padding: 0.75rem 0 0.75rem calc(1.4375rem + 16px);
