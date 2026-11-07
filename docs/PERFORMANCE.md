@@ -403,6 +403,19 @@ sheet's edge, which an offscreen layer on the sheet would clip. The remaining
 first-open compiles are not perspective draws (path-atlas, mesh and rect
 programs on the main framebuffer) and were not chased further.
 
+### 4a″. Opening onto a verse lays it out once
+
+Continue, a bookmark or a search hit opens the reader mid-chapter. The list
+is put on that verse before its first layout (`requestScrollToItem` from a
+`SideEffect` as the content arrives), and the instant settle
+(`ReaderFocusController`, `animate = false`) snaps from there without the
+glide's doorstep. Before, the list first laid out the chapter's opening, then
+the settle forced two synchronous remeasures (`scrollToItem` to a doorstep,
+then to the verse) between frames, in the middle of the page turn. A Pixel 10
+log export showed it as a 113 ms frame, 88 ms of it main-thread delay. Emulator
+A/B (Continue to 2:150): forced layout outside frames 58–66 → ~1 ms; the
+verse's page is composed once, in the tap frame, before the sheet moves.
+
 ### 4b. Transient progressive vellum
 
 The contextual guide's progressive vellum is developer-gated and transient.
