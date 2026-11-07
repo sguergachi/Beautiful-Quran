@@ -1587,8 +1587,10 @@ on the row by their ink so they sit at the words' x-height. While the wheel is o
 paper under it — the theme's own paper laid over everything at four-fifths,
 never a dark scrim — so the verse text recedes to a faint ghost and the small
 ticks, numbers and annotations read on clean paper rather than across the
-Arabic strokes they reach over. It is one even sheet with one fade: no
-separate panel or wash beside the rail, so nothing arrives in parts. The veil
+Arabic strokes they reach over. Under the rail's labels the same paper
+deepens to clean (holding solid about 145dp in, easing back to the veil by
+200dp), driven by the very same fade value, so veil and rail paper are one
+sheet that arrives and leaves together — never a panel on its own timing. The veil
 covers the entire screen — the page, the top bar and the player bar (including
 the pinned one the root hosts) — and only the rail itself stays sharp. Each
 bar veils itself and the veil's alpha is read only at draw, so the fade

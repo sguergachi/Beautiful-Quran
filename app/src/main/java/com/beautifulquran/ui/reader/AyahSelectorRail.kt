@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
@@ -285,6 +286,8 @@ internal fun AyahSelectorRail(
     /** Ayah numbers where the reader prostrates — the ۩, last. */
     sajdaAyahs: Set<Int> = emptySet(),
     chromeAlpha: () -> Float,
+    /** The screen's paper veil ([rememberAyahRailDimAlpha]), read at draw. */
+    veilAlpha: () -> Float = { 0f },
     /** Plain boolean for the touch-target gate, so composition never reads the
      * animated [chromeAlpha] (which would recompose the rail on every fade
      * frame). The gesture handler still consults [chromeAlpha] at touch time. */
@@ -407,6 +410,7 @@ internal fun AyahSelectorRail(
     }
     val accents = LocalQuranAccents.current
     val onSurface = MaterialTheme.colorScheme.onSurface
+    val paper = MaterialTheme.colorScheme.background
     val currentPlaceGreen = MaterialTheme.colorScheme.primary
     // Classic retains the rail's original system serif figures.
     val fontResolver = LocalFontFamilyResolver.current
@@ -459,8 +463,8 @@ internal fun AyahSelectorRail(
             // dash stack (vertically centered), not the full edge strip —
             // letting ayah text above/below and beside the stack receive taps.
             .width(92.dp)
-            // Modulated, not composited offscreen: the wheel's longer labels
-            // draw well past this 92dp box, and an offscreen
+            // Modulated, not composited offscreen: the wheel's paper and its
+            // longer labels draw well past this 92dp box, and an offscreen
             // layer (what any alpha below 1 gets by default) would crop them
             // at its edge for the whole chrome fade.
             .graphicsLayer {
@@ -478,6 +482,30 @@ internal fun AyahSelectorRail(
                 },
         ) {
             val expand = expansion.value
+            // Under the wheel's labels the veil deepens to clean paper: the
+            // ticks, numbers and annotations reach in over the verse text, and
+            // small type can't read across Arabic strokes, so the text there
+            // recedes fully, easing back to the screen's veil beyond. The same
+            // paper and the same fade value as the veil, so the two are one
+            // sheet that arrives and leaves together, never a separate panel.
+            val veil = (veilAlpha() / AyahRailVeilStrength).coerceIn(0f, 1f)
+            if (veil > 0.004f) {
+                val washWidth = 200.dp.toPx()
+                val edgeX = if (mirrored) size.width else 0f
+                val farX = if (mirrored) size.width - washWidth else washWidth
+                val solid = paper.copy(alpha = veil)
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        0f to solid,
+                        0.72f to solid,
+                        1f to paper.copy(alpha = 0f),
+                        startX = edgeX,
+                        endX = farX,
+                    ),
+                    topLeft = Offset(minOf(edgeX, farX), 0f),
+                    size = Size(washWidth, size.height),
+                )
+            }
             // The right-side rail is the left layout mirrored across the rail's
             // own width: bar rects flip so their hidden cap lands under the far
             // edge, and numbers hang off the inner end instead.

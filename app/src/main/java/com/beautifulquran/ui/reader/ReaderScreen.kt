@@ -3686,6 +3686,7 @@ fun ReaderScreen(
                     juzStarts = railJuzStarts,
                     sajdaAyahs = railSajdaAyahs,
                     chromeAlpha = { topBarAlpha.value },
+                    veilAlpha = { railDimAlpha.value },
                     interactive = !recitingActive,
                     onJumpToAyah = { ayah ->
                         dispatch(
