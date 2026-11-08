@@ -26,6 +26,7 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import audio
 import emus
 import formats
 import library
@@ -169,10 +170,17 @@ def geometry(s):
     pw, ph, pk = library.plate_geometry(plate_settings(s), W, H)
     key = S.take_key(s)
     revision = str(os.stat(os.path.join(S.take_dir(s), "meta.json")).st_mtime_ns) if meta else ""
+    heal = ""
+    if meta:
+        try:                      # the preview plays the repaired sound the export will use; a new URL once it is repaired
+            rec = audio.heal_wav(os.path.join(S.take_dir(s), "audio.wav"))
+            heal = f"-{rec['mtime_ns']}" if rec and rec["dropouts"] else ""
+        except Exception as e:
+            print(f"audio repair skipped: {e}", flush=True)
     return {"W": W, "H": H, "fps": s["fps"], "g": g, "take": meta,
             "frame": "/media/phone/" + os.path.basename(fp),
             "clip": f"/media/take/{key}/clip.mp4?v={revision}" if meta else None,
-            "audio": f"/media/take/{key}/audio.wav?v={revision}" if meta else None,
+            "audio": f"/media/take/{key}/audio.wav?v={revision}{heal}" if meta else None,
             "peaks": f"/media/take/{key}/peaks.json?v={revision}" if meta else None,
             "plate": {"w": pw, "h": ph, "k": pk}}
 

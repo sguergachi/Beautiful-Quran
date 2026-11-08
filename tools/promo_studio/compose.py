@@ -28,6 +28,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
+import audio
 import formats
 import library
 import phone as phone_mod
@@ -446,6 +447,7 @@ def audio_filter(s):
     -1.5 dBTP), then the spec's gain and fades. Returns (wav, filter_complex)."""
     a, dur = s["audio"], float(s["duration"])
     wav = os.path.join(take_dir(s), "audio.wav")
+    audio.heal_wav(wav)             # fill the capture's dropouts (clicks) before cutting; once per take
     graph = audio_graph(s)
     chain = []
     target = a.get("loudness", -16.0)

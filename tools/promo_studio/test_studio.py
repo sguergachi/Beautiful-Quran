@@ -319,6 +319,70 @@ class FormatTests(unittest.TestCase):
             self.assertEqual([e["file"] for e in server.exports("a-b")], ["a-b.mp4"])
 
 
+class AudioRepairTests(unittest.TestCase):
+    RATE = 48000
+
+    def voice(self, seconds, f0=140.0, seed=0):
+        """A vowel-like tone: a few harmonics, a little breath noise, 16-bit safe."""
+        t = np.arange(int(seconds * self.RATE)) / self.RATE
+        x = sum(a * np.sin(2 * np.pi * f0 * k * t + k) for k, a in enumerate((.5, .3, .2, .12, .08), 1))
+        x = x + np.random.default_rng(seed).normal(0, .004, len(t))
+        return np.stack([x, .9 * x], axis=1).astype(np.float32) * .5
+
+    def test_a_dropout_cut_into_sound_is_found_and_a_pause_is_not(self):
+        x = self.voice(1.0)
+        x[20000:21700] = 0                                  # 35 ms of exact silence mid-sound
+        quiet = self.voice(1.0); quiet[:] *= .001; quiet[10000:14000] = 0
+        self.assertEqual(audio.find_dropouts(x, self.RATE), [(20000, 21700)])
+        self.assertEqual(audio.find_dropouts(quiet, self.RATE), [], "a quiet passage is not a dropout")
+        lead = np.concatenate([np.zeros((30000, 2), np.float32), self.voice(.5)])
+        self.assertEqual(audio.find_dropouts(lead, self.RATE), [], "silence before the sound starts is not a dropout")
+        short = self.voice(1.0); short[20000:20040] = 0     # 0.8 ms: a glitch, found even though it is brief
+        self.assertEqual(audio.find_dropouts(short, self.RATE), [(20000, 20040)])
+
+    def test_the_fill_follows_the_voice_and_joins_both_edges(self):
+        x = self.voice(1.0)
+        for n in (600, 1700):                               # 12 ms and 35 ms
+            hole = x.copy(); hole[20000:20000 + n] = 0
+            y, rep = audio.conceal(hole, [(20000, 20000 + n)], self.RATE)
+            truth, got = x[20000:20000 + n], y[20000:20000 + n]
+            snr = 10 * np.log10(np.mean(truth ** 2) / np.mean((got - truth) ** 2))
+            self.assertGreater(snr, 12, f"{n} samples: the fill is close to the real sound ({snr:.1f} dB)")
+            steps = np.abs(np.diff(y[:, 0]))
+            self.assertLess(steps[19990:20010 + n].max(), 1.5 * np.abs(np.diff(x[:, 0])).max(), "no click at either edge")
+            np.testing.assert_array_equal(y[:20000], hole[:20000])
+            np.testing.assert_array_equal(y[20000 + n:], hole[20000 + n:])
+            self.assertEqual(rep, [(20000 / self.RATE, n * 1000 / self.RATE, True)])
+
+    def test_a_long_hole_is_faded_not_invented(self):
+        x = self.voice(2.0); x[30000:30000 + 24000] = 0     # half a second missing
+        y, rep = audio.conceal(x, audio.find_dropouts(x, self.RATE), self.RATE)
+        self.assertFalse(rep[0][2])
+        self.assertEqual(float(np.abs(y[30000:30000 + 24000]).max()), 0.0, "nothing made up")
+        self.assertLess(abs(float(y[29999, 0])), abs(float(x[29999, 0])) + 1e-9, "the sound ahead of the hole fades out")
+        self.assertLess(abs(float(y[54000, 0])), abs(float(x[54000, 0])) + 1e-9, "and in")
+
+    def test_heal_wav_repairs_in_place_once_and_keeps_the_original(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            path = os.path.join(d, "audio.wav")
+            x = self.voice(1.5); x[30000:31700] = 0
+            import wave
+            with wave.open(path, "wb") as w:
+                w.setnchannels(2); w.setsampwidth(2); w.setframerate(self.RATE)
+                w.writeframes((x * 32768).astype(np.int16).tobytes())
+            rec = audio.heal_wav(path)
+            self.assertEqual([(r[0], round(r[1])) for r in rec["dropouts"]], [(round(30000 / self.RATE, 3), 35)])
+            with wave.open(path) as w: healed = np.frombuffer(w.readframes(w.getnframes()), np.int16)
+            with wave.open(os.path.join(d, "audio.orig.wav")) as w: orig = np.frombuffer(w.readframes(w.getnframes()), np.int16)
+            self.assertEqual(len(healed), len(orig), "same length: the take's clock is untouched")
+            self.assertTrue(np.all(orig.reshape(-1, 2)[30000:31700] == 0), "the original keeps its hole")
+            self.assertGreater(np.abs(healed.reshape(-1, 2)[30000:31700]).max(), 1000, "the repaired file does not")
+            stamp = os.stat(path).st_mtime_ns
+            self.assertEqual(audio.heal_wav(path), rec)
+            self.assertEqual(os.stat(path).st_mtime_ns, stamp, "an already-healed take is not rewritten")
+            self.assertIsNone(audio.heal_wav(os.path.join(d, "missing.wav")))
+
+
 class ServerTests(unittest.TestCase):
     def test_named_new_video_and_copy_preserve_source_and_reject_collisions(self):
         with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(spec, 'SPECS', d):

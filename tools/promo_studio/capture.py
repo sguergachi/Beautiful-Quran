@@ -20,6 +20,7 @@ import subprocess
 import sys
 import time
 
+import audio
 from spec import CACHE, RECITERS, REPO, take_dir, take_needed
 
 sys.path.insert(0, os.path.join(REPO, "tools", "key_art"))
@@ -659,6 +660,7 @@ def conform(d, log=print, marks=None, capture_info=None, app=None):
                     "-g", "30", "-an", clip], check=True)
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", raw, "-ss", f"{start:.3f}", "-map", "0:a",
                     "-ar", "48000", "-ac", "2", wav], check=True)
+    audio.heal_wav(wav, log=log)      # the emulator's audio tap drops buffers under load: fill those gaps
     length = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
                                    clip], capture_output=True, text=True, check=True).stdout.strip())
     w, h = map(int, subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
