@@ -456,6 +456,7 @@ class AudioRepairTests(unittest.TestCase):
                 rec = audio.heal_wav(path)
             self.assertAlmostEqual(rec["app_clock"]["offset_ms"], 140.0, delta=.1)
             self.assertGreater(rec["app_clock"]["drift_ms"], 100)
+            self.assertEqual(rec["dropouts"], [], "a rebuilt take has nothing left to report, so it is not recorded again")
             with wave.open(path) as w: got = np.frombuffer(w.readframes(w.getnframes()), np.int16).reshape(-1, 2).astype(np.float32) / 32768
             self.assertEqual(len(got), len(take), "same length")
             after = audio.recitation_lags(got, ref, lead, step=2.0)

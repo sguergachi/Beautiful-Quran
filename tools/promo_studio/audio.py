@@ -377,7 +377,7 @@ def heal_wav(path, log=None):
                 log(f"audio: clean recitation unavailable ({str(e)[:80]}); filling from the voice around the gaps")
     if rebuilt is not None:
         y, info = rebuilt
-        report = [(s0 / rate, (e0 - s0) * 1000 / rate, False) for s0, e0 in gaps]
+        report = []                             # nothing left over: every gap and every slip is gone
         if log:
             log(f"audio: put back on the app's clock (it had slipped {info['drift_ms']:+.0f} ms, offset {info['offset_ms']:+.0f} ms kept)")
     else:
