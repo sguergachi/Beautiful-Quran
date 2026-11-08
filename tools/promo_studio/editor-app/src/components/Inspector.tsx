@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api.ts";
 import * as E from "../lib/edit.ts";
-import { panToPlacePhone, phoneCentre } from "../lib/geometry.ts";
+import { fitZoom, phoneCentre } from "../lib/geometry.ts";
 import { clamp, r3, stateAt, valueAt } from "../lib/model.ts";
 import { activeContext, INSPECTOR, type InspectorContext } from "../lib/inspector.ts";
 import type { Ease, Emulator, Job } from "../lib/types.ts";
@@ -75,7 +75,7 @@ function Animate({ context }: { context: InspectorContext | null }) {
                 <span className="truncate text-mute" title={`${d.label} · ${keys.length ? `${keys.length} key${keys.length > 1 ? "s" : ""}` : "one value for the whole video"}`}>{d.label}</span>
                 <Slider label={d.label} value={valueAt(spec, meta.props, n, t)} min={d.min} max={d.max} step={d.step} digits={d.step < 0.01 ? 3 : 2}
                   onChange={(v) => setProp(n, v)} onDone={endGesture} />
-                {(n === "pan_x" || n === "pan_y") && <PanPresets axis={n === "pan_x" ? "x" : "y"} />}
+                {QUICK_PROPS.includes(n) && <div className="col-span-3 -mt-0.5 mb-1 pl-[116px]"><QuickValues prop={n} /></div>}
               </div>
             );
           })}
@@ -89,25 +89,36 @@ function Animate({ context }: { context: InspectorContext | null }) {
   );
 }
 
-// Shortcuts under Pan X / Pan Y: put the phone's centre at a quarter, third or the
-// middle of the frame (left to right for X, top to bottom for Y).
+// Quick values for Pan X, Pan Y and Zoom, under the slider and on selected keys. Pan puts the phone's centre
+// at a quarter, third or the middle of the frame (left to right for X, top to bottom for Y); Zoom is a set of scales.
+export const QUICK_PROPS = ["zoom", "pan_x", "pan_y"];
 const PAN_STOPS: [string, number, string][] = [["¼", 1 / 4, "a quarter"], ["⅓", 1 / 3, "a third"], ["●", 1 / 2, "the centre"], ["⅔", 2 / 3, "two thirds"], ["¾", 3 / 4, "three quarters"]];
-function PanPresets({ axis }: { axis: "x" | "y" }) {
+const ZOOM_STOPS: [string, number][] = [["1×", 1], ["1.5×", 1.5], ["2×", 2], ["3×", 3]];
+/** `times`: the keys' times when editing selected keys; absent: the playhead. */
+function QuickValues({ prop, times }: { prop: string; times?: number[] }) {
   const meta = useStore((s) => s.meta)!, spec = useStore((s) => s.spec)!, geo = useStore((s) => s.geo);
-  const t = useTime(60);
+  const live = useTime(60);
   if (!geo) return null;
-  const go = (frac: number) => {
-    const p = panToPlacePhone(geo, stateAt(spec, meta.props, clock.t), axis, frac), tag = "pan-preset:" + performance.now();
-    setProp("pan_x", p.x, tag); setProp("pan_y", p.y, tag);     // coupled when the camera is rotated; the other is unchanged otherwise
-    endGesture();
-  };
-  const S = stateAt(spec, meta.props, t), cur = phoneCentre(geo, S, S.phone_x, S.phone_y)[axis === "x" ? 0 : 1] / (axis === "x" ? geo.W : geo.H);
-  const where = axis === "x" ? ["left", "right"] : ["top", "bottom"];
+  const at = times ?? [live], S = stateAt(spec, meta.props, at[0]);
+  const go = (apply: (raw: any, c: E.Ctx, t: number) => void) => mutate((raw, c) => { for (const t of times ?? [clock.t]) apply(raw, c, t); });
+  if (prop === "zoom") {
+    const stops: [string, number | "fit", string][] = [["1×", 1, "No zoom"], ["Fit", "fit", "The phone fills the frame's width"], ...ZOOM_STOPS.slice(1).map(([l, v]): [string, number, string] => [l, v, `${l} zoom`])];
+    return (
+      <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Zoom shortcuts">
+        {stops.map(([label, z, title]) => (
+          <button key={label} onClick={() => go((raw, c, t) => E.setProp(raw, c, "zoom", z === "fit" ? fitZoom(c.spec, geo, stateAt(c.spec, c.props, t)) : z, t))} title={title} aria-label={`Zoom ${label}`}
+            className={`h-5 min-w-8 rounded border px-1.5 text-[11px] ${at.length === 1 && Math.abs(S.zoom - (z === "fit" ? fitZoom(spec, geo, S) : z)) < 0.005 ? "border-gold/60 text-gold" : "border-line text-faint hover:text-ink"}`}>{label}</button>
+        ))}
+      </div>
+    );
+  }
+  const axis = prop === "pan_x" ? "x" : "y", where = axis === "x" ? ["left", "right"] : ["top", "bottom"];
+  const cur = phoneCentre(geo, S, S.phone_x, S.phone_y)[axis === "x" ? 0 : 1] / (axis === "x" ? geo.W : geo.H);
   return (
-    <div className="col-span-3 -mt-0.5 mb-1 flex items-center gap-1 pl-[116px]" role="group" aria-label={`Place the phone across the frame (${where[0]} to ${where[1]})`}>
+    <div className="flex flex-wrap items-center gap-1" role="group" aria-label={`Place the phone across the frame (${where[0]} to ${where[1]})`}>
       {PAN_STOPS.map(([label, f, name]) => (
-        <button key={label} onClick={() => go(f)} title={`Phone's centre at ${name} of the frame, from the ${where[0]}`} aria-label={`Phone at ${name} from the ${where[0]}`}
-          className={`h-5 min-w-8 rounded border px-1.5 text-[11px] ${Math.abs(cur - f) < 0.002 ? "border-gold/60 text-gold" : "border-line text-faint hover:text-ink"}`}>{label}</button>
+        <button key={label} onClick={() => go((raw, c, t) => E.placePhone(raw, c, geo, axis, f, t))} title={`Phone's centre at ${name} of the frame, from the ${where[0]}`} aria-label={`Phone at ${name} from the ${where[0]}`}
+          className={`h-5 min-w-8 rounded border px-1.5 text-[11px] ${at.length === 1 && Math.abs(cur - f) < 0.002 ? "border-gold/60 text-gold" : "border-line text-faint hover:text-ink"}`}>{label}</button>
       ))}
     </div>
   );
@@ -143,6 +154,11 @@ function KeyCard({ items }: { items: E.KeyRef[] }) {
           </Field>
         </>
       )}
+      {QUICK_PROPS.filter((n) => items.some((x) => x.prop === n)).map((n) => (
+        <Field key={n} label={`${meta.props[n].label} to`}>
+          <QuickValues prop={n} times={items.filter((x) => x.prop === n).map((x) => x.t)} />
+        </Field>
+      ))}
       <Field label={one ? "Ease into it" : "Ease into them"}>
         <Select value={eases.size > 1 ? "" : [...eases][0]} options={[...(eases.size > 1 ? [["", "(mixed)"] as [string, string]] : []), ...EASES]} onChange={(v) => v && setEase(v as Ease)} />
       </Field>
