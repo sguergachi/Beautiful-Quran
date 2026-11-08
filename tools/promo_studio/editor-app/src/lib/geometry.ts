@@ -51,9 +51,9 @@ export function fitZoom(spec: Spec, geo: Pick<Geo, "W" | "H" | "g">, S: State): 
 // Where the phone's centre lands in the frame for a given phone_x / phone_y:
 // out = O + z·Rcam·(P0 − C), so the tilt, the phone's size and its screen
 // offset do not move it.
-export function phoneCentre(geo: Pick<Geo, "W" | "H">, S: State, px: number, py: number): [number, number] {
+export function phoneCentre(geo: Pick<Geo, "W" | "H">, S: State, px: number, py: number, panX = S.pan_x, panY = S.pan_y): [number, number] {
   const { W, H } = geo, [c, s] = rot(S.rotate);
-  const vx = S.zoom * (W / 2 + px * W - S.pan_x * W), vy = S.zoom * (H / 2 + py * H - S.pan_y * H);
+  const vx = S.zoom * (W / 2 + px * W - panX * W), vy = S.zoom * (H / 2 + py * H - panY * H);
   return [W / 2 + c * vx - s * vy, H / 2 + s * vx + c * vy];
 }
 
@@ -68,6 +68,18 @@ export function snapPhoneToCentre(geo: Pick<Geo, "W" | "H">, S: State, px: numbe
   const ux = snapX ? ox : 0, uy = snapY ? oy : 0, [c, s] = rot(S.rotate);
   // frame delta -> world delta: Rcam⁻¹ · u / z
   return { x: px + (c * ux + s * uy) / (S.zoom * W), y: py + (-s * ux + c * uy) / (S.zoom * H), snapX, snapY };
+}
+
+// The same snap for a plain drag, which pans the camera: the phone's centre is
+// brought onto the frame's centre lines by adjusting pan_x / pan_y instead of
+// the phone's own position. Returns the adjusted pan.
+export function snapPanToPhone(geo: Pick<Geo, "W" | "H">, S: State, panX: number, panY: number, thr: number) {
+  const { W, H } = geo, [cx, cy] = phoneCentre(geo, S, S.phone_x, S.phone_y, panX, panY);
+  const ox = W / 2 - cx, oy = H / 2 - cy;
+  const snapX = Math.abs(ox) < thr, snapY = Math.abs(oy) < thr;
+  const ux = snapX ? ox : 0, uy = snapY ? oy : 0, [c, s] = rot(S.rotate);
+  // moving the camera by +p moves everything by -p, so the world delta flips sign
+  return { x: panX - (c * ux + s * uy) / (S.zoom * W), y: panY - (-s * ux + c * uy) / (S.zoom * H), snapX, snapY };
 }
 
 export function invert(m: M): M {

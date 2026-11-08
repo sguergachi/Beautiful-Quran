@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { track } from "../lib/drag.ts";
 import { sourceTime, stateAt } from "../lib/model.ts";
-import { phoneMatrix, snapPhoneToCentre } from "../lib/geometry.ts";
+import { phoneMatrix, snapPanToPhone, snapPhoneToCentre } from "../lib/geometry.ts";
 import { previewContext } from "../lib/inspector.ts";
 import { Preview } from "../lib/render.ts";
 import { clock, media } from "../state/clock.ts";
@@ -22,7 +22,7 @@ export function Stage() {
   // The recording in flight for this video: the pill below turns into its status.
   const capture = useStore((s) => s.jobs.find((j) => j.kind === "capture" && j.name === s.name && (j.state === "running" || j.state === "queued")));
   const box = useRef({ w: 0, h: 0 });
-  // Shift while moving the phone: its centre snaps to the frame's centre lines.
+  // Shift while dragging: the phone's centre snaps to the frame's centre lines.
   // null = no guides; else which of the two lines the phone is snapped to.
   const [guides, setGuides] = useState<{ v: boolean; h: boolean } | null>(null);
 
@@ -94,21 +94,35 @@ export function Stage() {
     const tag = `drag:${phone ? "phone" : "cam"}:${performance.now()}`;
     let moved = false;
     const r = (S0.rotate * Math.PI) / 180, c = Math.cos(-r), sn = Math.sin(-r);
+    // Shift snaps the phone's centre to the frame's centre lines, whether the
+    // drag moves the phone itself (Alt) or pans the camera under it.
+    let last = { x: x0, y: y0, shift: e.shiftKey };
+    const step = () => {
+      const sx = (last.x - x0) * outPerPx, sy = (last.y - y0) * outPerPx;
+      const dx = c * sx - sn * sy, dy = sn * sx + c * sy, W = s.geo!.W, H = s.geo!.H, thr = SNAP_PX * outPerPx;
+      let snap: { snapX: boolean; snapY: boolean } | null = null;
+      if (phone) {
+        let px = S0.phone_x + dx / (S0.zoom * W), py = S0.phone_y + dy / (S0.zoom * H);
+        if (last.shift) { const q = snapPhoneToCentre(s.geo!, S0, px, py, thr); px = q.x; py = q.y; snap = q; }
+        setProp("phone_x", px, tag); setProp("phone_y", py, tag);
+      } else {
+        let nx = S0.pan_x - dx / (S0.zoom * W), ny = S0.pan_y - dy / (S0.zoom * H);
+        if (last.shift) { const q = snapPanToPhone(s.geo!, S0, nx, ny, thr); nx = q.x; ny = q.y; snap = q; }
+        setProp("pan_x", nx, tag); setProp("pan_y", ny, tag);
+      }
+      const g = snap ? { v: snap.snapX, h: snap.snapY } : null;
+      setGuides((o) => (o === g || (o && g && o.v === g.v && o.h === g.h) ? o : g));
+    };
+    // pressing or releasing Shift mid-drag applies at once, without a mouse move
+    const onKey = (k: KeyboardEvent) => { if (k.key === "Shift" && moved && k.shiftKey !== last.shift) { last = { ...last, shift: k.shiftKey }; step(); } };
+    window.addEventListener("keydown", onKey); window.addEventListener("keyup", onKey);
     track(e, canvas.current!, (m) => {
       if (!moved && Math.hypot(m.clientX - x0, m.clientY - y0) < 3) return;
       moved = true;
-      const sx = (m.clientX - x0) * outPerPx, sy = (m.clientY - y0) * outPerPx;
-      const dx = c * sx - sn * sy, dy = sn * sx + c * sy, W = s.geo!.W, H = s.geo!.H;
-      if (phone) {
-        let px = S0.phone_x + dx / (S0.zoom * W), py = S0.phone_y + dy / (S0.zoom * H);
-        if (m.shiftKey) {
-          const sn = snapPhoneToCentre(s.geo!, S0, px, py, SNAP_PX * outPerPx);
-          px = sn.x; py = sn.y;
-          setGuides((g) => (g && g.v === sn.snapX && g.h === sn.snapY ? g : { v: sn.snapX, h: sn.snapY }));
-        } else setGuides(null);
-        setProp("phone_x", px, tag); setProp("phone_y", py, tag);
-      } else { setProp("pan_x", S0.pan_x - dx / (S0.zoom * W), tag); setProp("pan_y", S0.pan_y - dy / (S0.zoom * H), tag); }
+      last = { x: m.clientX, y: m.clientY, shift: m.shiftKey };
+      step();
     }, (up) => {
+      window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKey);
       setGuides(null);
       endGesture(); if (up.type === "pointercancel") return;
       inspect(moved ? (phone ? "phone-motion" : "camera") : sourceTime(s.spec!, clock.t)[1] < 0 ? "background-look" : previewContext(s.spec!, s.geo!, S0, (x0 - rect.left) * outPerPx, (y0 - rect.top) * outPerPx), !moved || innerWidth > 1000);
@@ -141,7 +155,7 @@ export function Stage() {
     <div ref={wrap} onPointerDown={(e) => { if (e.button === 0 && e.target === e.currentTarget && spec) inspect("canvas", true); }} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#0c0b0a]">
       <div ref={scene} className="relative shrink-0 overflow-hidden rounded-sm shadow-[0_0_0_1px_var(--color-line)]">
         <canvas ref={canvas} onPointerDown={onPointerDown} className="block cursor-grab"
-          title="Click phone / background: appearance · Drag: pan · Scroll: zoom · Shift-scroll: rotate · Alt-drag / Alt-scroll: move / scale the phone (add Shift to snap to the centre)" />
+          title="Click phone / background: appearance · Drag: pan (hold Shift to snap the phone to the centre) · Scroll: zoom · Shift-scroll: rotate · Alt-drag / Alt-scroll: move / scale the phone (Shift snaps too)" />
         <div ref={phone} className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: geo?.g.W, height: geo?.g.H, visibility: geo ? "visible" : "hidden" }}>
           <div ref={screen} className="absolute overflow-hidden" style={{ left: geo?.g.sx0, top: geo?.g.sy0, width: geo?.g.sw, height: geo?.g.sh, borderRadius: geo?.g.screen_r }} />
         </div>
