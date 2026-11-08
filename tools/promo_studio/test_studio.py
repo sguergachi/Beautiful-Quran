@@ -649,7 +649,7 @@ class ApkTests(unittest.TestCase):
 
 
 class InstallTests(unittest.TestCase):
-    """Each emulator row names its installed build next to the latest APK."""
+    """Each emulator row names its installed build."""
 
     DUMPSYS = ("Packages:\n  Package [com.beautifulquran] (deadbeef):\n"
                "    versionCode=13 minSdk=26 targetSdk=35\n    versionName=0.12\n")

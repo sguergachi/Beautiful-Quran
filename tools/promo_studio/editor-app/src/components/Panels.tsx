@@ -49,20 +49,18 @@ function statusOf(e: Emulator): { text: string; tone: ReturnType<typeof emulator
   return { text: "Ready to record", tone: "green" };
 }
 
-/** The installed build next to the APK an update would put on: version and
-commit on both sides, so Update app says what it would change. */
+/** The build installed on this emulator, and nothing else. The dot is gold
+when the release APK on disk is a different build (Update app is primary
+then), green when they match; the APK's own version lives in its card. */
 function BuildLine({ emu }: { emu: Emulator }) {
   const apk = useStore((s) => s.meta?.apk_info);
   if (!emu.app_version) return null;
   const same = !!emu.app_commit && !!apk?.exists && !!apk.commit && emu.app_commit === apk.commit;
   const installed = `v${emu.app_version}${emu.app_commit ? ` @${emu.app_commit}` : " · commit unknown"}`;
-  const latest = apk?.exists && apk.version ? `v${apk.version}${apk.commit ? ` @${apk.commit}` : ""}` : null;
   return (
     <p className="mt-1.5 flex items-start gap-1.5 text-[12px] leading-5 text-mute">
       <span className="mt-1.5"><Dot tone={same ? "green" : "gold"} /></span>
-      <span className="num min-w-0 break-words">
-        {installed} · {latest ? (same ? "up to date" : `latest ${latest}`) : "no APK on disk"}
-      </span>
+      <span className="num min-w-0 break-words">{installed}</span>
     </p>
   );
 }
@@ -221,6 +219,7 @@ const SHORTCUTS: [string, string][] = [
   [", / .", "Nudge selected keys a frame (Shift: ten)"], ["Ctrl A · C · V", "Select all keys · copy · paste at the playhead"],
   ["Ctrl Z · Ctrl Shift Z", "Undo · redo"], ["Ctrl S", "Save now"], ["Ctrl E", "Export"], ["Ctrl B · Ctrl .", "Hide / show the videos · the inspector"],
   ["Drag · scroll the picture", "Pan · zoom the camera"], ["Shift-scroll the picture", "Rotate"], ["Alt-drag · Alt-scroll", "Move · scale the phone"],
+  ["Shift while Alt-dragging", "Snap the phone to the frame's centre lines"],
   ["Alt while dragging a key", "No snapping"], ["Double-click a lane", "Add a key there"], ["Right-click", "Ease, copy, split, delete"],
   ["Ctrl-scroll the timeline", "Zoom around the pointer"], ["Drag a divider", "Resize panes (double-click: reset)"],
 ];
@@ -230,7 +229,7 @@ export function HelpPanel() {
       <dl className="shortcuts grid grid-cols-[minmax(0,180px)_minmax(0,1fr)] gap-x-3 gap-y-2">
         {SHORTCUTS.map(([k, v]) => <div key={k} className="contents"><dt><Kbd>{k}</Kbd></dt><dd className="text-mute">{v}</dd></div>)}
       </dl>
-      <p className="mt-5 text-[12px] leading-relaxed text-faint">Keys stay in video time when you cut the recording. A key's ease shapes the move into it. Edits save as you go; every one can be undone.</p>
+      <p className="mt-5 text-[12px] leading-relaxed text-faint">Deleting a clip closes the gap: later keys move back with it and keys inside it go. Splitting and trimming leave keys where they are. A key's ease shapes the move into it. Edits save as you go; every one can be undone.</p>
     </Drawer>
   );
 }
