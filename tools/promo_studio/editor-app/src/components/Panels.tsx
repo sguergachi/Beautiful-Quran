@@ -229,7 +229,7 @@ export function HelpPanel() {
       <dl className="shortcuts grid grid-cols-[minmax(0,180px)_minmax(0,1fr)] gap-x-3 gap-y-2">
         {SHORTCUTS.map(([k, v]) => <div key={k} className="contents"><dt><Kbd>{k}</Kbd></dt><dd className="text-mute">{v}</dd></div>)}
       </dl>
-      <p className="mt-5 text-[12px] leading-relaxed text-faint">Keys stay in video time when you cut the recording. A key's ease shapes the move into it. Edits save as you go; every one can be undone.</p>
+      <p className="mt-5 text-[12px] leading-relaxed text-faint">Deleting a clip closes the gap: later keys move back with it and keys inside it go. Splitting and trimming leave keys where they are. A key's ease shapes the move into it. Edits save as you go; every one can be undone.</p>
     </Drawer>
   );
 }
