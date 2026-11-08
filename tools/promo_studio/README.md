@@ -213,6 +213,17 @@ camera motion blur. Sound keeps gain and both fades together.
 
 ## Takes: the real app, its real sound
 
+**Which app a take shows.** Each take's `meta.json` records the app build it was
+recorded with (`build`: version and, when the Studio installed it, the commit).
+The editor compares that with the app now (`emus.build_check`, against `HEAD`):
+`older` when app commits (scoped to the paths a rebuild reads, so Studio-only
+commits never count) have landed since, `current`, `unknown` (a hand-installed
+app with the same version, or a commit this checkout lacks) or `untracked` (a
+take from before this was recorded). An `older` take is flagged on the preview,
+in the Recording tab (with what changed), in the Export panel and in the video
+list; `Record again` retakes it with the installed app. Build the APK and
+prepare the emulator first, or the retake records the same old app.
+
 A take is the Android app playing, recorded at 1× through the SDK's
 authenticated, loopback-only EmulatorController frame and PCM streams.
 Picture and sound retain their emulator host timestamps in one file; nothing

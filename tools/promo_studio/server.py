@@ -121,6 +121,7 @@ def spec_status(name):
     length = meta["length"] if meta else 0
     return {"name": name, "title": s.get("title", ""), "aspect": s["aspect"], "fps": s["fps"], "app": s["app"],
             "duration": s["duration"], "take": bool(meta), "take_length": length or None,
+            "take_build": emus.build_check((meta or {}).get("build"))["state"] if meta else None,
             "take_short": bool(length) and S.take_needed(s) > length + 0.05, "video": bool(files),
             "video_mtime": files[0]["mtime"] if files else None, "exports": files}
 
@@ -173,6 +174,7 @@ def geometry(s):
         except Exception as e:
             print(f"audio repair skipped: {e}", flush=True)
     return {"W": W, "H": H, "fps": s["fps"], "g": g, "take": meta,
+            "build": emus.build_check(meta.get("build")) if meta else None,
             "frame": "/media/phone/" + os.path.basename(fp),
             "clip": f"/media/take/{key}/clip.mp4?v={revision}" if meta else None,
             "audio": f"/media/take/{key}/audio.wav?v={revision}{heal}" if meta else None,

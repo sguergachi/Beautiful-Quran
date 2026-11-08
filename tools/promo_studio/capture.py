@@ -520,6 +520,12 @@ def _record_once(s, log=print, force=False):
     if "package:" not in adb("shell", "pm", "path", "com.beautifulquran", check=False):
         raise SystemExit(f"the app is not installed on {serial()}: prepare it from the Emulators panel")
     os.makedirs(d, exist_ok=True)
+    try:                  # which app build this take shows, so the editor can warn once the app has moved on
+        import emus
+        build = emus.installed_app(serial())
+    except Exception as e:
+        build = None
+        log(f"could not read the installed app's version: {e}")
     secs = max(int(a["seconds"]), int(need - LEAD + 1))
     stage("prepare", "Preparing the device (status bar, volume)", 0.03)
     prep()
@@ -623,7 +629,7 @@ def _record_once(s, log=print, force=False):
     radius = re.search(r'RoundedCorner\{position=TopLeft, radius=(\d+)', window)
     scale = width / info['native_width']
     info['display'] = {'camera_baked': True, 'corner_radius': round(int(radius[1]) * scale, 3) if radius else None}
-    conform(d, log, marks, info, s["app"])
+    conform(d, log, marks, info, s["app"], build)
     if rep:
         rep.progress(1.0, "take ready")
     return d
@@ -686,7 +692,7 @@ def record(s, log=print, force=False):
     return d
 
 
-def conform(d, log=print, marks=None, capture_info=None, app=None):
+def conform(d, log=print, marks=None, capture_info=None, app=None, build=None):
     """raw.mkv -> clip.mp4 (60 fps CFR) + audio.wav on one timeline.
 
     `marks` (recording seconds): "play", when playback was asked for (the
@@ -731,6 +737,7 @@ def conform(d, log=print, marks=None, capture_info=None, app=None):
             "width": w, "height": h, "recorded": time.strftime("%Y-%m-%d %H:%M")}
     if capture_info: meta.update(capture=capture_info, display=capture_info['display'])
     if app is not None: meta["app"] = app
+    if build: meta["build"] = {"version": build.get("version"), "commit": build.get("commit")}
     with open(os.path.join(d, "meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
     # The emulator's audio tap drops and skips buffers under load: rebuild the sound from the clean recitation
