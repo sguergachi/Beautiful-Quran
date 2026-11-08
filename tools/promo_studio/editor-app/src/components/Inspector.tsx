@@ -9,7 +9,7 @@ import { activeContext, INSPECTOR, type InspectorContext } from "../lib/inspecto
 import type { Ease, Emulator, Job } from "../lib/types.ts";
 import { clock, useTime } from "../state/clock.ts";
 import {
-  cancelJob, deleteSelection, endGesture, inspectSelection, mutate, openPanel, record, select, setEase, setProp, setUI, split, toggleKey,
+  cancelJob, deleteSelection, endGesture, inspectSelection, mutate, openPanel, record, select, setEase, setProp, setUI, split, toast, toggleKey,
   useStaleRecordingFields, useStore, wholeTake, type Tab,
 } from "../state/store.ts";
 import { Button, Dot, Empty, Field, Icon, Progress, Section, Segmented, Select, Slider, StaleDot, TextInput } from "./ui.tsx";
@@ -126,39 +126,51 @@ function QuickValues({ prop, times }: { prop: string; times?: number[] }) {
 
 function KeyCard({ items }: { items: E.KeyRef[] }) {
   const meta = useStore((s) => s.meta)!, raw = useStore((s) => s.raw)!, spec = useStore((s) => s.spec)!;
-  const keys = items.map((r) => E.findKey(raw, r)).filter(Boolean) as { t: number; v: number; ease?: Ease }[];
-  if (!keys.length) return null;
+  const found = items.map((r) => ({ ref: r, key: E.findKey(raw, r) as { t: number; v: number; ease?: Ease } | undefined })).filter((x) => x.key) as { ref: E.KeyRef; key: { t: number; v: number; ease?: Ease } }[];
+  if (!found.length) return null;
+  const keys = found.map((x) => x.key);
   const eases = new Set(keys.map((k) => k.ease || "inOutCubic"));
-  const one = items.length === 1, k = keys[0], d = meta.props[items[0].prop];
+  const one = items.length === 1, d0 = meta.props[items[0].prop];
+  // one time shared by every selected key (e.g. the keys at the playhead): editable, moving them all
+  const time = keys.every((k) => Math.abs(k.t - keys[0].t) < 1e-6) ? keys[0].t : null;
+  // one row per property among the selection, in the inspector's order
+  const props = Object.keys(meta.props).filter((n) => found.some((x) => x.ref.prop === n));
+  const setValue = (prop: string, n: number, key: string | null = null) => {
+    const d = meta.props[prop], v = r3(clamp(n, d.min, d.max));
+    mutate((r) => { for (const x of found) if (x.ref.prop === prop) { const k = E.findKey(r, x.ref); if (k) k.v = v; } }, key);
+  };
   return (
     <div className="mb-5 rounded-lg border border-gold/30 bg-gold/[0.06] p-3">
       <div className="mb-2.5 flex items-center justify-between">
-        <h3 className="font-semibold">{one ? `${d.label} key` : `${items.length} keys selected`}</h3>
+        <h3 className="font-semibold">{one ? `${d0.label} key` : `${items.length} keys selected`}</h3>
         <button className="text-faint hover:text-ink" onClick={() => select(null)} title="Deselect (Esc)">{Icon.x}</button>
       </div>
-      {one && (
-        <>
-          <Field label="Time (s)">
-            <TextInput type="number" step={0.01} value={k.t} onCommit={(v) => {
-              const t = r3(clamp(parseFloat(v), 0, spec.duration));
-              if (!Number.isFinite(t)) return;
-              let next: E.KeyRef[] | null = null;
-              mutate((r, c) => { next = E.moveKeys(r, c, items, t - k.t); });
-              if (next) { useStore.setState({ sel: { type: "keys", items: next } }); clock.seek(t); }
-            }} />
-          </Field>
-          <Field label="Value">
-            <TextInput type="number" step={d.step} min={d.min} max={d.max} value={k.v}
-              onScrub={(n) => mutate((r) => { const key = E.findKey(r, items[0]); if (key) key.v = r3(clamp(n, d.min, d.max)); }, "drag:key-value")} onScrubEnd={endGesture}
-              onCommit={(v) => { const n = parseFloat(v); if (Number.isFinite(n)) mutate((r) => { const key = E.findKey(r, items[0]); if (key) key.v = r3(clamp(n, d.min, d.max)); }); }} />
-          </Field>
-        </>
-      )}
-      {QUICK_PROPS.filter((n) => items.some((x) => x.prop === n)).map((n) => (
-        <Field key={n} label={`${meta.props[n].label} to`}>
-          <QuickValues prop={n} times={items.filter((x) => x.prop === n).map((x) => x.t)} />
+      {time != null && (
+        <Field label="Time (s)">
+          <TextInput type="number" step={0.01} value={time} onCommit={(v) => {
+            const t = r3(clamp(parseFloat(v), 0, spec.duration));
+            if (!Number.isFinite(t)) return;
+            let next: E.KeyRef[] | null = null;
+            mutate((r, c) => { next = E.moveKeys(r, c, items, t - time); });
+            if (next) { useStore.setState({ sel: { type: "keys", items: next } }); clock.seek(t); }
+            else toast("A key is in the way");
+          }} />
         </Field>
-      ))}
+      )}
+      {props.map((n) => {
+        const d = meta.props[n], vals = found.filter((x) => x.ref.prop === n).map((x) => x.key.v);
+        const shared = vals.every((v) => Math.abs(v - vals[0]) < 1e-9) ? vals[0] : null, count = vals.length;
+        return (
+          <Field key={n} label={one ? "Value" : count > 1 ? `${d.label} (${count})` : d.label}>
+            <div className="space-y-1.5">
+              <TextInput type="number" step={d.step} min={d.min} max={d.max} value={shared ?? ""} placeholder={shared == null ? "mixed: type to set all" : undefined}
+                onScrub={(v) => setValue(n, v, "drag:key-value:" + n)} onScrubEnd={endGesture}
+                onCommit={(v) => { const x = parseFloat(v); if (Number.isFinite(x)) setValue(n, x); }} />
+              {QUICK_PROPS.includes(n) && <QuickValues prop={n} times={found.filter((x) => x.ref.prop === n).map((x) => x.ref.t)} />}
+            </div>
+          </Field>
+        );
+      })}
       <Field label={one ? "Ease into it" : "Ease into them"}>
         <Select value={eases.size > 1 ? "" : [...eases][0]} options={[...(eases.size > 1 ? [["", "(mixed)"] as [string, string]] : []), ...EASES]} onChange={(v) => v && setEase(v as Ease)} />
       </Field>
@@ -166,7 +178,7 @@ function KeyCard({ items }: { items: E.KeyRef[] }) {
         <Button size="sm" variant="danger" onClick={deleteSelection}>{Icon.trash} {one ? "Delete key" : `Delete ${items.length}`}</Button>
         {one && <Button size="sm" variant="ghost" onClick={() => { mutate((r, c) => E.clearTrack(r, c, items[0].prop, clock.t)); select(null); }} title="Remove every key of this property; it keeps the value at the playhead">Clear track</Button>}
       </div>
-      {!one && <p className="mt-2 text-[11.5px] text-faint">Drag any of them on the timeline to move them together; , and . nudge them a frame.</p>}
+      {!one && <p className="mt-2 text-[11.5px] text-faint">Each value sets every selected key of that property. Drag any of them on the timeline to move them together; , and . nudge them a frame.</p>}
     </div>
   );
 }
