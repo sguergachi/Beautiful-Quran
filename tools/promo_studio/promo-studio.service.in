@@ -1,0 +1,32 @@
+[Unit]
+Description=Promo Studio server (Beautiful Quran)
+Documentation=file://@HERE@/README.md
+After=graphical-session.target
+# Never give up restarting (no start-rate limit).
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+NotifyAccess=main
+WorkingDirectory=@HERE@
+ExecStart=@PYTHON@ @HERE@/studio.py serve --host 127.0.0.1 --port 8765
+Environment=PYTHONUNBUFFERED=1
+
+# Never stay down: restart on any exit.
+Restart=always
+RestartSec=2
+# The server pings systemd only while it answers its own /api/health (service.py):
+# a hung server is restarted like a crashed one.
+WatchdogSec=60
+TimeoutStartSec=300
+TimeoutStopSec=15
+
+# Recordings, exports and emulators run as processes of their own. Restarting the
+# server must not kill them; the new server picks the running jobs up again.
+KillMode=process
+
+StandardOutput=append:%h/.cache/bq-promo/studio-server.log
+StandardError=append:%h/.cache/bq-promo/studio-server.log
+
+[Install]
+WantedBy=default.target

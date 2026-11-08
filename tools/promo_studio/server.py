@@ -10,6 +10,7 @@ Long work (captures, renders, emulator boots) runs as separate processes,
 the server tails. A job that crashes cannot take the server down, and a
 server restart finds jobs that are still running and follows them again.
 """
+import errno
 import io
 import json
 import math
@@ -29,6 +30,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import emus
 import formats
 import gpu_env
+import service
 import library
 import phone as phone_mod
 import spec as S
@@ -866,7 +868,9 @@ def thumb(bg_id):
 
 
 def ensure_built(force=False):
-    """Build the editor when its sources are newer than the last build."""
+    """Build the editor when its sources are newer than the last build. A build
+    that fails (a half-saved source, no network for `npm install`) never stops
+    the server: the last good build is served and the problem is printed."""
     index = os.path.join(DIST, "index.html")
     src = [os.path.join(r, f) for r, _, fs in os.walk(os.path.join(APP_DIR, "src")) for f in fs]
     if os.path.isdir(os.path.join(APP_DIR, "public")):
@@ -878,26 +882,64 @@ def ensure_built(force=False):
     if not shutil.which("npm"):
         print("warning: npm not found; the editor cannot be built", file=sys.stderr)
         return
-    if not os.path.isdir(os.path.join(APP_DIR, "node_modules")):
-        print("installing the editor's dependencies…", flush=True)
-        subprocess.run(["npm", "install", "--no-audit", "--no-fund"], cwd=APP_DIR, check=True)
-    print("building the editor…", flush=True)
-    subprocess.run(["npm", "run", "build"], cwd=APP_DIR, check=True)
+    try:
+        if not os.path.isdir(os.path.join(APP_DIR, "node_modules")):
+            print("installing the editor's dependencies…", flush=True)
+            subprocess.run(["npm", "install", "--no-audit", "--no-fund"], cwd=APP_DIR, check=True, timeout=600)
+        print("building the editor…", flush=True)
+        subprocess.run(["npm", "run", "build"], cwd=APP_DIR, check=True, timeout=600)
+    except (subprocess.SubprocessError, OSError) as e:
+        if not os.path.exists(index):
+            raise
+        print(f"warning: the editor did not build ({e}); serving the last build", file=sys.stderr, flush=True)
+
+
+def bind(host, port, patience=30.0):
+    """The HTTP server on host:port, waiting up to `patience` s for the port to
+    free up (a previous instance still closing) instead of dying on the spot."""
+    t0 = time.monotonic()
+    while True:
+        try:
+            return ThreadingHTTPServer((host, port), Handler)
+        except OSError as e:
+            if e.errno != errno.EADDRINUSE or time.monotonic() - t0 > patience:
+                raise
+            time.sleep(0.5)
 
 
 def serve(port=8765, build=True, host="127.0.0.1"):
+    """Run the studio. Built not to die: a hangup (the launching terminal or
+    session closing) and a broken pipe are ignored, a failed build serves the
+    last good one, a busy port is waited for, an error that escapes the HTTP loop
+    restarts the loop, and under systemd (service.py) a hung server is restarted."""
+    for sig in (getattr(signal, "SIGHUP", None), getattr(signal, "SIGPIPE", None)):
+        if sig is not None:
+            signal.signal(sig, signal.SIG_IGN)
     threading.Thread(target=gpu_env.status, daemon=True).start()     # probe the GPU once, off the request path
     global JOBS
     os.makedirs(S.SPECS, exist_ok=True)
     if build:
         ensure_built()
     JOBS = Jobs()
-    httpd = ThreadingHTTPServer((host, port), Handler)
+    httpd = bind(host, port)
     httpd.daemon_threads = True
     print(f"promo studio: http://{host}:{port}/  (specs in {S.SPECS}, videos to {S.OUT})", flush=True)
+    service.notify("READY=1")
+    service.start_watchdog(host, port)
     try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        pass
+        failures = 0
+        while True:
+            try:
+                httpd.serve_forever()
+                break
+            except KeyboardInterrupt:
+                break
+            except Exception as e:                       # the loop itself failing: log it and keep serving
+                failures += 1
+                print(f"server loop error ({failures}): {e!r}", file=sys.stderr, flush=True)
+                if failures > 20:
+                    raise                                # something is badly wrong: let the supervisor restart us
+                time.sleep(min(5.0, 0.2 * failures))
     finally:
+        service.notify("STOPPING=1")
         httpd.server_close()

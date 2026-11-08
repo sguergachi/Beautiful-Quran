@@ -1,14 +1,18 @@
 """Offline regressions: python3 -m unittest discover -s tools/promo_studio -p 'test_*.py'."""
 import glob
 import http.client
+import http.server
 import json
 import math
 import os
 from pathlib import Path
 import random
+import shutil as shutil_mod
 import subprocess
+import sys
 import tempfile
 import threading
+import time
 import unittest
 from unittest.mock import Mock, patch
 from http.server import ThreadingHTTPServer
@@ -441,6 +445,91 @@ class GpuCompositorTests(unittest.TestCase):
                                                  '-f', 'rawvideo', '-pix_fmt', 'yuv420p', '-'], input=raw.tobytes(), capture_output=True, check=True).stdout, np.uint8).astype(int)
         d = np.abs(yuv(rgb, 'rgb24') - yuv(nv, 'nv12'))
         self.assertLessEqual(int(d.max()), 3, "the GPU's RGB->NV12 is swscale's default BT.601 conversion")
+
+
+class ServiceTests(unittest.TestCase):
+    """The server is built not to stay down: systemd notify + watchdog, a build
+    that cannot stop it, a busy port waited for, a unit that always restarts."""
+
+    def test_notify_reaches_systemd_and_is_a_noop_outside_it(self):
+        import socket as _socket
+        import service
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("NOTIFY_SOCKET", None)
+            self.assertFalse(service.notify("READY=1"))
+        with tempfile.TemporaryDirectory(dir="/tmp") as d:
+            path = os.path.join(d, "notify")
+            srv = _socket.socket(_socket.AF_UNIX, _socket.SOCK_DGRAM); srv.bind(path); srv.settimeout(2)
+            self.addCleanup(srv.close)
+            with patch.dict(os.environ, {"NOTIFY_SOCKET": path}):
+                self.assertTrue(service.notify("READY=1"))
+            self.assertEqual(srv.recv(64), b"READY=1")
+
+    def test_watchdog_pings_only_while_the_server_answers(self):
+        import service
+        self.assertIsNone(service.start_watchdog("127.0.0.1", 1, interval=None, ping=lambda m: None)) if "WATCHDOG_USEC" not in os.environ else None
+        with patch.dict(os.environ, {"WATCHDOG_USEC": "60000000"}):
+            self.assertEqual(service.watchdog_interval(), 30.0)
+        pings = []
+        class Health(http.server.BaseHTTPRequestHandler):
+            alive = True
+            def do_GET(self):
+                self.send_response(200 if Health.alive else 500); self.end_headers(); self.wfile.write(b"{}")
+            def log_message(self, *a): pass
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), Health)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        self.addCleanup(httpd.server_close)
+        self.addCleanup(httpd.shutdown)
+        service.start_watchdog("127.0.0.1", httpd.server_address[1], interval=.1, ping=pings.append)
+        time.sleep(.45)
+        self.assertGreaterEqual(len(pings), 2)
+        self.assertEqual(set(pings), {"WATCHDOG=1"})
+        Health.alive = False                                    # a server that stops answering stops pinging: systemd restarts it
+        time.sleep(.25); n = len(pings); time.sleep(.45)
+        self.assertEqual(len(pings), n)
+
+    def test_a_failed_build_serves_the_last_good_one_and_never_stops_the_server(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            app, dist = Path(d, "app"), Path(d, "app", "dist")
+            (app / "src").mkdir(parents=True); dist.mkdir()
+            (dist / "index.html").write_text("old"); os.utime(dist / "index.html", (1, 1))
+            (app / "src" / "a.ts").write_text("x")                       # newer than the build: a rebuild is due
+            (app / "node_modules").mkdir()
+            boom = subprocess.CalledProcessError(1, "npm")
+            with patch.object(server, "APP_DIR", str(app)), patch.object(server, "DIST", str(dist)), \
+                    patch.object(shutil_mod, "which", return_value="/usr/bin/npm"), patch.object(subprocess, "run", side_effect=boom):
+                server.ensure_built()                                    # does not raise: index.html exists
+                (dist / "index.html").unlink()
+                with self.assertRaises(subprocess.CalledProcessError):
+                    server.ensure_built()                                # nothing to serve at all: that is fatal
+
+    def test_a_busy_port_is_waited_for_not_fatal(self):
+        import errno
+        busy = OSError(errno.EADDRINUSE, "Address already in use")
+        calls = []
+        def fake(addr, handler):
+            calls.append(addr)
+            if len(calls) < 3: raise busy
+            return "server"
+        with patch.object(server, "ThreadingHTTPServer", fake), patch.object(time, "sleep", lambda s: None):
+            self.assertEqual(server.bind("127.0.0.1", 8765), "server")
+        self.assertEqual(len(calls), 3)
+        with patch.object(server, "ThreadingHTTPServer", side_effect=OSError(errno.EACCES, "denied")):
+            with self.assertRaises(OSError): server.bind("127.0.0.1", 80)
+
+    def test_the_unit_always_restarts_and_leaves_running_jobs_alone(self):
+        here = Path(__file__).parent
+        text = (here / "promo-studio.service.in").read_text()
+        for needle in ("Restart=always", "StartLimitIntervalSec=0", "WatchdogSec=", "Type=notify", "KillMode=process", "WantedBy=default.target"):
+            self.assertIn(needle, text)
+        rendered = text.replace("@HERE@", str(here)).replace("@PYTHON@", sys.executable)
+        self.assertNotIn("@", rendered.replace("%h", ""), "every placeholder is filled")
+        if shutil_mod.which("systemd-analyze"):
+            with tempfile.TemporaryDirectory(dir="/tmp") as d:
+                unit = Path(d, "promo-studio.service"); unit.write_text(rendered)
+                r = subprocess.run(["systemd-analyze", "--user", "verify", str(unit)], capture_output=True, text=True)
+                self.assertNotIn("Unknown key", r.stderr + r.stdout)
+                self.assertNotIn("Unknown section", r.stderr + r.stdout)
 
 
 class ServerTests(unittest.TestCase):
