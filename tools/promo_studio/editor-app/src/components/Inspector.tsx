@@ -41,9 +41,9 @@ export function Inspector() {
       </div>
       {context && <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-4 py-2">
         <span role="status" className="text-[12px] text-gold">{INSPECTOR[context].title}</span>
-        <button className="shrink-0 text-[11px] text-mute hover:text-ink" onClick={() => setUI({ tab })}>All {tab === "look" ? "Look" : tab === "animate" ? "Animate" : "Recording"}</button>
+        {context !== "keys" && <button className="shrink-0 text-[11px] text-mute hover:text-ink" onClick={() => setUI({ tab })}>All {tab === "look" ? "Look" : tab === "animate" ? "Animate" : "Recording"}</button>}
       </div>}
-      <div key={`${tab}:${context ?? "all"}`} data-inspector-context={context ?? "all"} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
+      <div key={`${tab}:${context === "keys" ? "all" : context ?? "all"}`} data-inspector-context={context ?? "all"} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
         {!spec ? <Empty>No video open.</Empty> : context === "clip" ? <ClipEditor /> : tab === "animate" ? <Animate context={context} /> : tab === "recording" ? <Recording contentsOnly={context === "contents"} /> : <Look context={context} />}
       </div>
     </div>
@@ -59,7 +59,6 @@ function Animate({ context }: { context: InspectorContext | null }) {
   for (const [n, p] of Object.entries(meta.props)) (groups[p.group] = groups[p.group] || []).push(n);
   const items = sel?.type === "keys" ? sel.items : [];
   const group = context === "camera" ? "Camera" : context === "phone-motion" ? "Phone" : context === "background-motion" ? "Background" : null;
-  if (context === "keys") return <KeyCard items={items} />;
   return (
     <>
       {items.length > 0 && <KeyCard items={items} />}
