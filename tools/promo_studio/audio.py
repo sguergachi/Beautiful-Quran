@@ -108,7 +108,7 @@ def recitation(reciter, surah, ayah, seconds, lead, out):
 # from the voice's own waveform (below). Takes are healed in place once, keeping
 # the original beside as audio.orig.wav.
 
-HEAL_VERSION = 4
+HEAL_VERSION = 5
 HEAL_MIN_RUN = 16           # samples (0.33 ms) of exact silence that count as a dropout
 HEAL_LEVEL = 0.02           # RMS (-34 dBFS) of the 10 ms right either side: sound stopped mid-sentence, not a pause
 HEAL_SHORT = 0.004          # a run under 3 ms can only be a glitch: it needs only this much sound around it
@@ -221,6 +221,64 @@ def conceal(x, gaps, rate=48000, donors=None):
     return y, report
 
 
+LAG_WINDOW = 0.8            # seconds compared at a time when aligning the take to the clean recitation
+LAG_MIN_CORR = 0.995        # a window only counts when the take really is that recitation
+LAG_DRIFT_MS = 8.0          # how far the take may stray from its own starting offset before it is put back on the app's clock
+
+
+def recitation_lags(take, ref, lead, rate=48000, first=1.0, step=1.0):
+    """[(take time s, ms the take runs ahead of the recitation on the app's clock `lead` (+) or behind (-), gain)]
+    for every window of `take` that really is the clean recitation `ref`."""
+    import numpy as np
+    from numpy.fft import irfft, rfft
+    m, r = take.mean(axis=1), ref.mean(axis=1)
+    w, pad = int(LAG_WINDOW * rate), int(0.6 * rate)
+    n = 1 << int(np.ceil(np.log2(3 * w + 2 * pad)))
+    out = []
+    for t in np.arange(lead + first, len(m) / rate - LAG_WINDOW - 0.2, step):
+        a = m[int(t * rate):int(t * rate) + w]
+        r0 = int((t - lead) * rate)
+        if r0 - pad < 0 or r0 + w + pad > len(r) or float(np.sqrt(np.mean(a ** 2))) < 0.02:
+            continue
+        seg = r[r0 - pad:r0 + w + pad]
+        cc = irfft(rfft(seg, n) * np.conj(rfft(a, n)), n)[:len(seg) - w + 1]
+        k = int(cc.argmax())
+        b = seg[k:k + w]
+        if float(np.dot(a, b) / np.sqrt(np.dot(a, a) * np.dot(b, b) + 1e-12)) >= LAG_MIN_CORR:
+            out.append((float(t), (k - pad) * 1000.0 / rate, float(np.dot(a, b) / np.dot(b, b))))
+    return out
+
+
+def _on_the_apps_clock(take, ref, lead, rate=48000):
+    """The take's sound put back on the app's clock, or None when it never left it.
+    The emulator hands the recorder about 0.09% fewer audio samples than real
+    time passes (it drops ~22 ms every ~20 s), so the recorded sound slips
+    ahead of the app's own clock, and so of the picture, and each drop is a click. The recitation
+    it was recording is known exactly (the files the app plays), so the sound is
+    rebuilt from them at the offset the take began with, before any slip: sync
+    stays what the recording started with and never drifts. Returns (sound, info)."""
+    import numpy as np
+    lags = recitation_lags(take, ref, lead, rate)
+    if len(lags) < 6:
+        return None
+    start = [l for _, l, _ in lags[:6]]
+    base = float(np.median(start))
+    if max(abs(x - base) for x in start) > LAG_DRIFT_MS:
+        return None                                        # not steady at the start: nothing to anchor to
+    off = [abs(l - base) for _, l, _ in lags]
+    if sum(1 for o in off if o > LAG_DRIFT_MS) < 3:
+        return None                                        # it stayed on the app's clock: leave the recording alone
+    gain = float(np.median([g for _, _, g in lags[:6]]))
+    at = int(round((lead - base / 1000.0) * rate))
+    out = np.zeros_like(take)
+    n = min(len(ref), len(out) - at) if at >= 0 else min(len(ref) + at, len(out))
+    if n <= 0:
+        return None
+    src0, dst0 = max(0, -at), max(0, at)
+    out[dst0:dst0 + n] = gain * ref[src0:src0 + n, :out.shape[1]]
+    return out, {"offset_ms": round(base, 1), "drift_ms": round(max(l for _, l, _ in lags) - base, 1), "windows": len(lags), "gain": round(gain, 3)}
+
+
 def _gap_donors(take, ref, gaps, lead, rate=48000):
     """For each gap, the clean recitation's real continuation at the take's own
     local timing (found just before the gap), or None where it cannot be matched.
@@ -305,23 +363,32 @@ def heal_wav(path, log=None):
             meta = json.load(f)
     except (OSError, ValueError):
         meta = {}
-    donors, matched = None, 0
-    if gaps and meta.get("app") and meta.get("lead") is not None:
-        try:                                    # the voice's real continuation, where the clean recitation can be had
-            ref = clean_recitation(meta["app"], len(x) / rate)
+    donors, matched, ref, rebuilt = None, 0, None, None
+    if meta.get("app") and meta.get("lead") is not None:
+        try:                                    # the recitation as the app played it, where it can be had
+            ref = clean_recitation(meta["app"], len(x) / rate + 3)
             if ref is not None:
-                donors = _gap_donors(x, ref, gaps, float(meta["lead"]), rate)
-                matched = sum(1 for dn in donors if dn is not None)
-        except Exception as e:                  # offline, an unfetched ayah: the repeated period will do
+                rebuilt = _on_the_apps_clock(x, ref, float(meta["lead"]), rate)
+                if rebuilt is None and gaps:
+                    donors = _gap_donors(x, ref, gaps, float(meta["lead"]), rate)
+                    matched = sum(1 for dn in donors if dn is not None)
+        except Exception as e:                  # offline, an unfetched ayah: fill from the voice around the gaps instead
             if log:
                 log(f"audio: clean recitation unavailable ({str(e)[:80]}); filling from the voice around the gaps")
-    y, report = conceal(x, gaps, rate, donors) if gaps else (x.copy(), [])
-    muted = _mute_intro(y, meta, rate)
-    if gaps and log:
+    if rebuilt is not None:
+        y, info = rebuilt
+        report = [(s0 / rate, (e0 - s0) * 1000 / rate, False) for s0, e0 in gaps]
+        if log:
+            log(f"audio: put back on the app's clock (it had slipped {info['drift_ms']:+.0f} ms, offset {info['offset_ms']:+.0f} ms kept)")
+    else:
+        y, report = conceal(x, gaps, rate, donors) if gaps else (x.copy(), [])
+        info = {}
+    muted = _mute_intro(y, meta, rate) if rebuilt is None else 0
+    if gaps and rebuilt is None and log:
         log(f"audio: filled {sum(1 for r in report if r[2])} dropouts ({matched} from the recitation's own continuation)"
             + (f", faded {sum(1 for r in report if not r[2])} long ones" if any(not r[2] for r in report) else "")
             + (f", silenced the recorder's ticks before {muted:.1f} s" if muted else ""))
-    if gaps or muted:
+    if gaps or muted or rebuilt is not None:
         if not os.path.exists(orig):
             os.link(path, orig)                   # the original stays; the new file replaces the name
         tmp = f"{path}.{os.getpid()}.heal"
@@ -331,7 +398,7 @@ def heal_wav(path, log=None):
         os.replace(tmp, path)
         st = os.stat(path)
     rec = {"version": HEAL_VERSION, "size": st.st_size, "mtime_ns": st.st_mtime_ns, "muted_before_s": round(muted, 2),
-           "from_recitation": matched, "dropouts": [[round(t, 3), round(ms, 1), bool(f)] for t, ms, f in report]}
+           "from_recitation": matched, "app_clock": info, "dropouts": [[round(t, 3), round(ms, 1), bool(f)] for t, ms, f in report]}
     tmp = f"{side}.{os.getpid()}.tmp"
     with open(tmp, "w") as f:
         json.dump(rec, f)

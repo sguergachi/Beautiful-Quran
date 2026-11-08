@@ -418,6 +418,70 @@ class AudioRepairTests(unittest.TestCase):
                 self.assertEqual(int(np.abs(got[:int(2.5 * self.RATE)]).max()) == 0, silenced)
                 np.testing.assert_array_equal(got[3 * self.RATE:], (x * 32768).astype(np.int16)[3 * self.RATE:], "the recitation is never touched")
 
+    def speech(self, seconds, seed=0):
+        """Aperiodic, voice-like sound (wandering pitch, syllable envelope, breath): every moment is unique, so alignment has one answer."""
+        rng = np.random.default_rng(seed)
+        n = int(seconds * self.RATE); t = np.arange(n) / self.RATE
+        f0 = 120 + 40 * np.cumsum(rng.normal(0, .0004, n)).clip(-1, 1)
+        phase = 2 * np.pi * np.cumsum(f0) / self.RATE
+        env = np.clip(np.sin(2 * np.pi * np.cumsum(2.5 + rng.normal(0, .002, n)) / self.RATE) ** 2 + .15, 0, 1)
+        x = env * sum(a * np.sin(k * phase) for k, a in enumerate((.5, .3, .2, .1), 1)) + .02 * rng.normal(0, 1, n)
+        return np.stack([x, x], axis=1).astype(np.float32) * .6
+
+    def test_a_take_that_slipped_off_the_apps_clock_is_put_back_at_its_starting_offset(self):
+        import wave
+        rate, lead, offset = self.RATE, 3.0, .140
+        ref = self.speech(40.0)
+        at = int((lead - offset) * rate)
+        # what the recorder produced: the recitation from `at`, with ~22.7 ms of it dropped every 5 s from 12 s on, and a zero gap
+        take = np.zeros((int(38 * rate), 2), np.float32)
+        pos, src = at, 0
+        pieces = []
+        for t_drop in (12, 17, 22, 27, 32):
+            n = int((t_drop - pos / rate) * rate)
+            pieces.append(ref[src:src + n]); src += n + int(.0227 * rate); pos += n
+        pieces.append(ref[src:src + int(5 * rate)])
+        body = np.concatenate(pieces)
+        take[at:at + len(body)] = body[:len(take) - at]
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            path = os.path.join(d, "audio.wav")
+            with wave.open(path, "wb") as w:
+                w.setnchannels(2); w.setsampwidth(2); w.setframerate(rate); w.writeframes((take * 32768).astype(np.int16).tobytes())
+            Path(d, "meta.json").write_text(json.dumps({"lead": lead, "length": 38.0, "app": {"reciter": "alafasy", "surah": 2, "ayah": 156, "repeat": "off"}, "marks": {}}))
+            before = audio.recitation_lags(take, ref, lead, step=2.0)
+            self.assertGreater(max(l for _, l, _ in before) - min(l for _, l, _ in before), 100, "the recording slipped by ~113 ms")
+            with patch.object(audio, "clean_recitation", return_value=ref):
+                rec = audio.heal_wav(path)
+            self.assertAlmostEqual(rec["app_clock"]["offset_ms"], 140.0, delta=.1)
+            self.assertGreater(rec["app_clock"]["drift_ms"], 100)
+            with wave.open(path) as w: got = np.frombuffer(w.readframes(w.getnframes()), np.int16).reshape(-1, 2).astype(np.float32) / 32768
+            self.assertEqual(len(got), len(take), "same length")
+            after = audio.recitation_lags(got, ref, lead, step=2.0)
+            self.assertLess(max(l for _, l, _ in after) - min(l for _, l, _ in after), .1, "one constant offset from the first word to the last")
+            self.assertEqual(float(np.abs(got[:at]).max()), 0.0, "nothing before the recitation")
+            i0, i1 = int((lead + 1) * rate), int((lead + 8) * rate)                       # before the first slip: the recording is untouched in effect
+            err = got[i0:i1] - take[i0:i1]
+            self.assertGreater(10 * np.log10(np.mean(take[i0:i1] ** 2) / np.mean(err ** 2)), 40)
+
+    def test_a_take_that_never_left_the_apps_clock_is_left_alone(self):
+        import wave
+        rate, lead = self.RATE, 3.0
+        ref = self.speech(30.0, seed=2)
+        take = np.zeros((int(28 * rate), 2), np.float32)
+        at = int((lead - .1) * rate); take[at:] = ref[:len(take) - at]
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            path = os.path.join(d, "audio.wav")
+            with wave.open(path, "wb") as w:
+                w.setnchannels(2); w.setsampwidth(2); w.setframerate(rate); w.writeframes((take * 32768).astype(np.int16).tobytes())
+            Path(d, "meta.json").write_text(json.dumps({"lead": lead, "length": 28.0, "app": {"reciter": "alafasy", "surah": 2, "ayah": 156, "repeat": "off"}, "marks": {}}))
+            with patch.object(audio, "clean_recitation", return_value=ref):
+                rec = audio.heal_wav(path)
+            self.assertEqual(rec["app_clock"], {}, "no slip, nothing rebuilt")
+            with wave.open(path) as w: got = np.frombuffer(w.readframes(w.getnframes()), np.int16)
+            want = (take * 32768).astype(np.int16).reshape(-1, 2)
+            k = int(lead * rate)
+            np.testing.assert_array_equal(got.reshape(-1, 2)[k:], want[k:], "the recitation is exactly as recorded")
+
 
 class ServerTests(unittest.TestCase):
     def test_named_new_video_and_copy_preserve_source_and_reject_collisions(self):
