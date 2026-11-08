@@ -7,9 +7,10 @@ import { sourceTime, stateAt } from "../lib/model.ts";
 import { phoneMatrix, snapPanToPhone, snapPhoneToCentre } from "../lib/geometry.ts";
 import { previewContext } from "../lib/inspector.ts";
 import { oldTakeWarning } from "../lib/build.ts";
+import { GLPreview } from "../lib/glpreview.ts";
 import { Preview } from "../lib/render.ts";
 import { clock, media } from "../state/clock.ts";
-import { cancelJob, endGesture, hideExact, inspect, record, select, setProp, setUI, useStore } from "../state/store.ts";
+import { cancelJob, endGesture, hideExact, inspect, record, select, setProp, setScreenNeed, setUI, useStore } from "../state/store.ts";
 import { Button, Icon, Progress } from "./ui.tsx";
 
 const SNAP_PX = 12;   // screen px within which Shift snaps the phone to a centre line
@@ -28,9 +29,14 @@ export function Stage() {
   // null = no guides; else which of the two lines the phone is snapped to.
   const [guides, setGuides] = useState<{ v: boolean; h: boolean } | null>(null);
 
-  // Keep the video in the browser's video compositor. Copying a full 1080 ×
-  // 2400 video through Canvas every tick dominated preview time on CPU decode.
+  // The scene draws on the GPU in one pass (lib/glpreview.ts): every layer
+  // mipmapped at its exact sub-pixel place, so slow camera moves neither
+  // shimmer nor wiggle the phone against the background. Without WebGL2 the
+  // canvas draws the background and the browser's compositor the phone.
+  const gl = useRef<GLPreview | null | undefined>(undefined);
   useEffect(() => {
+    gl.current = GLPreview.create(canvas.current!, () => paint());
+    if (gl.current) { phone.current!.style.display = "none"; return; }
     screen.current!.append(media.screen);
     phone.current!.append(media.frame);
     Object.assign(media.screen.style, { width: "100%", height: "100%", display: "block" });
@@ -69,13 +75,19 @@ export function Stage() {
       if (!c || !s.spec || !s.geo || !s.meta) return;
       const S = stateAt(s.spec, s.meta.props, clock.t), scale = box.current.w / s.geo.W;
       const recording = sourceTime(s.spec, clock.t)[1] >= 0;
+      const scene = {
+        spec: s.spec, geo: s.geo, plate: s.plate, S, recording,
+        themeBg: s.meta.themes[s.spec.app.theme]?.bg ?? "#111", screen: media.screen, plateVideo: media.plate, frame: media.frame,
+      };
+      // how tall the phone's screen gets on this stage, in device px: picks the picture's source
+      const most = (n: string) => Math.max(+(s.spec!.props[n] ?? s.meta!.props[n]?.default ?? 1), ...(s.spec!.tracks[n] || []).map((k) => +k.v));
+      setScreenNeed(s.geo.g.sh * (s.spec.phone.height * s.geo.H / s.geo.g.bh) * most("zoom") * most("phone_scale") * (c.height / s.geo.H));
+      if (gl.current) return gl.current.draw(scene);
+      if (gl.current === undefined) return;            // the renderer is chosen on mount
       phone.current!.style.visibility = recording ? "visible" : "hidden";
       phone.current!.style.transform = `matrix(${phoneMatrix(s.spec, s.geo, S).map((v) => v * scale).join(",")})`;
-      screen.current!.style.background = s.meta.themes[s.spec.app.theme]?.bg ?? "#111";
-      preview.draw(c.getContext("2d", { alpha: false, desynchronized: true })!, {
-        spec: s.spec, geo: s.geo, plate: s.plate, S, nativePhone: true, recording,
-        themeBg: s.meta.themes[s.spec.app.theme]?.bg ?? "#111", screen: media.screen, plateVideo: media.plate, frame: media.frame,
-      });
+      screen.current!.style.background = scene.themeBg;
+      preview.draw(c.getContext("2d", { alpha: false })!, { ...scene, nativePhone: true });
     });
   };
   useEffect(() => {

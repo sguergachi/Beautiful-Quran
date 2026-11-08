@@ -84,6 +84,8 @@ export interface Geo {
   /** The take's app build against the app now (emus.build_check); null with no take. */
   build?: BuildCheck | null;
   frame: string; clip: string | null; audio: string | null; peaks: string | null;
+  /** The take's light preview copy (preview.py), once made; `preview_pending` while it is being made. */
+  preview?: string | null; preview_pending?: boolean;
   plate: { w: number; h: number; k: number };
 }
 /** The take's waveform: one 0..255 column (square-root scale) per 1/rate s. */

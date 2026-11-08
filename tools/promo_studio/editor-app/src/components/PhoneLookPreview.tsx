@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { sourceTime } from "../lib/model.ts";
 import { clock, media } from "../state/clock.ts";
-import { useStore } from "../state/store.ts";
+import { previewSrc, useStore } from "../state/store.ts";
 
 /** A whole-phone view for appearance edits, sharing the stage's decoded take. */
 export function PhoneLookPreview() {
@@ -45,7 +45,7 @@ export function PhoneLookPreview() {
       ctx.fillRect(x + g.sx0 * k, y + g.sy0 * k, g.sw * k, g.sh * k);
       const matches = (src: string, path: string) => src === new URL(path, location.href).href;
       const gap = sourceTime(spec, clock.t)[1] < 0;
-      if (!gap && geo.clip && matches(media.screen.currentSrc, geo.clip) && media.screen.readyState >= 2) {
+      if (!gap && geo.clip && matches(media.screen.currentSrc, previewSrc(geo)!) && media.screen.readyState >= 2) {
         ctx.drawImage(media.screen, x + g.sx0 * k, y + g.sy0 * k, g.sw * k, g.sh * k);
       } else {
         ctx.fillStyle = "#a49c8c"; ctx.font = "10px system-ui"; ctx.textAlign = "center";

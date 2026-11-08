@@ -143,3 +143,32 @@ test('play, media loads, cuts, seeks, and loops keep gaps silent and resume at t
     assert.equal(media.audio.paused, true);
   } finally { clock.pause(); clock.setLoop(false); spec.edit = original; }
 });
+
+test('a split that carries straight on keeps the recording playing (no seek at the cut)', () => {
+  const original = spec.edit;
+  spec.edit = [{ in: 0, out: 5 }, { in: 5, out: 10 }];
+  clock.seek(4.9); clock.play();
+  try {
+    media.screen.currentTime = 4.995;
+    clock.t = 5.0;
+    clock.sync(false);
+    assert.equal(media.screen.currentTime, 4.995, 'no seek where the take simply continues');
+  } finally { clock.pause(); spec.edit = original; }
+});
+
+test('the background loop is eased, never seeked, for drift under a second while playing', () => {
+  clock.seek(2); clock.play();
+  try {
+    media.plate.currentTime = 2.3;
+    clock.sync(false);
+    assert.equal(media.plate.currentTime, 2.3, 'no seek');
+    assert.ok(media.plate.playbackRate < 1, 'a leading plate slows');
+    media.plate.currentTime = 11.95;           // 12 s loop: 11.95 is just behind 0.0 / just ahead of 2 - 2.05
+    clock.t = 0.02; clock.sync(false);
+    assert.equal(media.plate.currentTime, 11.95, 'the loop wrap is not a jump');
+    media.plate.currentTime = 6;
+    clock.t = 2; clock.sync(false);
+    assert.equal(media.plate.currentTime, 2, 'a real jump still lands exactly');
+  } finally { clock.pause(); }
+  assert.equal(media.plate.playbackRate, 1);
+});

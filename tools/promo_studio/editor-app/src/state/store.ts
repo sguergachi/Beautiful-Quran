@@ -10,6 +10,7 @@ import { clamp, plateLook, resolve, soundOnset, takeKey } from "../lib/model.ts"
 import { loadSubmitted, recordingReference, saveSubmitted, staleRecordingFields } from "../lib/recorded.ts";
 import type { Ease, Emulator, ExportFile, ExportOptions, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline, Wave } from "../lib/types.ts";
 import { clock, media } from "./clock.ts";
+import { sound } from "./sound.ts";
 import { videoSlug } from "../lib/videos.ts";
 import { activeContext, INSPECTOR, selectionContext, type InspectorContext } from "../lib/inspector.ts";
 
@@ -66,7 +67,7 @@ let lastTimelineKey = "", verseRequest = 0;
 clock.bind(() => {
   const s = get();
   return {
-    spec: s.spec, hasClip: !!s.geo?.clip, hasPlate: !!s.plate, offset: +(s.spec?.background.offset || 0),
+    spec: s.spec, hasClip: !!s.geo?.clip, hasPlate: !!s.plate, offset: +(s.spec?.background.offset || 0), audio: s.geo?.audio ?? null,
     onset: s.spec ? soundOnset(s.spec, s.geo?.take?.lead ?? 1) : 0,
   };
 });
@@ -338,13 +339,62 @@ export async function loadGeometry() {
   lastGeoKey = key;
   media.frame.src = geo.frame;
   if (geo.clip) {
-    if (!media.screen.src.endsWith(geo.clip)) { media.screen.src = geo.clip; media.audio.src = geo.audio!; }
+    const src = previewSrc(geo)!;
+    if (!media.screen.src.endsWith(src)) { media.screen.src = src; }
+    if (!media.audio.src.endsWith(geo.audio!)) media.audio.src = geo.audio!;
   } else {
     media.screen.removeAttribute("src"); media.audio.removeAttribute("src"); media.screen.load(); media.audio.load();
   }
+  void sound.load(geo.clip ? geo.audio : null);       // decoded once: playback then never waits on the network
+  if (geo.clip && !geo.preview && geo.preview_pending) watchPreview(name, key);
   set({ geo });
   clock.seek(clock.t);
   void loadWave(geo.peaks);
+}
+
+// The picture the preview plays. The light copy (preview.py, PREVIEW_HEIGHT
+// tall: a quarter of the pixels to decode, already area-scaled) while the
+// stage shows the phone's screen no taller than that in device pixels; the
+// full recording when it is shown taller (a big window, a HiDPI screen, a
+// close zoom), so the picture is never stretched up into blur.
+export const PREVIEW_HEIGHT = 1600;
+let screenNeed = 0;       // device px the phone's screen reaches at its largest on the stage (0: not yet known)
+export function previewSrc(geo: Geo | null): string | null {
+  if (!geo?.clip) return null;
+  return geo.preview && screenNeed > 0 && screenNeed <= PREVIEW_HEIGHT * 1.05 ? geo.preview : geo.clip;
+}
+/** The stage reports how tall the screen gets; the picture source follows (never under a playing playhead). */
+export function setScreenNeed(px: number) {
+  if (!Number.isFinite(px) || Math.abs(px - screenNeed) <= screenNeed * 0.02) return;
+  screenNeed = px;
+  applyPicture();
+}
+let pictureWait: (() => void) | null = null;
+function applyPicture() {
+  const want = previewSrc(get().geo);
+  if (!want || media.screen.src.endsWith(want)) return;
+  if (clock.playing) {                        // swapping reloads the picture: wait for the pause
+    if (!pictureWait) pictureWait = clock.onState(() => { if (!clock.playing) { pictureWait?.(); pictureWait = null; applyPicture(); } });
+    return;
+  }
+  const t = clock.t;
+  media.screen.src = want;
+  clock.seek(t);
+}
+
+// The preview copy is made in the background on first open; take it up once it lands.
+let previewTimer: number | undefined;
+function watchPreview(name: string, key: string) {
+  clearTimeout(previewTimer);
+  previewTimer = window.setTimeout(async () => {
+    const s = get();
+    if (s.name !== name || !s.spec || geoKey(s.spec) !== key) return;
+    try {
+      const geo = await api.geometry(name);
+      if (get().name !== name || geoKey(get().spec!) !== key) return;
+      if (geo.preview) { set({ geo }); applyPicture(); } else watchPreview(name, key);
+    } catch { watchPreview(name, key); }
+  }, 4000);
 }
 
 let waveUrl: string | null = null;
