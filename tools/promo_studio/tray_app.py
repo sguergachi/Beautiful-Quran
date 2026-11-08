@@ -28,6 +28,7 @@ PORT = 8765
 URL = f"http://{HOST}:{PORT}/"
 SOCKET_NAME = f"\0promo_studio_tray_{os.getuid()}"
 
+UNIT = "promo-studio.service"
 proc = None
 state = "stopped"  # "stopped", "starting", "running", "error"
 icon_ref = None
@@ -60,8 +61,29 @@ def update_ui():
         pass
 
 
+def unit_installed():
+    """True when install_service.sh has set up the self-restarting systemd service:
+    the server then belongs to systemd, not to this tray."""
+    return os.path.exists(os.path.expanduser(f"~/.config/systemd/user/{UNIT}"))
+
+
+def _systemctl(*args):
+    try:
+        subprocess.run(["systemctl", "--user", *args], check=False, timeout=60,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"systemctl {' '.join(args)} failed: {e}", file=sys.stderr)
+
+
 def start_server():
     global proc, state
+    if unit_installed():
+        with server_lock:
+            state = "running" if is_healthy(timeout=0.5) else "starting"
+            update_ui()
+        if state == "starting":
+            _systemctl("start", UNIT)                  # a no-op when it is already up; systemd keeps it up
+        return
     with server_lock:
         if is_healthy(timeout=0.5):
             state = "running"
@@ -105,8 +127,16 @@ def _kill_proc():
                 pass
 
 
-def stop_server():
+def stop_server(quitting=False):
     global state
+    if unit_installed():
+        if quitting:
+            return                                     # quitting the tray must not take the server down with it
+        with server_lock:
+            state = "stopped"
+            update_ui()
+        _systemctl("stop", UNIT)
+        return
     with server_lock:
         state = "stopped"
         _kill_proc()
@@ -114,6 +144,14 @@ def stop_server():
 
 
 def restart_server():
+    if unit_installed():
+        with server_lock:
+            global state
+            state = "starting"
+            update_ui()
+        _systemctl("restart", UNIT)
+        open_studio(wait=True)
+        return
     stop_server()
     time.sleep(0.5)
     start_server()
@@ -146,7 +184,7 @@ def view_server_log():
 
 
 def on_quit():
-    stop_server()
+    stop_server(quitting=True)
     if icon_ref:
         icon_ref.stop()
 
@@ -315,7 +353,7 @@ def main():
         print(f"Missing tray dependency: {e}", file=sys.stderr)
         sys.exit(1)
 
-    atexit.register(stop_server)
+    atexit.register(lambda: stop_server(quitting=True))
 
     def _sig_handler(sig, frame):
         on_quit()

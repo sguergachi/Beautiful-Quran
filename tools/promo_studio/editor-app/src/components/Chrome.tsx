@@ -4,7 +4,7 @@ import { exportLabel } from "../lib/exporting.ts";
 import { copyTitle, searchText, videoSlug } from "../lib/videos.ts";
 import type { SpecStatus } from "../lib/types.ts";
 import {
-  createVideo, deleteVideo, exportOptions, exportVideo, mutate, open, openPanel, redo, renameVideo, revealInspector, save, setUI, undo, useStore,
+  createVideo, deleteVideo, exportOptions, exportVideo, mutate, open, openPanel, redo, renameVideo, resolveConflict, revealInspector, save, setUI, undo, useStore,
 } from "../state/store.ts";
 import { openMenu } from "./Menu.tsx";
 import { Button, Dot, Icon, Segmented } from "./ui.tsx";
@@ -34,10 +34,19 @@ export function TopBar() {
             <Button size="icon" variant="ghost" disabled={!u.length} onClick={undo} title="Undo (Ctrl Z)">{Icon.undo}</Button>
             <Button size="icon" variant="ghost" disabled={!r.length} onClick={redo} title="Redo (Ctrl Shift Z)">{Icon.redo}</Button>
           </div>
-          <button onClick={() => save()} title={saveError ?? "Saved to specs/ as you edit (Ctrl S saves now)"}
-            className={`rounded px-1.5 py-0.5 text-[11.5px] ${saveState === "error" ? "bg-danger/15 text-danger" : "text-faint hover:text-mute"}`}>
-            {saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : saveState === "dirty" ? "Editing…" : "Not saved · retry"}
-          </button>
+          {saveState === "conflict" ? (
+            <span role="alert" className="flex items-center gap-1.5 rounded bg-danger/15 px-1.5 py-0.5 text-[11.5px] text-danger" title="Another tab or window saved this video since you opened it. Both versions are kept.">
+              Changed elsewhere
+              <button onClick={() => resolveConflict("mine")} className="rounded px-1 underline hover:bg-danger/20" title="Save my edits; the other version goes to Version history">Keep mine</button>
+              <button onClick={() => resolveConflict("theirs")} className="rounded px-1 underline hover:bg-danger/20" title="Open the other version; my edits go to Version history">Load theirs</button>
+            </span>
+          ) : (
+            <button onClick={() => save()} title={saveState === "error" ? `${saveError ?? "Not saved"} — retrying automatically; your edits are kept in this browser` : "Saved to specs/ as you edit, with every earlier version kept (Ctrl S saves now)"}
+              className={`rounded px-1.5 py-0.5 text-[11.5px] ${saveState === "error" ? "bg-danger/15 text-danger" : "text-faint hover:text-mute"}`}>
+              {saveState === "saved" ? "Saved" : saveState === "saving" ? "Saving…" : saveState === "dirty" ? "Editing…" : "Not saved · retrying"}
+            </button>
+          )}
+          <button onClick={() => openPanel("history")} title="Every earlier version of this video, and deleted videos" className="rounded px-1.5 py-0.5 text-[11.5px] text-faint hover:text-mute">History</button>
         </>
       )}
       <div className="flex-1" />
@@ -84,6 +93,7 @@ function VideoItem({ s, active, onAction }: { s: SpecStatus; active: boolean; on
     ...(s.exports?.length ? [{ label: "Open the latest export ↗", run: () => window.open(`/media/out/${s.exports![0].file}?${s.exports![0].mtime}`, "_blank") }] : []),
     { label: `Export · ${exportLabel({ aspect: s.aspect ?? "1:1", fps: s.fps ?? 60 }, exportOptions(), useStore.getState().meta!.aspects)}`, disabled: !s.take || s.take_short, run: () => exportVideo(s.name) },
     { label: "Export settings…", run: () => { if (s.name !== useStore.getState().name) open(s.name); openPanel("export"); } },
+    { label: "Version history…", run: async () => { if (s.name !== useStore.getState().name) await open(s.name); openPanel("history"); } },
     "-",
     { label: "Delete video…", danger: true, run: () => onAction({ kind: "delete", source: s }) },
   ], e.currentTarget as HTMLElement);

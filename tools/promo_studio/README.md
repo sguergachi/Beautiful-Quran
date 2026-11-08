@@ -412,3 +412,14 @@ paper, no music under the recitation, never a hexagram.
 
 Specs written before the timeline (with `camera`, `captions`, `end_card`,
 `duration`) are migrated when loaded: the framing is kept, the text is dropped.
+
+## Your edits are never lost
+
+Every change to a video's edit goes through `spec_store.py`:
+
+- **Atomic.** Saved to a temp file, fsynced, renamed over the spec, then the directory is fsynced: a crash or power cut leaves the old version or the new one, never a half-written or empty file.
+- **Stale saves are refused.** Each save carries the revision it was made from. If another tab or window saved the video since, the server refuses (409) and the editor offers **Keep mine** (the other version goes to the history) or **Load theirs** (your edits go to the history). Neither version is dropped.
+- **Versions are kept outside the repo** (`~/.cache/bq-promo/spec-history/<video>/`): everything a save replaced, thinned over time (the last 40, hourly for 3 days, daily for 60), and a deleted video's last version, a restored-over one and a stale tab's edits are kept for a year. **History** in the top bar lists them with **Restore** (which keeps what it replaces) and brings back deleted videos. Deleting a video archives it.
+- **Refused outright:** empty saves, non-object saves and an empty video over a real one. New / copy / rename are exclusive and atomic.
+- **In the browser:** a failed save (the server restarting, a network blip) retries by itself (1, 2, 5, 10, then every 30 s) and the status says so; every unsaved edit is also held in this browser and recovered when the video reopens (or kept in the history if the video was saved elsewhere meanwhile); closing the tab with anything unsaved asks first.
+- **On start**, the server checks every spec, puts back the last good version of a broken one and clears crash litter.

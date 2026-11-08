@@ -2,7 +2,8 @@
 // the previous one for drags and slider moves), a resolved spec for the
 // preview, and an ordered autosave to the server.
 import { create } from "zustand";
-import { api } from "../lib/api.ts";
+import { api, SaveConflict } from "../lib/api.ts";
+import { backoff, decideDraft, draftKey, encodeDraft, fitsKeepalive, parseDraft } from "../lib/safety.ts";
 import * as E from "../lib/edit.ts";
 import { applyVersePlan, nextVerseRange, verseRange, type VerseAction } from "../lib/verses.ts";
 import { clamp, plateLook, resolve, soundOnset, takeKey } from "../lib/model.ts";
@@ -17,9 +18,9 @@ export interface UI {
   leftW: number; rightW: number; tlH: number; labelW: number; hideL: boolean; hideR: boolean;
   tab: Tab; pps: number; fit: boolean; collapsed: Record<string, boolean>;
 }
-export type Panel = null | "emulators" | "jobs" | "help" | "export";
+export type Panel = null | "emulators" | "jobs" | "help" | "export" | "history";
 export interface Toast { id: number; msg: string; kind: "info" | "error" | "ok" }
-type SaveState = "saved" | "dirty" | "saving" | "error";
+type SaveState = "saved" | "dirty" | "saving" | "error" | "conflict";
 
 const UI_DEFAULTS: UI = { leftW: 248, rightW: 340, tlH: 260, labelW: 136, hideL: false, hideR: false, tab: "animate", pps: 60, fit: false, collapsed: {} };
 function loadUI(): UI {
@@ -34,6 +35,8 @@ interface St {
   meta: Meta | null; specs: SpecStatus[]; name: string | null; raw: RawSpec | null; spec: Spec | null;
   geo: Geo | null; plate: Plate | null; tl: Timeline | null; wave: Wave | null; sel: Selection; clipboard: E.Clip[] | null;
   undo: string[]; redo: string[]; saveState: SaveState; saveError: string | null;
+  rev: string | null;                   // the server's revision this edit is made against (a stale save is refused, never written)
+  conflict: { raw: RawSpec; rev: string } | null;   // what the server holds when a save found it changed elsewhere
   jobs: Job[]; emus: Emulator[]; booting: Job[]; emusLoaded: boolean;
   exact: string | null; ui: UI; panel: Panel; toasts: Toast[]; fatal: string | null;
   verseBusy: boolean; verseError: string | null;
@@ -43,7 +46,7 @@ interface St {
 
 export const useStore = create<St>(() => ({
   meta: null, specs: [], name: null, raw: null, spec: null, geo: null, plate: null, tl: null, wave: null, sel: null, clipboard: null,
-  undo: [], redo: [], saveState: "saved", saveError: null, jobs: [], emus: [], booting: [], emusLoaded: false,
+  undo: [], redo: [], saveState: "saved", saveError: null, rev: null, conflict: null, jobs: [], emus: [], booting: [], emusLoaded: false,
   exact: null, ui: loadUI(), panel: null, toasts: [], fatal: null,
   verseBusy: false, verseError: null,
   exportOpts: loadExport(),
@@ -55,6 +58,7 @@ let session = 0;                       // bumps on open: late answers for anothe
 let saved: string | null = null;       // the JSON last written for this video
 let saveChain: Promise<unknown> = Promise.resolve();
 let saveTimer: number | undefined, plateTimer: number | undefined;
+let retryTimer: number | undefined, retryAttempt = 0, draftTimer: number | undefined;
 let coalesce: { key: string; at: number } | null = null;
 let lastLook = "", lastGeoKey = "";
 let lastTimelineKey = "", verseRequest = 0;
@@ -136,6 +140,8 @@ function commit(draft: RawSpec, undo: string[], redo: string[]) {
   if (editChanged || clock.t > spec.duration) clock.seek(Math.min(clock.t, spec.duration)); else clock.emit();
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(save, 450);
+  clearTimeout(draftTimer);
+  draftTimer = window.setTimeout(writeDraft, 150);                     // unsaved edits are also kept in this browser until the server has them
   if (plateLook(spec) !== lastLook) { clearTimeout(plateTimer); plateTimer = window.setTimeout(loadPlate, 350); }
 }
 
@@ -159,45 +165,104 @@ export function redo() {
 // -------------------------------------------------------------- saving
 
 // Saves run one after another, so a slow early PUT never lands after a later one.
+// Each is made against the revision the edit started from: if the video was saved
+// elsewhere meanwhile the server refuses it (a conflict you resolve), and a save
+// that fails for any other reason is retried until it lands. Until then the edit
+// is also held in this browser (a draft) and the tab warns before it closes.
 export function save(): Promise<boolean> {
   clearTimeout(saveTimer);
   const { name, raw } = get();
   if (!name || !raw) return Promise.resolve(true);
+  if (get().saveState === "conflict") return Promise.resolve(false);      // resolve the conflict first
   const body = JSON.stringify(raw), mine = session;
   const task = saveChain.catch(() => {}).then(async () => {
     if (mine !== session) return;
-    if (saved === body) { if (body === snapshot()) set({ saveState: "saved" }); return; }
+    if (saved === body) { if (body === snapshot()) { set({ saveState: "saved" }); clearDraft(name); } return; }
     set({ saveState: "saving" });
-    const r = await api.save(name, body);
+    const r = await api.save(name, body, get().rev);
     if (mine !== session) return;
     saved = body;
-    set({ saveState: body === snapshot() ? "saved" : "dirty", saveError: null, specs: get().specs.map((x) => (x.name === name ? r.status : x)) });
+    retryAttempt = 0; clearTimeout(retryTimer);
+    set({ rev: r.rev, saveState: body === snapshot() ? "saved" : "dirty", saveError: null, specs: get().specs.map((x) => (x.name === name ? r.status : x)) });
+    if (body === snapshot()) clearDraft(name); else writeDraft();
     const s = get().spec!;
     if (geoKey(s) !== lastGeoKey) await loadGeometry();
     else if (timelineKey(s) !== lastTimelineKey) void loadTimeline();
   });
   saveChain = task;
   return task.then(() => true, (e: Error) => {
-    if (mine === session) { set({ saveState: "error", saveError: e.message }); toast("Not saved: " + e.message, "error"); }
+    if (mine !== session) return false;
+    writeDraft();
+    if (e instanceof SaveConflict) {
+      clearTimeout(retryTimer);
+      set({ saveState: "conflict", conflict: { raw: e.raw, rev: e.rev }, saveError: e.message });
+      toast("This video was changed elsewhere. Your edits are safe: choose Keep mine or Load theirs.", "error", 8000);
+    } else {
+      set({ saveState: "error", saveError: e.message });
+      if (!retryTimer) toast("Not saved: " + e.message + " Retrying…", "error");
+      scheduleRetry();
+    }
     return false;
   });
 }
+
+function scheduleRetry() {
+  clearTimeout(retryTimer);
+  retryTimer = window.setTimeout(() => { retryTimer = undefined; if (get().saveState === "error") void save(); }, backoff(retryAttempt++));
+}
+
+// ---- the browser's copy of unsaved edits
+function writeDraft() {
+  const { name, raw, rev } = get();
+  if (!name || !raw) return;
+  try {
+    if (JSON.stringify(raw) === saved) localStorage.removeItem(draftKey(name));
+    else localStorage.setItem(draftKey(name), encodeDraft(rev, raw));
+  } catch { /* private mode or a full quota: the server save is still the primary copy */ }
+}
+function clearDraft(name: string) { try { localStorage.removeItem(draftKey(name)); } catch { /* ignore */ } }
+
+/** Another window saved this video first. Keep mine: the other version goes to the history, mine is saved.
+ *  Load theirs: mine goes to the history and the other version is opened. Nothing is ever dropped. */
+export async function resolveConflict(choice: "mine" | "theirs") {
+  const { name, raw, conflict } = get();
+  if (!name || !raw || !conflict) return;
+  try {
+    if (choice === "mine") {
+      await api.stash(name, conflict.raw, "replaced");
+      saved = null;
+      set({ rev: conflict.rev, conflict: null, saveState: "dirty", saveError: null });
+      await save();
+    } else {
+      await api.stash(name, raw, "unsaved");
+      clearDraft(name);
+      set({ conflict: null, saveState: "saved", saveError: null });
+      await open(name, { discard: true });
+      toast("Loaded the other version. Your edits are kept in Version history.", "ok", 6000);
+    }
+  } catch (e) {
+    toast("Could not resolve it: " + (e as Error).message, "error");
+  }
+}
+
 const geoKey = (s: Spec) => [takeKey(s), s.aspect, s.phone.color].join("|");
 const timelineKey = (s: Spec) => JSON.stringify([takeKey(s), s.app.seconds, Math.max(...s.edit.map((p) => p.out))]);
 
 if (typeof window !== "undefined") {
   // Autosave must survive a closed tab: flush the debounced save when the
-  // page hides, and beacon it when the page is going away for good.
-  addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") void save(); });
+  // page hides, keep a local draft, and beacon the save when the page is going away.
+  addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") { writeDraft(); void save(); } });
   addEventListener("pagehide", () => {
-    const { name, saveState } = get();
-    if (!name || saveState === "saved" || saveState === "error") return;
+    const { name, saveState, rev } = get();
+    if (!name) return;
+    writeDraft();                                                     // synchronous: survives even if the beacon cannot be sent
+    if (saveState === "saved" || saveState === "conflict") return;
     clearTimeout(saveTimer);
-    fetch(`/api/spec/${name}`, {
-      method: "PUT", body: snapshot(), keepalive: true,
-      headers: { "Content-Type": "application/json" },
-    }).catch(() => {});
+    const body = snapshot();
+    if (!fitsKeepalive(body)) return;                                 // too big to beacon: the draft above holds it
+    void api.save(name, body, rev, true).catch(() => {});
   });
+  addEventListener("online", () => { if (get().saveState === "error") { retryAttempt = 0; void save(); } });
 }
 
 // -------------------------------------------------------------- loading
@@ -221,26 +286,45 @@ export async function init() {
 
 export async function refreshSpecs() { set({ specs: await api.specs() }); }
 
-export async function open(name: string) {
+export async function open(name: string, opts: { discard?: boolean } = {}) {
   clock.pause();
-  if (get().name && !(await save())) { toast("Save failed, so this video stays open. Retry from the save status.", "error"); return; }
+  if (!opts.discard && get().name && !(await save())) { toast("Save failed, so this video stays open. Retry from the save status.", "error"); return; }
   const mine = ++session;
   try {
     const r = await api.spec(name);
     if (mine !== session) return;
-    clearTimeout(saveTimer); clearTimeout(plateTimer);
+    clearTimeout(saveTimer); clearTimeout(plateTimer); clearTimeout(retryTimer); retryTimer = undefined; retryAttempt = 0;
     coalesce = null; lastLook = ""; lastGeoKey = ""; lastTimelineKey = ""; verseRequest++;
     const spec = resolve(r.raw, get().meta!);
     // New specs may contain just a title; editing always needs real pieces.
     r.raw.edit = spec.edit.map((p) => ({ ...p }));
     saved = JSON.stringify(r.raw);
-    set({ name, raw: r.raw, spec, geo: null, plate: null, tl: null, wave: null, sel: null, inspector: null, undo: [], redo: [], exact: null, saveState: "saved", saveError: null, verseBusy: false, verseError: null });
+    set({ name, raw: r.raw, spec, rev: r.rev, conflict: null, geo: null, plate: null, tl: null, wave: null, sel: null, inspector: null, undo: [], redo: [], exact: null, saveState: "saved", saveError: null, verseBusy: false, verseError: null });
     localStorage.setItem("promo.last", name);
+    await recoverDraft(name, r.raw, r.rev);
     clock.t = 0;
     await Promise.all([loadGeometry(), loadPlate()]);
     clock.seek(0);
   } catch (e) {
     toast("Could not open " + name + ": " + (e as Error).message, "error");
+  }
+}
+
+/** Unsaved edits left in this browser (a crash, a failed save): put them back, or keep them aside if the video was saved elsewhere since. */
+async function recoverDraft(name: string, serverRaw: RawSpec, serverRev: string) {
+  let draft = null;
+  try { draft = parseDraft(localStorage.getItem(draftKey(name))); } catch { /* no storage */ }
+  const what = decideDraft(draft, serverRaw, serverRev);
+  if (!draft || what === "none") { if (draft) clearDraft(name); return; }
+  if (what === "adopt") {
+    const spec = resolve(draft.raw, get().meta!);
+    draft.raw.edit = spec.edit.map((p) => ({ ...p }));
+    set({ raw: draft.raw, spec, saveState: "dirty" });
+    clearTimeout(saveTimer); saveTimer = window.setTimeout(save, 450);
+    toast("Recovered unsaved edits from this browser.", "ok", 6000);
+  } else {
+    try { await api.stash(name, draft.raw, "unsaved"); clearDraft(name); } catch { return; }
+    toast("This video was saved elsewhere since you last edited it. Your unsaved copy is in Version history.", "info", 9000);
   }
 }
 
@@ -518,7 +602,7 @@ export async function renameVideo(from: string, title: string) {
     if (!(await save())) throw new Error("The title could not be saved. Try again.");
   } else {
     const { raw } = await api.spec(from);
-    await api.save(from, JSON.stringify({ ...raw, title: title.trim() }));
+    await api.save(from, JSON.stringify({ ...raw, title: title.trim() }), null);
   }
   await refreshSpecs();
 }
