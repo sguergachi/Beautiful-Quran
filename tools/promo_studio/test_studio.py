@@ -1080,6 +1080,18 @@ class TakeBuildTests(unittest.TestCase):
         self.assertEqual(self._check({"version": "weird", "commit": "deadbeef0"}, in_repo=False)["state"], "unknown")
 
 
+class PlaybackLogTests(unittest.TestCase):
+    def test_playback_reports_append_one_line_each_and_reject_anything_else(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d, patch.object(server, "PLAYBACK_LOG", str(Path(d, "playback.log"))):
+            server.log_client({"kind": "playback", "from": 1.5, "jumps": [{"t": 3, "ms": 140}]}, "Zen")
+            server.log_client({"kind": "playback", "from": 9}, "Zen")
+            lines = [json.loads(l) for l in Path(d, "playback.log").read_text().splitlines()]
+            self.assertEqual([l["from"] for l in lines], [1.5, 9])
+            self.assertEqual(lines[0]["jumps"][0]["ms"], 140)
+            with self.assertRaises(ValueError):
+                server.log_client({"kind": "other"})
+
+
 class PreviewCopyTests(unittest.TestCase):
     """The editor's light copy of a take: same frames and clock, a quarter of the pixels, never during a recording."""
 

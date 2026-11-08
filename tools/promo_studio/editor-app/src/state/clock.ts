@@ -86,11 +86,26 @@ for (const m of [media.screen, media.plate, media.audio]) {
 type Ctx = { spec: Spec | null; hasClip: boolean; hasPlate: boolean; offset: number; onset: number; audio?: string | null };
 let ctx: () => Ctx = () => ({ spec: null, hasClip: false, hasPlate: false, offset: 0, onset: 0 });
 
+// What each play was like, sent to the server's playback.log when it stops:
+// how long it took to start, frames the page missed, the picture stalling,
+// and the sound card's clock jumping (an audio dropout on the machine).
+type Session = { from: number; at: number; startMs: number | null; path: string; frames: number; gaps: number; maxGapMs: number;
+  waits: number; jumps: { t: number; ms: number }[]; states: string[] };
+let session: Session | null = null, lastFrame = 0;
+function report() {
+  if (!session) return;
+  const { at, ...rest } = session;
+  const s = { ...rest, to: +clock.t.toFixed(3), secs: +((performance.now() - at) / 1000).toFixed(2), latency: sound.ctx ? +(((sound.ctx.outputLatency || 0) + (sound.ctx.baseLatency || 0)) * 1000).toFixed(1) : null };
+  session = null;
+  try { navigator.sendBeacon?.("/api/log", JSON.stringify({ kind: "playback", ...s })); } catch { /* diagnostics only */ }
+}
+media.screen.addEventListener("waiting", () => { if (session && clock.playing && !clock._priming) session.waits++; });
+
 // The take's sound runs through one gain node so the preview hears the spec's
 // gain and fades as the export will (a media element's volume stops at 1):
 // the decoded buffer when it is ready, the <audio> element until then. The
 // graph resumes on the first play, inside the user's gesture.
-let elementRouted = false;
+let elementRouted = false, watchedState = false;
 function startSound() {
   const ac = sound.context();
   if (ac && !elementRouted) {
@@ -179,6 +194,8 @@ export const clock = {
     if (this.t >= spec.duration - 0.05) this.t = 0;
     this.playing = true;
     startSound();
+    session = { from: +this.t.toFixed(3), at: performance.now(), startMs: null, path: "", frames: 0, gaps: 0, maxGapMs: 0, waits: 0, jumps: [], states: [] };
+    if (sound.ctx && !watchedState) { watchedState = true; sound.ctx.addEventListener("statechange", () => session?.states.push(sound.ctx!.state)); }
     this.emitState();
     this._prime();
   },
@@ -231,6 +248,8 @@ export const clock = {
     }
     setGain(this.t, true);
     if (hasPlate) media.plate.play().catch(() => {});
+    if (session) { session.startMs ??= Math.round(performance.now() - session.at); session.path = joined ? "decoded" : picture ? "element" : "silent"; }
+    lastFrame = 0;
     this._raf = requestAnimationFrame(() => this._tick());
   },
   /** Reschedule the decoded sound from the playhead without restarting the picture (a loop, an edit while playing). */
@@ -243,6 +262,7 @@ export const clock = {
   },
   pause() {
     if (!this.playing) return;
+    report();
     this.playing = false;
     this._priming = false;
     this._go++;
@@ -263,11 +283,19 @@ export const clock = {
     // nothing seeks to rejoin them. (A start without picture holds until the
     // sound is heard.)
     const now = performance.now();
+    if (session) {
+      session.frames++;
+      if (lastFrame && now - lastFrame > 50) { session.gaps++; session.maxGapMs = Math.max(session.maxGapMs, Math.round(now - lastFrame)); }
+    }
+    lastFrame = now;
     this.t = this._t0 + (this._hold ? Math.max(0, now - this._wall0) : now - this._wall0) / 1000;
     const heard = sound.heard();
     if (heard != null && now >= this._wall0) {
       const err = heard - this.t;
-      if (Math.abs(err) > 0.1) { this._wall0 = now - (heard - this._t0) * 1000; this.t = heard; }
+      if (Math.abs(err) > 0.1) {
+        if (session && session.jumps.length < 40) session.jumps.push({ t: +this.t.toFixed(2), ms: Math.round(err * 1000) });
+        this._wall0 = now - (heard - this._t0) * 1000; this.t = heard;
+      }
       else { this._wall0 -= err * 50; this.t += err * 0.05; }
     }
     const d = this.duration();

@@ -60,14 +60,25 @@ precision highp float;
 in vec2 v_src;
 uniform sampler2D u_tex;
 uniform vec4 u_rect;
-uniform float u_alpha, u_radius;
+uniform float u_alpha, u_radius, u_bias;
 uniform int u_mode;      // 0 texture, 1 texture clipped, 2 flat clipped
 uniform vec3 u_flat;
 out vec4 o;
+// An area filter for shrinking: four samples spread over the pixel's
+// footprint, each from the mip level of half that footprint. Sharp where plain
+// trilinear filtering goes soft, and steady where bilinear would shimmer.
+vec4 area(vec2 uv) {
+  vec2 dx = dFdx(uv), dy = dFdy(uv), ts = vec2(textureSize(u_tex, 0));
+  float fp = max(length(dx * ts), length(dy * ts));          // texels under one pixel
+  if (fp <= 1.0) return texture(u_tex, uv);
+  float lod = max(0.0, log2(fp * 0.5) + u_bias);
+  vec2 a = 0.25 * (dx + dy), b = 0.25 * (dx - dy);
+  return 0.25 * (textureLod(u_tex, uv + a, lod) + textureLod(u_tex, uv - a, lod) + textureLod(u_tex, uv + b, lod) + textureLod(u_tex, uv - b, lod));
+}
 float rr(vec2 p, vec2 h, float r) { vec2 d = abs(p) - h + r; return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r; }
 void main() {
   vec2 uv = (v_src - u_rect.xy) / u_rect.zw;
-  vec4 c = u_mode == 2 ? vec4(u_flat, 1.0) : texture(u_tex, uv);
+  vec4 c = u_mode == 2 ? vec4(u_flat, 1.0) : area(uv);
   if (u_mode > 0) {
     float d = rr(v_src - (u_rect.xy + u_rect.zw * 0.5), u_rect.zw * 0.5, u_radius);
     c *= clamp(0.5 - d / max(fwidth(d), 1e-4), 0.0, 1.0);
@@ -154,7 +165,7 @@ export class GLPreview {
     const ext = gl.getExtension("EXT_texture_filter_anisotropic");
     this.aniso = ext ? Math.min(8, gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT)) : 0;
     this.bg = this.program(FS_BG, ["u_rect", "u_m", "u_out", "u_tex", "u_has", "u_inv", "u_box", "u_theme", "u_bright", "u_vig"]);
-    this.layer = this.program(FS_LAYER, ["u_rect", "u_m", "u_out", "u_tex", "u_alpha", "u_radius", "u_mode", "u_flat"]);
+    this.layer = this.program(FS_LAYER, ["u_rect", "u_m", "u_out", "u_tex", "u_alpha", "u_radius", "u_mode", "u_flat", "u_bias"]);
     this.blur = this.program(FS_BLUR, ["u_rect", "u_m", "u_out", "u_tex", "u_dir", "u_map", "u_w", "u_o", "u_n"]);
     this.vao = gl.createVertexArray()!;
     gl.bindVertexArray(this.vao);
@@ -363,12 +374,14 @@ export class GLPreview {
     gl.useProgram(lp.p);
     gl.uniform2f(lp.u.u_out, W, H);
     gl.uniform1i(lp.u.u_tex, 0);
-    const layer = (tex: WebGLTexture | null, rect: number[], mat: M, mode: number, alpha = 1, radius = 0, flat: [number, number, number] = [0, 0, 0]) => {
+    // bias -0.5: each of the four area samples reads a finer level, which keeps the
+    // recording's text as sharp as the exporter's frame without letting it shimmer
+    const layer = (tex: WebGLTexture | null, rect: number[], mat: M, mode: number, alpha = 1, radius = 0, flat: [number, number, number] = [0, 0, 0], bias = -0.5) => {
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.uniformMatrix3fv(lp.u.u_m, false, mat3(mat));
       gl.uniform4f(lp.u.u_rect, rect[0], rect[1], rect[2], rect[3]);
       gl.uniform1f(lp.u.u_alpha, alpha); gl.uniform1f(lp.u.u_radius, radius);
-      gl.uniform1i(lp.u.u_mode, mode); gl.uniform3fv(lp.u.u_flat, flat);
+      gl.uniform1i(lp.u.u_mode, mode); gl.uniform3fv(lp.u.u_flat, flat); gl.uniform1f(lp.u.u_bias, bias);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
     const shd = +spec.phone.shadow;

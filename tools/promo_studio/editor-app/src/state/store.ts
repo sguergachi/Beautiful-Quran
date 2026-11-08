@@ -352,29 +352,47 @@ export async function loadGeometry() {
   void loadWave(geo.peaks);
 }
 
-// The picture the preview plays: the take's light preview copy once the
-// server has made it (a quarter of the pixels to decode, already scaled with
-// an area filter), the full recording until then.
-export const previewSrc = (geo: Geo | null) => geo?.preview ?? geo?.clip ?? null;
+// The picture the preview plays. The light copy (preview.py, PREVIEW_HEIGHT
+// tall: a quarter of the pixels to decode, already area-scaled) while the
+// stage shows the phone's screen no taller than that in device pixels; the
+// full recording when it is shown taller (a big window, a HiDPI screen, a
+// close zoom), so the picture is never stretched up into blur.
+export const PREVIEW_HEIGHT = 1600;
+let screenNeed = 0;       // device px the phone's screen reaches at its largest on the stage (0: not yet known)
+export function previewSrc(geo: Geo | null): string | null {
+  if (!geo?.clip) return null;
+  return geo.preview && screenNeed > 0 && screenNeed <= PREVIEW_HEIGHT * 1.05 ? geo.preview : geo.clip;
+}
+/** The stage reports how tall the screen gets; the picture source follows (never under a playing playhead). */
+export function setScreenNeed(px: number) {
+  if (!Number.isFinite(px) || Math.abs(px - screenNeed) <= screenNeed * 0.02) return;
+  screenNeed = px;
+  applyPicture();
+}
+let pictureWait: (() => void) | null = null;
+function applyPicture() {
+  const want = previewSrc(get().geo);
+  if (!want || media.screen.src.endsWith(want)) return;
+  if (clock.playing) {                        // swapping reloads the picture: wait for the pause
+    if (!pictureWait) pictureWait = clock.onState(() => { if (!clock.playing) { pictureWait?.(); pictureWait = null; applyPicture(); } });
+    return;
+  }
+  const t = clock.t;
+  media.screen.src = want;
+  clock.seek(t);
+}
 
-// The preview copy is made in the background on first open; swap it in once
-// it lands, but never under a playing playhead (the swap reloads the picture).
+// The preview copy is made in the background on first open; take it up once it lands.
 let previewTimer: number | undefined;
 function watchPreview(name: string, key: string) {
   clearTimeout(previewTimer);
   previewTimer = window.setTimeout(async () => {
     const s = get();
     if (s.name !== name || !s.spec || geoKey(s.spec) !== key) return;
-    if (clock.playing) return watchPreview(name, key);
     try {
       const geo = await api.geometry(name);
       if (get().name !== name || geoKey(get().spec!) !== key) return;
-      if (geo.preview && !clock.playing) {
-        const t = clock.t;
-        media.screen.src = geo.preview;
-        set({ geo });
-        clock.seek(t);
-      } else watchPreview(name, key);
+      if (geo.preview) { set({ geo }); applyPicture(); } else watchPreview(name, key);
     } catch { watchPreview(name, key); }
   }, 4000);
 }

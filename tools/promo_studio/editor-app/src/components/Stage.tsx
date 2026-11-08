@@ -10,7 +10,7 @@ import { oldTakeWarning } from "../lib/build.ts";
 import { GLPreview } from "../lib/glpreview.ts";
 import { Preview } from "../lib/render.ts";
 import { clock, media } from "../state/clock.ts";
-import { cancelJob, endGesture, hideExact, inspect, record, select, setProp, setUI, useStore } from "../state/store.ts";
+import { cancelJob, endGesture, hideExact, inspect, record, select, setProp, setScreenNeed, setUI, useStore } from "../state/store.ts";
 import { Button, Icon, Progress } from "./ui.tsx";
 
 const SNAP_PX = 12;   // screen px within which Shift snaps the phone to a centre line
@@ -79,6 +79,9 @@ export function Stage() {
         spec: s.spec, geo: s.geo, plate: s.plate, S, recording,
         themeBg: s.meta.themes[s.spec.app.theme]?.bg ?? "#111", screen: media.screen, plateVideo: media.plate, frame: media.frame,
       };
+      // how tall the phone's screen gets on this stage, in device px: picks the picture's source
+      const most = (n: string) => Math.max(+(s.spec!.props[n] ?? s.meta!.props[n]?.default ?? 1), ...(s.spec!.tracks[n] || []).map((k) => +k.v));
+      setScreenNeed(s.geo.g.sh * (s.spec.phone.height * s.geo.H / s.geo.g.bh) * most("zoom") * most("phone_scale") * (c.height / s.geo.H));
       if (gl.current) return gl.current.draw(scene);
       if (gl.current === undefined) return;            // the renderer is chosen on mount
       phone.current!.style.visibility = recording ? "visible" : "hidden";

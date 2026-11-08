@@ -157,6 +157,24 @@ def take_peaks(key):
     return body
 
 
+PLAYBACK_LOG = os.path.join(S.CACHE, "playback.log")
+
+
+def log_client(entry, agent=""):
+    """One line per preview playback (state/clock.ts reports how it went), for diagnosing hitches on the user's machine."""
+    if not isinstance(entry, dict) or entry.get("kind") != "playback":
+        raise ValueError("unknown log entry")
+    line = json.dumps({"at": time.strftime("%Y-%m-%d %H:%M:%S"), "agent": agent[:160], **entry}, separators=(",", ":"))[:8000]
+    try:
+        if os.path.getsize(PLAYBACK_LOG) > 2_000_000:
+            os.replace(PLAYBACK_LOG, PLAYBACK_LOG + ".1")
+    except OSError:
+        pass
+    with open(PLAYBACK_LOG, "a") as f:
+        f.write(line + "\n")
+    return {"ok": True}
+
+
 def _recording():
     return any(j["kind"] == "capture" and j["state"] == "running" for j in JOBS.jobs.values())
 
@@ -868,6 +886,8 @@ class Handler(BaseHTTPRequestHandler):
             emus.stop(m.group(1))
             _EMU_CACHE["at"] = 0
             return self.send_json({"ok": True})
+        if p == "/api/log":
+            return self.send_json(log_client(self.body(), self.headers.get("User-Agent", "")))
         if p == "/api/apk/build":
             return self.send_json(JOBS.submit("apk-build", "release APK", ["apk-build"], title="Build APK"))
         self.send_json({"error": "not found"}, 404)
