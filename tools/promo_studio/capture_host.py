@@ -40,6 +40,14 @@ def python(cache, log=print):
 JITTER_S = .5     # delivery-time jitter the audio clock ignores (seconds)
 
 
+DEAD_REOPEN_S = 1.0  # seconds of digital zeros after which the sound stream is reopened
+
+
+def silent(pcm):
+    """True when a packet of s16 PCM is all exact zeros (a dead tap, not a quiet room)."""
+    return not pcm or not any(pcm)
+
+
 def audio_position(timestamp_us, origin_us, next_sample, samples, rate=48000):
     """Place one audio packet. The emulator's audio is a continuous stream (a
     pause in the app arrives as silent samples), but its packet timestamps
@@ -135,27 +143,47 @@ def record(args):
     stats.update(encoder='h264_nvenc', started_wall_us=origin, clock='emulator-host-us')
 
     def reader(kind, method, request, deserialize, target):
-        call = channel.unary_stream(rpc + method, request_serializer=type(request).SerializeToString,
-                                    response_deserializer=deserialize)(request, metadata=metadata)
-        calls.append(call)
-        try:
-            for message in call:
-                if stopped.is_set(): break
-                stamp = message.timestampUs if kind == 'video' else message.timestamp
-                if stamp - origin > (time.monotonic() - started + 1) * 1_000_000:
-                    raise RuntimeError('Emulator media clock jumped during recording')
-                if kind == 'video':
-                    if not message.image: continue
-                    if (message.format.width, message.format.height) != (w, h):
-                        raise RuntimeError('Display size changed during recording')
-                    try: target.put_nowait(message)
-                    except queue.Full: stats['dropped_frames'] += 1
-                else:
-                    while not stopped.is_set():
-                        try: target.put(message, timeout=.1); break
-                        except queue.Full: pass
-        except Exception as error:
-            if not stopped.is_set(): errors.append(f'{kind} stream: {error}'); stopped.set()
+        # The emulator's audio tap can go dead mid-take: the guest keeps mixing
+        # and writing sound, but every packet arrives as zeros until the stream
+        # ends. A sound stream that stays at digital zero for DEAD_REOPEN_S is
+        # closed and opened again; real silence simply stays silent.
+        zeros, heard, streak = 0, False, 0       # streak: reopens in a row that brought no sound back (each waits twice as long)
+        while not stopped.is_set():
+            call = channel.unary_stream(rpc + method, request_serializer=type(request).SerializeToString,
+                                        response_deserializer=deserialize)(request, metadata=metadata)
+            calls.append(call)
+            reopen = False
+            try:
+                for message in call:
+                    if stopped.is_set(): break
+                    stamp = message.timestampUs if kind == 'video' else message.timestamp
+                    if stamp - origin > (time.monotonic() - started + 1) * 1_000_000:
+                        raise RuntimeError('Emulator media clock jumped during recording')
+                    if kind == 'video':
+                        if not message.image: continue
+                        if (message.format.width, message.format.height) != (w, h):
+                            raise RuntimeError('Display size changed during recording')
+                        try: target.put_nowait(message)
+                        except queue.Full: stats['dropped_frames'] += 1
+                    else:
+                        if silent(message.audio):
+                            zeros += len(message.audio) // 4
+                        else:
+                            zeros, heard, streak = 0, True, 0
+                        while not stopped.is_set():
+                            try: target.put(message, timeout=.1); break
+                            except queue.Full: pass
+                        if heard and zeros >= DEAD_REOPEN_S * 48000 * 2 ** streak:
+                            stats['audio_reopens'] = stats.get('audio_reopens', 0) + 1
+                            stats.setdefault('audio_reopened_at_s', []).append(round(time.monotonic() - started, 1))
+                            zeros, reopen, streak = 0, True, streak + 1
+                            call.cancel()
+                            break
+            except Exception as error:
+                if reopen: continue
+                if not stopped.is_set(): errors.append(f'{kind} stream: {error}'); stopped.set()
+                return
+            if not reopen: return
 
     threads = [threading.Thread(target=reader, args=('video', 'streamScreenshot', pb.ImageFormat(
         format=1, width=w, height=h), pb.Image.FromString, frames), daemon=True),

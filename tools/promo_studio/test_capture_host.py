@@ -68,3 +68,12 @@ class CaptureHostTests(unittest.TestCase):
             a = phone.ensure(root, 360, 800, 'obsidian', display)
             b = phone.ensure(root, 360, 800, 'obsidian')
             self.assertNotEqual(a[:2], b[:2])
+
+
+class DeadTapTests(unittest.TestCase):
+    def test_only_exact_digital_zeros_count_as_a_dead_tap(self):
+        import capture_host
+        self.assertTrue(capture_host.silent(bytes(1920)))
+        self.assertTrue(capture_host.silent(b''))
+        quiet = bytearray(1920); quiet[100] = 1             # one LSB of room tone is sound, not a dead tap
+        self.assertFalse(capture_host.silent(bytes(quiet)))
