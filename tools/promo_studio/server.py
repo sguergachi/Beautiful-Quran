@@ -31,6 +31,7 @@ import emus
 import formats
 import gpu_env
 import service
+import spec_store
 import library
 import phone as phone_mod
 import spec as S
@@ -48,20 +49,11 @@ def spec_path(name):
     return os.path.join(S.SPECS, name + ".json")
 
 
-def write_spec(name, raw):
-    """Readers see either complete revision, never a half-written JSON file."""
-    path = spec_path(name)
-    with SPEC_LOCK:
-        tmp = None
-        try:
-            with tempfile.NamedTemporaryFile(mode="w", dir=S.SPECS, suffix=".json.part", delete=False) as f:
-                tmp = f.name
-                json.dump(raw, f, indent=2, ensure_ascii=False, allow_nan=False)
-                f.write("\n")
-            os.replace(tmp, path)
-        finally:
-            if tmp and os.path.exists(tmp):
-                os.remove(tmp)
+def write_spec(name, raw, expect=None, force=False):
+    """Save a spec through spec_store: atomic and fsynced, refused when it was
+    made against an out-of-date revision, with the replaced version kept in the
+    history. Returns the new revision."""
+    return spec_store.write(name, raw, expect=expect, force=force)
 
 
 def render_scale(value):
@@ -604,10 +596,19 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/spec/([\w.-]+)", self.path)
         if not m:
             return self.send_json({"error": "not found"}, 404)
-        raw = S.migrate(self.body())                     # an old editor tab may still send v1
+        name = m.group(1)
+        if int(self.headers.get("Content-Length") or 0) <= 0:
+            raise ValueError("an empty save was refused")           # never turn a video into defaults by accident
+        body = self.body()
+        if not isinstance(body, dict) or (not body and spec_store.current_revision(name)):
+            raise ValueError("refusing to replace a video with an empty one")
+        raw = S.migrate(body)                            # an old editor tab may still send v1
         S.resolve(raw)                                   # validate before saving
-        write_spec(m.group(1), raw)
-        self.send_json({"ok": True, "status": spec_status(m.group(1))})
+        try:
+            rev = write_spec(name, raw, expect=self.headers.get("If-Match") or None, force=self.headers.get("X-Force") == "1")
+        except spec_store.SpecConflict as c:
+            return self.send_json({"error": str(c), "conflict": True, "rev": c.rev, "raw": c.raw}, 409)
+        self.send_json({"ok": True, "rev": rev, "status": spec_status(name)})
 
     def route_delete(self):
         m = re.fullmatch(r"/api/exports/([\w.-]+)/([\w.-]+)", urllib.parse.unquote(self.path))
@@ -619,10 +620,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/spec/([\w.-]+)", self.path)
         if not m:
             return self.send_json({"error": "not found"}, 404)
-        p = spec_path(m.group(1))
-        with SPEC_LOCK:
-            if os.path.exists(p):
-                os.remove(p)
+        spec_path(m.group(1))
+        if os.path.exists(spec_path(m.group(1))):
+            spec_store.delete(m.group(1))          # kept in the history: restore it from there
         self.send_json({"ok": True})
 
     def route_get(self):
@@ -651,8 +651,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json([spec_status(n) for n in names])
         m = re.fullmatch(r"/api/spec/([\w.-]+)", p)
         if m:
-            raw = S.migrate(json.load(open(spec_path(m.group(1)))))
-            return self.send_json({"raw": raw, "status": spec_status(m.group(1))})
+            raw, rev = spec_store.read(m.group(1))
+            return self.send_json({"raw": raw, "rev": rev, "status": spec_status(m.group(1))})
+        m = re.fullmatch(r"/api/spec/([\w.-]+)/history", p)
+        if m:
+            return self.send_json({"versions": spec_store.history(m.group(1)), "rev": spec_store.current_revision(m.group(1))})
+        if p == "/api/trash":
+            return self.send_json({"deleted": spec_store.deleted()})
         m = re.fullmatch(r"/api/geometry/([\w.-]+)", p)
         if m:
             return self.send_json(geometry(S.load(m.group(1))))
@@ -747,22 +752,29 @@ class Handler(BaseHTTPRequestHandler):
             pw, ph, pk = library.plate_geometry(bg, W, H)
             return self.send_json({"url": "/media/plate/" + os.path.basename(path), "w": pw, "h": ph, "k": pk,
                                    "blur": bg["blur"]})
+        m = re.fullmatch(r"/api/spec/([\w.-]+)/restore", p)
+        if m:
+            raw, rev = spec_store.restore(m.group(1), self.body().get("id"))
+            return self.send_json({"ok": True, "raw": raw, "rev": rev, "status": spec_status(m.group(1))})
+        m = re.fullmatch(r"/api/spec/([\w.-]+)/stash", p)
+        if m:                                           # keep a version that was not saved (a draft, another tab's edits) in the history only
+            raw = S.migrate(self.body().get("raw") or {})
+            return self.send_json({"ok": True, "id": spec_store.stash(m.group(1), raw)})
         m = re.fullmatch(r"/api/copy/([\w.-]+)/([\w.-]+)", p)
         if m:
-            src, dst = spec_path(m.group(1)), spec_path(m.group(2))
-            with SPEC_LOCK:
-                if os.path.exists(dst):
-                    return self.send_json({"error": f"{m.group(2)} already exists"}, 409)
-                with open(src, "rb") as a, open(dst, "xb") as b:
-                    shutil.copyfileobj(a, b)
+            spec_path(m.group(1)), spec_path(m.group(2))
+            try:
+                spec_store.duplicate(m.group(1), m.group(2))
+            except FileExistsError:
+                return self.send_json({"error": f"{m.group(2)} already exists"}, 409)
             return self.send_json({"ok": True})
         m = re.fullmatch(r"/api/rename/([\w.-]+)/([\w.-]+)", p)
         if m:
-            src, dst = spec_path(m.group(1)), spec_path(m.group(2))
-            with SPEC_LOCK:
-                if os.path.exists(dst):
-                    return self.send_json({"error": f"{m.group(2)} already exists"}, 409)
-                os.rename(src, dst)
+            spec_path(m.group(1)), spec_path(m.group(2))
+            try:
+                spec_store.rename(m.group(1), m.group(2))
+            except FileExistsError:
+                return self.send_json({"error": f"{m.group(2)} already exists"}, 409)
             for e in exports(m.group(1)):                # every export follows its video
                 renamed = m.group(2) + e["file"][len(m.group(1)):]
                 if not os.path.exists(os.path.join(S.OUT, renamed)):
@@ -775,15 +787,14 @@ class Handler(BaseHTTPRequestHandler):
             base, title = body.get("from"), body.get("title")
             if title is not None and (not isinstance(title, str) or not title.strip()):
                 raise ValueError("Give the video a title")
-            with SPEC_LOCK:
-                if os.path.exists(dst):
-                    return self.send_json({"error": f"{m.group(1)} already exists"}, 409)
-                raw = {"title": m.group(1).replace("-", " ")}
-                if base:
-                    with open(spec_path(base)) as source: raw = json.load(source)
-                if title is not None: raw["title"] = title.strip()
-                with open(dst, "x") as f:
-                    json.dump(raw, f, indent=2, ensure_ascii=False)
+            raw = {"title": m.group(1).replace("-", " ")}
+            if base:
+                raw, _ = spec_store.read(base)
+            if title is not None: raw["title"] = title.strip()
+            try:
+                spec_store.create(m.group(1), raw)
+            except FileExistsError:
+                return self.send_json({"error": f"{m.group(1)} already exists"}, 409)
             return self.send_json({"ok": True})
         m = re.fullmatch(r"/api/capture/([\w.-]+)", p)
         if m:
@@ -920,6 +931,8 @@ def serve(port=8765, build=True, host="127.0.0.1"):
     os.makedirs(S.SPECS, exist_ok=True)
     if build:
         ensure_built()
+    for name, version in spec_store.recover(lambda m: print(m, flush=True)):    # a broken spec is put back before anything reads it
+        pass
     JOBS = Jobs()
     httpd = bind(host, port)
     httpd.daemon_threads = True

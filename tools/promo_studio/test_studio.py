@@ -29,10 +29,12 @@ import library
 import phone
 import server
 import spec
+import spec_store
 import capture
 
 SCRATCH = Path(spec.CACHE) / "test"
 SCRATCH.mkdir(parents=True, exist_ok=True)
+spec_store.HISTORY = str(SCRATCH / "spec-history")        # tests never touch the real history
 
 
 class ModelTests(unittest.TestCase):
@@ -530,6 +532,159 @@ class ServiceTests(unittest.TestCase):
                 r = subprocess.run(["systemd-analyze", "--user", "verify", str(unit)], capture_output=True, text=True)
                 self.assertNotIn("Unknown key", r.stderr + r.stdout)
                 self.assertNotIn("Unknown section", r.stderr + r.stdout)
+
+
+class SpecStoreTests(unittest.TestCase):
+    """Edits are never lost: atomic and fsynced, refused when stale, versioned outside the repo, recoverable."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(dir=SCRATCH)
+        self.addCleanup(self.tmp.cleanup)
+        self.d = self.tmp.name
+        self.specs, self.hist = os.path.join(self.d, "specs"), os.path.join(self.d, "history")
+        os.makedirs(self.specs)
+        for target, name, value in ((spec, "SPECS", self.specs), (spec_store, "HISTORY", self.hist)):
+            patcher = patch.object(target, name, value); patcher.start(); self.addCleanup(patcher.stop)
+
+    A = {"title": "A", "edit": [{"in": 0, "out": 10}], "tracks": {"zoom": [{"t": 0, "v": 1}, {"t": 2, "v": 2}]}}
+    B = {"title": "B", "edit": [{"in": 0, "out": 10}], "tracks": {"zoom": [{"t": 0, "v": 1}, {"t": 3, "v": 3}]}}
+
+    def test_a_crash_while_saving_leaves_the_old_version_and_no_litter(self):
+        spec_store.write("v", self.A)
+        before = Path(self.specs, "v.json").read_bytes()
+        with patch("os.replace", side_effect=OSError("power cut")):
+            with self.assertRaises(OSError):
+                spec_store.write("v", self.B)
+        self.assertEqual(Path(self.specs, "v.json").read_bytes(), before)
+        self.assertEqual([f for f in os.listdir(self.specs) if f.endswith(".part")], [], "no temp file left behind")
+
+    def test_data_and_directory_are_synced_to_disk_before_a_save_counts(self):
+        with patch("os.fsync", wraps=os.fsync) as sync:
+            spec_store.write("v", self.A)
+        self.assertGreaterEqual(sync.call_count, 2, "the file, then its directory")
+
+    def test_a_stale_save_is_refused_with_the_current_version_and_nothing_is_lost(self):
+        r1 = spec_store.write("v", self.A)
+        r2 = spec_store.write("v", self.B, expect=r1)
+        self.assertNotEqual(r1, r2)
+        stale = {**self.A, "title": "from a tab that was open before"}
+        with self.assertRaises(spec_store.SpecConflict) as c:
+            spec_store.write("v", stale, expect=r1)
+        self.assertEqual((c.exception.raw["title"], c.exception.rev), ("B", r2))
+        self.assertEqual(spec_store.read("v")[0]["title"], "B", "the refused save changed nothing")
+        spec_store.stash("v", stale)
+        spec_store.write("v", stale, expect=r1, force=True)               # "keep mine"
+        self.assertEqual(spec_store.read("v")[0]["title"], stale["title"])
+        kept = {h["reason"]: h for h in spec_store.history("v")}
+        self.assertIn("replaced", kept, "the version it overwrote is kept")
+        self.assertIn("unsaved", kept, "and so is the version that was refused")
+
+    def test_every_replaced_version_can_be_restored_and_a_deleted_video_comes_back(self):
+        r = spec_store.write("v", self.A)
+        with patch.object(spec_store, "THROTTLE_S", 0):
+            r = spec_store.write("v", self.B, expect=r)
+        versions = spec_store.history("v")
+        self.assertTrue(any(v["title"] == "A" for v in versions), "A was kept when B replaced it")
+        a = next(v for v in versions if v["title"] == "A")
+        raw, rev = spec_store.restore("v", a["id"])
+        self.assertEqual(raw["title"], "A")
+        self.assertTrue(any(v["reason"] == "before-restore" and v["title"] == "B" for v in spec_store.history("v")), "restoring keeps what it replaces")
+        spec_store.delete("v")
+        self.assertFalse(os.path.exists(os.path.join(self.specs, "v.json")))
+        self.assertEqual([d["name"] for d in spec_store.deleted()], ["v"])
+        dead = spec_store.deleted()[0]
+        spec_store.restore("v", dead["id"])
+        self.assertEqual(spec_store.read("v")[0]["title"], "A")
+        self.assertEqual(spec_store.deleted(), [])
+
+    def test_history_is_thinned_but_never_loses_what_was_marked(self):
+        now = time.time()
+        for i in range(120):                                              # one per minute over two hours
+            spec_store.snapshot("v", spec_store.encode({**self.A, "title": f"t{i}"}), "save", at=now - i * 60)
+        spec_store.snapshot("v", spec_store.encode({**self.A, "title": "doomed"}), "deleted", at=now - 100 * 86400)
+        spec_store.prune("v", now)
+        got = spec_store.history("v")
+        self.assertLessEqual(len(got), spec_store.KEEP_RECENT + 6, "two hours of minutes are thinned to the recent ones plus one per hour (and the marked one)")
+        self.assertLess(len(got), 60, "far fewer than the 121 versions saved")
+        self.assertEqual(got[0]["title"], "t0", "newest first")
+        self.assertTrue(any(v["title"] == "doomed" for v in got), "a deleted video's last version is kept")
+
+    def test_a_broken_spec_is_put_back_on_start_and_crash_litter_is_cleared(self):
+        spec_store.write("good", self.A)
+        spec_store.snapshot("good", spec_store.encode(self.A), "created")
+        Path(self.specs, "good.json").write_text('{"title": "half writ')          # torn by something outside the store
+        Path(self.specs, "empty.json").write_text("")
+        spec_store.snapshot("empty", spec_store.encode(self.B), "created")
+        Path(self.specs, ".good.json.abc.part").write_text("{")
+        os.utime(Path(self.specs, ".good.json.abc.part"), (1, 1))
+        lonely = Path(self.specs, "lonely.json"); lonely.write_text(json.dumps(self.A))
+        said = []
+        fixed = dict(spec_store.recover(said.append))
+        self.assertEqual(spec_store.read("good")[0]["title"], "A")
+        self.assertEqual(spec_store.read("empty")[0]["title"], "B")
+        self.assertEqual(set(fixed), {"good", "empty"})
+        self.assertFalse(list(Path(self.specs).glob("*.part")))
+        self.assertTrue(spec_store.history("lonely"), "every spec gets a version to return to")
+        self.assertTrue(any(v["reason"] == "corrupt" for v in spec_store.history("good")), "the broken file is kept too")
+
+    def test_new_copy_and_rename_are_exclusive_and_keep_history(self):
+        spec_store.create("one", self.A)
+        with self.assertRaises(FileExistsError): spec_store.create("one", self.B)
+        spec_store.duplicate("one", "two")
+        with self.assertRaises(FileExistsError): spec_store.duplicate("one", "two")
+        with patch.object(spec_store, "THROTTLE_S", 0):
+            spec_store.write("two", self.B)
+        spec_store.rename("two", "three")
+        self.assertFalse(os.path.exists(os.path.join(self.specs, "two.json")))
+        self.assertEqual(spec_store.read("three")[0]["title"], "B")
+        self.assertTrue(any(v["title"] == "A" for v in spec_store.history("three")), "the history moved with the name")
+
+    def test_many_writers_at_once_always_leave_a_valid_spec_and_history(self):
+        def worker(i):
+            for k in range(15):
+                spec_store.write("v", {**self.A, "title": f"w{i}-{k}"})
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(6)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+        raw, rev = spec_store.read("v")
+        self.assertEqual(rev, spec_store.current_revision("v"))
+        for v in spec_store.history("v"):
+            self.assertTrue(v["pieces"] == 1)
+        self.assertFalse(list(Path(self.specs).glob("*.part")))
+
+    def test_the_http_save_refuses_empty_stale_and_destructive_writes(self):
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+        thread = threading.Thread(target=srv.serve_forever, daemon=True); thread.start()
+        def req(method, path, body=None, headers=None):
+            c = http.client.HTTPConnection(*srv.server_address)
+            c.request(method, path, body, headers or {})
+            r = c.getresponse(); data = r.read(); c.close()
+            return r.status, (json.loads(data) if data[:1] in (b"{", b"[") else data)
+        try:
+            st, r = req("PUT", "/api/spec/v", json.dumps(self.A)); self.assertEqual(st, 200); rev1 = r["rev"]
+            self.assertEqual(req("GET", "/api/spec/v")[1]["rev"], rev1, "a load tells the editor its revision")
+            before = Path(self.specs, "v.json").read_bytes()
+            self.assertEqual(req("PUT", "/api/spec/v", "")[0], 400, "an empty body is refused")
+            self.assertEqual(req("PUT", "/api/spec/v", "{}")[0], 400, "an empty video never replaces a real one")
+            self.assertEqual(req("PUT", "/api/spec/v", "[1,2]")[0], 400)
+            self.assertEqual(Path(self.specs, "v.json").read_bytes(), before)
+            st, r = req("PUT", "/api/spec/v", json.dumps(self.B), {"If-Match": rev1}); self.assertEqual(st, 200); rev2 = r["rev"]
+            st, r = req("PUT", "/api/spec/v", json.dumps(self.A), {"If-Match": rev1})
+            self.assertEqual((st, r["conflict"], r["rev"], r["raw"]["title"]), (409, True, rev2, "B"), "a stale tab is told what is there now")
+            self.assertEqual(spec_store.read("v")[0]["title"], "B")
+            st, r = req("PUT", "/api/spec/v", json.dumps(self.A), {"If-Match": rev1, "X-Force": "1"}); self.assertEqual(st, 200)
+            self.assertEqual(req("DELETE", "/api/spec/v")[0], 200)
+            self.assertEqual([d["name"] for d in req("GET", "/api/trash")[1]["deleted"]], ["v"])
+            st, hist = req("GET", "/api/spec/v/history"); self.assertEqual(st, 200)
+            self.assertTrue(any(v["reason"] == "deleted" for v in hist["versions"]))
+            deleted = next(v for v in hist["versions"] if v["reason"] == "deleted")
+            st, r = req("POST", "/api/spec/v/restore", json.dumps({"id": deleted["id"]})); self.assertEqual(st, 200)
+            self.assertEqual(req("GET", "/api/spec/v")[1]["raw"]["title"], "A")
+            self.assertEqual(req("POST", "/api/spec/v/restore", json.dumps({"id": "../../etc/passwd"}))[0], 400)
+            self.assertEqual(req("POST", "/api/spec/v/stash", json.dumps({"raw": self.B}))[0], 200)
+            self.assertFalse(list(Path(self.specs).glob("*.part")))
+        finally:
+            srv.shutdown(); srv.server_close(); thread.join()
 
 
 class ServerTests(unittest.TestCase):
