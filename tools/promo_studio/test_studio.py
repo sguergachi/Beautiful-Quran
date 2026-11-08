@@ -332,6 +332,16 @@ class FormatTests(unittest.TestCase):
 class AudioRepairTests(unittest.TestCase):
     RATE = 48000
 
+    def test_the_anchor_is_the_takes_start_even_when_it_slips_within_seconds(self):
+        lag = lambda *ms: [(float(i), float(m), 0.99) for i, m in enumerate(ms)]
+        # a busy host: steady for two windows, then a drop every couple of seconds
+        self.assertEqual(audio._anchor(lag(175.4, 175.4, 267.9, 267.9, 290.6, 313.3, 336, 358.7))[0], 175.4)
+        # a quiet host: the same answer the six-window rule gave
+        self.assertAlmostEqual(audio._anchor(lag(140, 140.1, 139.9, 140, 140, 140))[0], 140, delta=0.2)
+        # nothing steady, or something earlier sitting lower than the steady run: refuse rather than guess
+        self.assertIsNone(audio._anchor(lag(100, 150, 200, 250, 300, 350)))
+        self.assertIsNone(audio._anchor(lag(90, 175, 175, 175, 175, 175)))
+
     def voice(self, seconds, f0=140.0, seed=0):
         """A vowel-like tone: a few harmonics, a little breath noise, 16-bit safe."""
         t = np.arange(int(seconds * self.RATE)) / self.RATE

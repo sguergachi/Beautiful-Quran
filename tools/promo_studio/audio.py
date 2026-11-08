@@ -108,7 +108,7 @@ def recitation(reciter, surah, ayah, seconds, lead, out):
 # from the voice's own waveform (below). Takes are healed in place once, keeping
 # the original beside as audio.orig.wav.
 
-HEAL_VERSION = 5
+HEAL_VERSION = 6
 HEAL_MIN_RUN = 16           # samples (0.33 ms) of exact silence that count as a dropout
 HEAL_LEVEL = 0.02           # RMS (-34 dBFS) of the 10 ms right either side: sound stopped mid-sentence, not a pause
 HEAL_SHORT = 0.004          # a run under 3 ms can only be a glitch: it needs only this much sound around it
@@ -249,10 +249,35 @@ def recitation_lags(take, ref, lead, rate=48000, first=1.0, step=1.0):
     return out
 
 
+ANCHOR_RUN = 2              # windows in a row that must agree on the take's starting offset
+
+
+def _anchor(lags):
+    """(offset ms, gain) the take began with, before any slip, or None.
+
+    A drop only ever pushes the recorded sound ahead of the app (the lag grows),
+    so the take's own offset is the earliest stretch that holds steady, and it is
+    the lowest lag of the opening windows. On a busy host the emulator can drop
+    a chunk every couple of seconds (1.1% on a 2K take), so the opening is not
+    steady for long: a steady first pair is enough, and anything that is not
+    the lowest of the opening is refused (no anchor is better than a wrong one)."""
+    import numpy as np
+    head = lags[:8]
+    for i in range(len(head) - ANCHOR_RUN + 1):
+        run = [l for _, l, _ in head[i:i + ANCHOR_RUN]]
+        if max(run) - min(run) <= LAG_DRIFT_MS:
+            base = float(np.median(run))
+            if min(l for _, l, _ in head) < base - LAG_DRIFT_MS:
+                return None                                # something earlier sat lower: not the take's start
+            return base, float(np.median([g for _, _, g in head[i:i + ANCHOR_RUN]]))
+    return None
+
+
 def _on_the_apps_clock(take, ref, lead, rate=48000):
     """The take's sound put back on the app's clock, or None when it never left it.
-    The emulator hands the recorder about 0.09% fewer audio samples than real
-    time passes (it drops ~22 ms every ~20 s), so the recorded sound slips
+    The emulator hands the recorder fewer audio samples than real time passes
+    (it drops ~22 ms chunks: every ~20 s on a quiet host, every couple of
+    seconds on a busy one), so the recorded sound slips
     ahead of the app's own clock, and so of the picture, and each drop is a click. The recitation
     it was recording is known exactly (the files the app plays), so the sound is
     rebuilt from them at the offset the take began with, before any slip: sync
@@ -261,14 +286,13 @@ def _on_the_apps_clock(take, ref, lead, rate=48000):
     lags = recitation_lags(take, ref, lead, rate)
     if len(lags) < 6:
         return None
-    start = [l for _, l, _ in lags[:6]]
-    base = float(np.median(start))
-    if max(abs(x - base) for x in start) > LAG_DRIFT_MS:
+    found = _anchor(lags)
+    if found is None:
         return None                                        # not steady at the start: nothing to anchor to
+    base, gain = found
     off = [abs(l - base) for _, l, _ in lags]
     if sum(1 for o in off if o > LAG_DRIFT_MS) < 3:
         return None                                        # it stayed on the app's clock: leave the recording alone
-    gain = float(np.median([g for _, _, g in lags[:6]]))
     at = int(round((lead - base / 1000.0) * rate))
     out = np.zeros_like(take)
     n = min(len(ref), len(out) - at) if at >= 0 else min(len(ref) + at, len(out))
