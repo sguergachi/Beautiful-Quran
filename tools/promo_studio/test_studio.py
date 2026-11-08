@@ -332,6 +332,33 @@ class FormatTests(unittest.TestCase):
 class AudioRepairTests(unittest.TestCase):
     RATE = 48000
 
+    def test_sound_that_goes_dead_mid_take_is_found_and_rebuilt_from_the_recitation(self):
+        rate, rng = 48000, np.random.default_rng(7)
+        # a "recitation": voiced bursts with short breaths, 30 s
+        t = np.arange(30 * rate) / rate
+        voice = (0.2 * np.sin(2 * np.pi * 180 * t) * (np.sin(2 * np.pi * 0.7 * t) > -0.6)).astype(np.float32)
+        voice += 0.02 * rng.standard_normal(len(t)).astype(np.float32) * (np.abs(voice) > 0)
+        ref = np.stack([voice, voice], axis=1)
+        lead = 1.0
+        take = np.zeros((int(29 * rate), 2), np.float32)
+        take[int(lead * rate):] = ref[:len(take) - int(lead * rate)]
+        take[int(18 * rate):] = 0                      # the emulator's sound dies at 18 s and stays dead
+        dead = audio.dead_stretches(take, ref, lead, 0.0, rate)
+        self.assertEqual(len(dead), 1)
+        self.assertAlmostEqual(dead[0][0], 18.0, delta=0.15)
+        self.assertGreater(dead[0][1], 10000)
+        with patch.object(audio, "recitation_lags", return_value=[(float(k), 0.0, 1.0) for k in range(2, 18)]):
+            y, info = audio._on_the_apps_clock(take, ref, lead, rate)
+        self.assertTrue(info["dead"])
+        self.assertLess(np.abs(y[int(20 * rate):int(25 * rate)] - ref[int(19 * rate):int(24 * rate)]).max(), 1e-6,
+                        "the dead stretch now holds the recitation, in place")
+        self.assertEqual(audio.dead_stretches(y, ref, lead, 0.0, rate), [])
+        # a take that was heard throughout is left alone
+        whole = take.copy(); whole[int(lead * rate):] = ref[:len(take) - int(lead * rate)]
+        self.assertEqual(audio.dead_stretches(whole, ref, lead, 0.0, rate), [])
+        with patch.object(audio, "recitation_lags", return_value=[(float(k), 0.0, 1.0) for k in range(2, 28)]):
+            self.assertIsNone(audio._on_the_apps_clock(whole, ref, lead, rate))
+
     def test_the_anchor_is_the_takes_start_even_when_it_slips_within_seconds(self):
         lag = lambda *ms: [(float(i), float(m), 0.99) for i, m in enumerate(ms)]
         # a busy host: steady for two windows, then a drop every couple of seconds

@@ -108,7 +108,7 @@ def recitation(reciter, surah, ayah, seconds, lead, out):
 # from the voice's own waveform (below). Takes are healed in place once, keeping
 # the original beside as audio.orig.wav.
 
-HEAL_VERSION = 6
+HEAL_VERSION = 7
 HEAL_MIN_RUN = 16           # samples (0.33 ms) of exact silence that count as a dropout
 HEAL_LEVEL = 0.02           # RMS (-34 dBFS) of the 10 ms right either side: sound stopped mid-sentence, not a pause
 HEAL_SHORT = 0.004          # a run under 3 ms can only be a glitch: it needs only this much sound around it
@@ -273,6 +273,35 @@ def _anchor(lags):
     return None
 
 
+DEAD_MIN_S = 0.25           # dead sound shorter than this is left to the dropout fill
+
+
+def dead_stretches(take, ref, lead, base_ms, rate=48000):
+    """[(take s, ms)] where the recitation was being played but the take holds
+    digital silence. The emulator's sound path can die mid-take and stay dead
+    (the app goes on reciting, its words still light, its player still
+    playing); a dropout finder only sees silence with sound after it, so a dead
+    tail went unnoticed. Aligned through the take's starting offset `base_ms`."""
+    import numpy as np
+    at = int(round((lead - base_ms / 1000.0) * rate))           # take sample = recitation sample + at
+    blk = rate // 10
+    m, r = np.abs(take).max(axis=1), np.abs(ref).mean(axis=1)
+    out, run = [], None
+    for k in range(max(0, at), len(m) - blk, blk):
+        j = k - at
+        if j < 0 or j + blk > len(r):
+            continue
+        voiced = float(np.sqrt(np.mean(r[j:j + blk] ** 2))) > 0.01
+        silent = float(m[k:k + blk].max()) < 1.5 / 32768
+        if voiced and silent:
+            run = [k, k + blk] if run is None else [run[0], k + blk]
+        elif run is not None and not silent:
+            out.append(run); run = None
+    if run is not None:
+        out.append(run)
+    return [(round(a / rate, 3), round((b - a) * 1000 / rate)) for a, b in out if b - a >= DEAD_MIN_S * rate]
+
+
 def _on_the_apps_clock(take, ref, lead, rate=48000):
     """The take's sound put back on the app's clock, or None when it never left it.
     The emulator hands the recorder fewer audio samples than real time passes
@@ -291,8 +320,9 @@ def _on_the_apps_clock(take, ref, lead, rate=48000):
         return None                                        # not steady at the start: nothing to anchor to
     base, gain = found
     off = [abs(l - base) for _, l, _ in lags]
-    if sum(1 for o in off if o > LAG_DRIFT_MS) < 3:
-        return None                                        # it stayed on the app's clock: leave the recording alone
+    dead = dead_stretches(take, ref, lead, base, rate)
+    if sum(1 for o in off if o > LAG_DRIFT_MS) < 3 and not dead:
+        return None                                        # it stayed on the app's clock, all of it heard: leave the recording alone
     at = int(round((lead - base / 1000.0) * rate))
     out = np.zeros_like(take)
     n = min(len(ref), len(out) - at) if at >= 0 else min(len(ref) + at, len(out))
@@ -300,7 +330,8 @@ def _on_the_apps_clock(take, ref, lead, rate=48000):
         return None
     src0, dst0 = max(0, -at), max(0, at)
     out[dst0:dst0 + n] = gain * ref[src0:src0 + n, :out.shape[1]]
-    return out, {"offset_ms": round(base, 1), "drift_ms": round(max(l for _, l, _ in lags) - base, 1), "windows": len(lags), "gain": round(gain, 3)}
+    return out, {"offset_ms": round(base, 1), "drift_ms": round(max(l for _, l, _ in lags) - base, 1), "windows": len(lags), "gain": round(gain, 3),
+                 "dead": dead}
 
 
 def _gap_donors(take, ref, gaps, lead, rate=48000):
@@ -403,7 +434,8 @@ def heal_wav(path, log=None):
         y, info = rebuilt
         report = []                             # nothing left over: every gap and every slip is gone
         if log:
-            log(f"audio: put back on the app's clock (it had slipped {info['drift_ms']:+.0f} ms, offset {info['offset_ms']:+.0f} ms kept)")
+            dead = "".join(f", its sound went dead at {a:.1f} s for {ms / 1000:.1f} s" for a, ms in info.get("dead", []))
+            log(f"audio: rebuilt from the recitation on the app's clock (it had slipped {info['drift_ms']:+.0f} ms{dead}; offset {info['offset_ms']:+.0f} ms kept)")
     else:
         y, report = conceal(x, gaps, rate, donors) if gaps else (x.copy(), [])
         info = {}
