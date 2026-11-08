@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api.ts";
 import * as E from "../lib/edit.ts";
-import { clamp, r3, valueAt } from "../lib/model.ts";
+import { panToPlacePhone, phoneCentre } from "../lib/geometry.ts";
+import { clamp, r3, stateAt, valueAt } from "../lib/model.ts";
 import { activeContext, INSPECTOR, type InspectorContext } from "../lib/inspector.ts";
 import type { Ease, Emulator, Job } from "../lib/types.ts";
 import { clock, useTime } from "../state/clock.ts";
@@ -74,6 +75,7 @@ function Animate({ context }: { context: InspectorContext | null }) {
                 <span className="truncate text-mute" title={`${d.label} · ${keys.length ? `${keys.length} key${keys.length > 1 ? "s" : ""}` : "one value for the whole video"}`}>{d.label}</span>
                 <Slider label={d.label} value={valueAt(spec, meta.props, n, t)} min={d.min} max={d.max} step={d.step} digits={d.step < 0.01 ? 3 : 2}
                   onChange={(v) => setProp(n, v)} onDone={endGesture} />
+                {(n === "pan_x" || n === "pan_y") && <PanPresets axis={n === "pan_x" ? "x" : "y"} />}
               </div>
             );
           })}
@@ -84,6 +86,30 @@ function Animate({ context }: { context: InspectorContext | null }) {
         {raw.tracks && Object.keys(raw.tracks).length === 0 && " Try Push in under the picture."}
       </p>
     </>
+  );
+}
+
+// Shortcuts under Pan X / Pan Y: put the phone's centre at a quarter, third or the
+// middle of the frame (left to right for X, top to bottom for Y).
+const PAN_STOPS: [string, number, string][] = [["¼", 1 / 4, "a quarter"], ["⅓", 1 / 3, "a third"], ["●", 1 / 2, "the centre"], ["⅔", 2 / 3, "two thirds"], ["¾", 3 / 4, "three quarters"]];
+function PanPresets({ axis }: { axis: "x" | "y" }) {
+  const meta = useStore((s) => s.meta)!, spec = useStore((s) => s.spec)!, geo = useStore((s) => s.geo);
+  const t = useTime(60);
+  if (!geo) return null;
+  const go = (frac: number) => {
+    const p = panToPlacePhone(geo, stateAt(spec, meta.props, clock.t), axis, frac), tag = "pan-preset:" + performance.now();
+    setProp("pan_x", p.x, tag); setProp("pan_y", p.y, tag);     // coupled when the camera is rotated; the other is unchanged otherwise
+    endGesture();
+  };
+  const S = stateAt(spec, meta.props, t), cur = phoneCentre(geo, S, S.phone_x, S.phone_y)[axis === "x" ? 0 : 1] / (axis === "x" ? geo.W : geo.H);
+  const where = axis === "x" ? ["left", "right"] : ["top", "bottom"];
+  return (
+    <div className="col-span-3 -mt-0.5 mb-1 flex items-center gap-1 pl-[116px]" role="group" aria-label={`Place the phone across the frame (${where[0]} to ${where[1]})`}>
+      {PAN_STOPS.map(([label, f, name]) => (
+        <button key={label} onClick={() => go(f)} title={`Phone's centre at ${name} of the frame, from the ${where[0]}`} aria-label={`Phone at ${name} from the ${where[0]}`}
+          className={`h-5 min-w-8 rounded border px-1.5 text-[11px] ${Math.abs(cur - f) < 0.002 ? "border-gold/60 text-gold" : "border-line text-faint hover:text-ink"}`}>{label}</button>
+      ))}
+    </div>
   );
 }
 
