@@ -108,7 +108,7 @@ def recitation(reciter, surah, ayah, seconds, lead, out):
 # from the voice's own waveform (below). Takes are healed in place once, keeping
 # the original beside as audio.orig.wav.
 
-HEAL_VERSION = 2
+HEAL_VERSION = 4
 HEAL_MIN_RUN = 16           # samples (0.33 ms) of exact silence that count as a dropout
 HEAL_LEVEL = 0.02           # RMS (-34 dBFS) of the 10 ms right either side: sound stopped mid-sentence, not a pause
 HEAL_SHORT = 0.004          # a run under 3 ms can only be a glitch: it needs only this much sound around it
@@ -160,15 +160,46 @@ def _period(m, lo, hi, side):
     return best_lag if best >= 0.3 else None
 
 
-def conceal(x, gaps, rate=48000):
-    """Fill each short dropout from the sound around it: the last pitch period
-    before the gap repeated forward, the first one after it repeated backward,
-    cross-faded across the gap so both edges join smoothly. Longer holes just
-    get short fades. Returns (healed copy, [(start s, ms, filled)])."""
+def _read_pcm(path):
+    import numpy as np
+    with wave.open(path, "rb") as w:
+        if w.getsampwidth() != 2:
+            raise ValueError("not 16-bit PCM")
+        ch, rate = w.getnchannels(), w.getframerate()
+        return np.frombuffer(w.readframes(w.getnframes()), np.int16).reshape(-1, ch).astype(np.float32) / 32768, rate, w.getparams()
+
+
+def clean_recitation(app, seconds):
+    """The recitation exactly as the app plays it (EveryAyah files, gapless),
+    from its own start, as float (n, 2) at 48 kHz; None when the take's
+    settings are not a plain one-pass playlist (repeats are timed by the app)."""
+    import numpy as np
+    if app.get("repeat", "off") != "off" or app.get("reciter") not in RECITERS:
+        return None
+    items, _ = playlist(app["reciter"], int(app["surah"]), int(app["ayah"]), seconds)
+    parts = []
+    for _, wav, _ in items:
+        x, rate, _p = _read_pcm(wav)
+        if rate != 48000:
+            raise ValueError("playlist audio is not 48 kHz")
+        parts.append(x if x.shape[1] == 2 else np.repeat(x, 2, axis=1))
+    return np.concatenate(parts) if parts else None
+
+
+XFADE = 0.006               # seconds: how long the fill takes to join the sound after the gap
+
+
+def conceal(x, gaps, rate=48000, donors=None):
+    """Fill each short dropout without moving anything in time. The fill runs on
+    from the sound before the gap (`donors[i]`, the voice's real continuation
+    when known, else the last pitch period repeated) and only in its last few
+    ms joins the sound after the gap (the first period after it, repeated
+    backward), so the level never pinches in the middle of the gap. Longer holes
+    just get short fades. Returns (healed copy, [(start s, ms, filled)])."""
     import numpy as np
     y, m, report = x.copy(), x.mean(axis=1), []
     w = rate * 40 // 1000
-    for s, e in gaps:
+    for i, (s, e) in enumerate(gaps):
         n = e - s
         report.append((s / rate, n * 1000 / rate, n <= HEAL_MAX_FILL * rate))
         if n > HEAL_MAX_FILL * rate:
@@ -176,59 +207,131 @@ def conceal(x, gaps, rate=48000):
             if s > f: y[s - f:s] *= np.linspace(1, 0, f, dtype=np.float32)[:, None]
             if e + f < len(y): y[e:e + f] *= np.linspace(0, 1, f, dtype=np.float32)[:, None]
             continue
-        pf = _period(m, max(0, s - w), s, -1) or min(480, max(32, s))
-        pb = _period(m, e, min(len(m), e + w), 1) or min(480, max(32, len(m) - e))
         k = np.arange(n)
-        fwd = x[np.clip(s - pf + (k % pf), 0, len(x) - 1)]                  # last period, tiled forward
-        bwd = x[np.clip(e + ((s + k - e) % pb), 0, len(x) - 1)]             # first period after, tiled backward
-        t = (k + 0.5) / n
-        wgt = (t * t * (3 - 2 * t)).astype(np.float32)[:, None]            # smoothstep
-        y[s:e] = (1 - wgt) * fwd + wgt * bwd
+        donor = donors[i] if donors and donors[i] is not None else None
+        if donor is None:
+            pf = _period(m, max(0, s - w), s, -1) or min(480, max(32, s))
+            donor = x[np.clip(s - pf + (k % pf), 0, len(x) - 1)]                  # last period, tiled forward
+        pb = _period(m, e, min(len(m), e + w), 1) or min(480, max(32, len(m) - e))
+        bwd = x[np.clip(e + ((s + k - e) % pb), 0, len(x) - 1)]                   # first period after, tiled backward
+        xf = max(1, min(int(XFADE * rate), n // 3))
+        t = np.clip((k - (n - xf) + 0.5) / xf, 0, 1)
+        wgt = (t * t * (3 - 2 * t)).astype(np.float32)[:, None]                  # 0 until the last xf samples, then smoothstep to 1
+        y[s:e] = (1 - wgt) * donor + wgt * bwd
     return y, report
 
 
+def _gap_donors(take, ref, gaps, lead, rate=48000):
+    """For each gap, the clean recitation's real continuation at the take's own
+    local timing (found just before the gap), or None where it cannot be matched.
+    Only ever used to fill the gap itself: no sample outside a gap is replaced."""
+    import numpy as np
+    from numpy.fft import irfft, rfft
+    m, r = take.mean(axis=1), ref.mean(axis=1)
+    w, pad = int(0.15 * rate), int(0.4 * rate)
+    n = 1 << int(np.ceil(np.log2(3 * w + 2 * pad)))
+    out = []
+    for s, e in gaps:
+        a = m[max(0, s - w - 480):max(0, s - 480)]
+        if len(a) < w or e - s > HEAL_MAX_FILL * rate or float(np.sqrt(np.mean(a ** 2))) < 0.02:
+            out.append(None); continue
+        r0 = (s - w - 480) - int(lead * rate)
+        if r0 - pad < 0 or r0 + w + pad > len(r) - (e - s) - 480:
+            out.append(None); continue
+        seg = r[r0 - pad:r0 + w + pad]
+        cc = irfft(rfft(seg, n) * np.conj(rfft(a, n)), n)[:len(seg) - w + 1]
+        k = int(cc.argmax()); b = seg[k:k + w]
+        corr = float(np.dot(a, b) / np.sqrt(np.dot(a, a) * np.dot(b, b) + 1e-12))
+        if corr < 0.93:                                          # 0.15 s of a noisy fricative can sit a little lower
+            out.append(None); continue
+        g = float(np.dot(a, b) / np.dot(b, b))
+        start = r0 - pad + k + w + 480                          # where the voice stands at the gap's first sample
+        d = g * ref[start:start + (e - s)]
+        out.append(d[:, :take.shape[1]] if d.shape[1] >= take.shape[1] else np.repeat(d[:, :1], take.shape[1], axis=1))
+    return out
+
+
+def _mute_intro(y, meta, rate):
+    """Silence the quiet ticks Android plays for the recorder's own taps before
+    the recitation starts, when that stretch holds nothing louder. Nothing moves:
+    samples are only zeroed, ending 0.3 s before the recitation with a short fade."""
+    import numpy as np
+    lead = meta.get("lead")
+    if lead is None or lead < 1.0 or lead >= len(y) / rate or (meta.get("marks") or {}).get("scene_only"):
+        return 0
+    end = int((lead - 0.3) * rate)
+    if end < rate // 2:
+        return 0
+    loud = max(float(np.sqrt(np.mean(y[i:i + rate // 10] ** 2))) for i in range(0, end, rate // 10))
+    if loud > 0.02:
+        return 0                                                # there is real sound in the intro: leave it
+    f = rate // 50
+    y[:end - f] = 0
+    y[end - f:end] *= np.linspace(1, 0, f, dtype=np.float32)[:, None]
+    return end / rate
+
+
 def heal_wav(path, log=None):
-    """Repair dropouts in a take's audio.wav in place (the original is kept as
-    audio.orig.wav). Idempotent: a sidecar records the version and the file it
-    healed, so an unchanged, healed take costs one stat. Returns the sidecar's
-    dict ({"version", "dropouts": [[t, ms, filled]]}) or None if there is no wav."""
+    """Make a take's audio.wav free of the capture's glitches, in place, without
+    moving any sound in time (the original is kept as audio.orig.wav and is
+    always the source). Dropouts are filled (see conceal), from the clean
+    recitation's own continuation where it can be matched; the quiet ticks of
+    the recorder's taps before the recitation are silenced. Idempotent: a
+    sidecar records the version and the file it wrote, so an unchanged, healed
+    take costs one stat. Returns the sidecar's dict or None without a wav."""
     if not os.path.isfile(path):
         return None
     d = os.path.dirname(path)
-    side = os.path.join(d, "audio.heal.json")
+    side, orig = os.path.join(d, "audio.heal.json"), os.path.join(d, "audio.orig.wav")
     st = os.stat(path)
+    use_orig = False
     try:
         with open(side) as f:
             rec = json.load(f)
-        if rec.get("version") == HEAL_VERSION and rec.get("size") == st.st_size and rec.get("mtime_ns") == st.st_mtime_ns:
+        if rec.get("size") != st.st_size or rec.get("mtime_ns") != st.st_mtime_ns:
+            if os.path.exists(orig):                # the file is not the one we wrote: a new take's sound,
+                os.remove(orig)                     # and an earlier take's backup must never stand in for it
+        elif rec.get("version") == HEAL_VERSION:
             return rec
+        else:
+            use_orig = os.path.exists(orig)         # healed by an older version: redo it from the original
     except (OSError, ValueError):
         pass
     import numpy as np
-    with wave.open(path, "rb") as w:
-        if w.getsampwidth() != 2:
-            return None
-        ch, rate, params = w.getnchannels(), w.getframerate(), w.getparams()
-        pcm = np.frombuffer(w.readframes(w.getnframes()), np.int16).reshape(-1, ch)
-    x = pcm.astype(np.float32) / 32768
+    x, rate, params = _read_pcm(orig if use_orig else path)
     gaps = find_dropouts(x, rate)
-    report = []
-    if gaps:
-        y, report = conceal(x, gaps, rate)
-        orig = os.path.join(d, "audio.orig.wav")
+    try:
+        with open(os.path.join(d, "meta.json")) as f:
+            meta = json.load(f)
+    except (OSError, ValueError):
+        meta = {}
+    donors, matched = None, 0
+    if gaps and meta.get("app") and meta.get("lead") is not None:
+        try:                                    # the voice's real continuation, where the clean recitation can be had
+            ref = clean_recitation(meta["app"], len(x) / rate)
+            if ref is not None:
+                donors = _gap_donors(x, ref, gaps, float(meta["lead"]), rate)
+                matched = sum(1 for dn in donors if dn is not None)
+        except Exception as e:                  # offline, an unfetched ayah: the repeated period will do
+            if log:
+                log(f"audio: clean recitation unavailable ({str(e)[:80]}); filling from the voice around the gaps")
+    y, report = conceal(x, gaps, rate, donors) if gaps else (x.copy(), [])
+    muted = _mute_intro(y, meta, rate)
+    if gaps and log:
+        log(f"audio: filled {sum(1 for r in report if r[2])} dropouts ({matched} from the recitation's own continuation)"
+            + (f", faded {sum(1 for r in report if not r[2])} long ones" if any(not r[2] for r in report) else "")
+            + (f", silenced the recorder's ticks before {muted:.1f} s" if muted else ""))
+    if gaps or muted:
         if not os.path.exists(orig):
-            os.link(path, orig)                   # the original stays; the healed file replaces the name
+            os.link(path, orig)                   # the original stays; the new file replaces the name
         tmp = f"{path}.{os.getpid()}.heal"
         with wave.open(tmp, "wb") as out:
             out.setparams(params)
             out.writeframes(np.clip(np.round(y * 32768), -32768, 32767).astype(np.int16).tobytes())
         os.replace(tmp, path)
         st = os.stat(path)
-        if log:
-            log(f"audio: filled {sum(1 for r in report if r[2])} dropouts"
-                + (f", faded {sum(1 for r in report if not r[2])} long ones" if any(not r[2] for r in report) else ""))
-    rec = {"version": HEAL_VERSION, "size": st.st_size, "mtime_ns": st.st_mtime_ns,
-           "dropouts": [[round(t, 3), round(ms, 1), bool(f)] for t, ms, f in report]}
+    rec = {"version": HEAL_VERSION, "size": st.st_size, "mtime_ns": st.st_mtime_ns, "muted_before_s": round(muted, 2),
+           "from_recitation": matched, "dropouts": [[round(t, 3), round(ms, 1), bool(f)] for t, ms, f in report]}
     tmp = f"{side}.{os.getpid()}.tmp"
     with open(tmp, "w") as f:
         json.dump(rec, f)

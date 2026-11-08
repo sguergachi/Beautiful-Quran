@@ -348,6 +348,8 @@ class AudioRepairTests(unittest.TestCase):
             truth, got = x[20000:20000 + n], y[20000:20000 + n]
             snr = 10 * np.log10(np.mean(truth ** 2) / np.mean((got - truth) ** 2))
             self.assertGreater(snr, 12, f"{n} samples: the fill is close to the real sound ({snr:.1f} dB)")
+            mid = got[n // 3:2 * n // 3, 0]
+            self.assertGreater(float(np.sqrt(np.mean(mid ** 2))), .6 * float(np.sqrt(np.mean(truth[n // 3:2 * n // 3, 0] ** 2))), "the level does not pinch mid-gap")
             steps = np.abs(np.diff(y[:, 0]))
             self.assertLess(steps[19990:20010 + n].max(), 1.5 * np.abs(np.diff(x[:, 0])).max(), "no click at either edge")
             np.testing.assert_array_equal(y[:20000], hole[:20000])
@@ -381,6 +383,40 @@ class AudioRepairTests(unittest.TestCase):
             self.assertEqual(audio.heal_wav(path), rec)
             self.assertEqual(os.stat(path).st_mtime_ns, stamp, "an already-healed take is not rewritten")
             self.assertIsNone(audio.heal_wav(os.path.join(d, "missing.wav")))
+
+    def test_a_new_take_never_inherits_the_previous_takes_backup(self):
+        import wave
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            path = os.path.join(d, "audio.wav")
+            def write(x):
+                with wave.open(path, "wb") as w:
+                    w.setnchannels(2); w.setsampwidth(2); w.setframerate(self.RATE); w.writeframes((x * 32768).astype(np.int16).tobytes())
+            first = self.voice(1.5); first[30000:31700] = 0
+            write(first); audio.heal_wav(path)
+            self.assertTrue(os.path.exists(os.path.join(d, "audio.orig.wav")))
+            second = self.voice(1.5, f0=170.0, seed=3)               # a re-take lands in the same directory
+            write(second)
+            rec = audio.heal_wav(path)
+            self.assertEqual(rec["dropouts"], [], "the new take is clean and is left alone")
+            with wave.open(path) as w: got = np.frombuffer(w.readframes(w.getnframes()), np.int16)
+            np.testing.assert_array_equal(got, (second * 32768).astype(np.int16).reshape(-1))
+            self.assertFalse(os.path.exists(os.path.join(d, "audio.orig.wav")), "the old take's backup is gone")
+
+    def test_intro_ticks_are_silenced_but_a_real_intro_is_kept(self):
+        import wave
+        for intro_level, silenced in ((.004, True), (.3, False)):
+            with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+                path = os.path.join(d, "audio.wav")
+                x = np.concatenate([self.voice(3.0) * intro_level / .15, self.voice(2.0)])        # 3 s before the recitation
+                x[48000 * 1, :] += .004                                                           # a tick
+                with wave.open(path, "wb") as w:
+                    w.setnchannels(2); w.setsampwidth(2); w.setframerate(self.RATE); w.writeframes((x * 32768).astype(np.int16).tobytes())
+                Path(d, "meta.json").write_text(json.dumps({"lead": 3.0, "length": 5.0, "marks": {}}))
+                rec = audio.heal_wav(path)
+                with wave.open(path) as w: got = np.frombuffer(w.readframes(w.getnframes()), np.int16).reshape(-1, 2)
+                self.assertEqual(rec["muted_before_s"] > 0, silenced)
+                self.assertEqual(int(np.abs(got[:int(2.5 * self.RATE)]).max()) == 0, silenced)
+                np.testing.assert_array_equal(got[3 * self.RATE:], (x * 32768).astype(np.int16)[3 * self.RATE:], "the recitation is never touched")
 
 
 class ServerTests(unittest.TestCase):
