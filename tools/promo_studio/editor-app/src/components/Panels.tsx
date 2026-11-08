@@ -49,20 +49,18 @@ function statusOf(e: Emulator): { text: string; tone: ReturnType<typeof emulator
   return { text: "Ready to record", tone: "green" };
 }
 
-/** The installed build next to the APK an update would put on: version and
-commit on both sides, so Update app says what it would change. */
+/** The build installed on this emulator, and nothing else. The dot is gold
+when the release APK on disk is a different build (Update app is primary
+then), green when they match; the APK's own version lives in its card. */
 function BuildLine({ emu }: { emu: Emulator }) {
   const apk = useStore((s) => s.meta?.apk_info);
   if (!emu.app_version) return null;
   const same = !!emu.app_commit && !!apk?.exists && !!apk.commit && emu.app_commit === apk.commit;
   const installed = `v${emu.app_version}${emu.app_commit ? ` @${emu.app_commit}` : " · commit unknown"}`;
-  const latest = apk?.exists && apk.version ? `v${apk.version}${apk.commit ? ` @${apk.commit}` : ""}` : null;
   return (
     <p className="mt-1.5 flex items-start gap-1.5 text-[12px] leading-5 text-mute">
       <span className="mt-1.5"><Dot tone={same ? "green" : "gold"} /></span>
-      <span className="num min-w-0 break-words">
-        {installed} · {latest ? (same ? "up to date" : `latest ${latest}`) : "no APK on disk"}
-      </span>
+      <span className="num min-w-0 break-words">{installed}</span>
     </p>
   );
 }
