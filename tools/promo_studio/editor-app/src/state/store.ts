@@ -479,7 +479,6 @@ export function selectAll() {
   for (const [prop, keys] of Object.entries(get().spec?.tracks || {})) for (const k of keys) items.push({ prop, t: k.t });
   selectKeys(items);
   inspectSelection();
-  if (items.length) toast(`${items.length} key${items.length > 1 ? "s" : ""} selected`);
 }
 /** The keys at the playhead, on every property. */
 export function keysAtPlayhead(t = clock.t): E.KeyRef[] {
@@ -498,7 +497,6 @@ export function togglePlayheadKeys() {
   if (!items.length) return toast("No keys at the playhead");
   selectKeys(items);
   inspectSelection();
-  toast(`${items.length} key${items.length > 1 ? "s" : ""} at the playhead`);
 }
 export function split(t = clock.t) {
   let at: number | null = null;
