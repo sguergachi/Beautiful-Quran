@@ -57,12 +57,17 @@ def main():
     p.add_argument("--scale", type=float, default=1.0); p.add_argument("--workers", type=int)
     p.add_argument("--format", default="h264"); p.add_argument("--quality", default="high")
     p.add_argument("--fps", type=int); p.add_argument("--audio", type=int, default=256, help="AAC kbps; 0 = no sound")
+    p.add_argument("--accel", default="auto", choices=["auto", "gpu", "cpu"],
+                   help="auto: composite and encode H.264/HEVC on the GPU when it works (setup_gpu.sh)")
     p = sub.add_parser("make"); p.add_argument("specs", nargs="+"); p.add_argument("--force", action="store_true")
     p = sub.add_parser("remux"); p.add_argument("specs", nargs="+")
     p = sub.add_parser("still"); p.add_argument("spec"); p.add_argument("t", type=float); p.add_argument("out")
     p.add_argument("--scale", type=float, default=1.0)
     p = sub.add_parser("new"); p.add_argument("name"); p.add_argument("--from", dest="src")
     a = ap.parse_args()
+    if a.cmd in ("render", "make") or (a.cmd == "job" and a.kind == "render"):
+        import gpu_env
+        gpu_env.reexec_if_needed()            # the GPU venv's Python, when it exists
 
     if a.cmd == "serve":
         import server
@@ -110,7 +115,7 @@ def main():
     elif a.cmd == "render":
         import compose
         for n in names(a.specs):
-            o = {"format": a.format, "quality": a.quality, "scale": a.scale, "fps": a.fps, "audio_kbps": a.audio}
+            o = {"format": a.format, "quality": a.quality, "scale": a.scale, "fps": a.fps, "audio_kbps": a.audio, "accel": a.accel}
             compose.export(S.load(n), out=a.out if len(a.specs) == 1 else None, workers=a.workers, options=o)
     elif a.cmd == "remux":
         import compose

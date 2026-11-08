@@ -2,7 +2,7 @@
 // size estimate, and this video's earlier exports. The settings are the
 // editor's, remembered between sessions, and apply to every export.
 import { useRef, useState } from "react";
-import type { ExportFile, ExportFormat, ExportOptions, ExportQuality } from "../lib/types.ts";
+import type { Accel, ExportFile, ExportFormat, ExportOptions, ExportQuality } from "../lib/types.ts";
 import { estimateBytes, exportFilename, exportFps, fmtBytes, frameSize, scaleLabel } from "../lib/exporting.ts";
 import { cancelJob, deleteExport, exportOptions, exportVideo, openPanel, refreshSpecs, setExport, toast, useStore } from "../state/store.ts";
 import { Drawer } from "./Panels.tsx";
@@ -16,6 +16,17 @@ const PRESETS: [string, string, Partial<ExportOptions>][] = [
   ["GIF", "540p, 25 fps, silent loop", { format: "gif", quality: "balanced", scale: 0.5, fps: 25, audio_kbps: 0 }],
 ];
 const QUALITY: Record<ExportQuality, string> = { best: "Best", high: "High", balanced: "Balanced", small: "Small" };
+const ACCEL: Record<Accel, string> = { auto: "Auto", gpu: "GPU", cpu: "CPU" };
+
+/** What "Render with" will do for this format, in words. */
+function accelHint(o: ExportOptions, gpu: { available: boolean; device: string | null; reason: string | null; nvenc: string[]; checking?: boolean }) {
+  if (o.accel === "cpu") return "Everything renders on the processor: slowest, and the reference for the picture.";
+  if (gpu.checking) return "Checking for a GPU…";
+  if (!gpu.available) return `${o.accel === "gpu" ? "Not available" : "Auto uses the CPU"}: ${gpu.reason ?? "no GPU found"}`;
+  const nv = (o.format === "h264" || o.format === "hevc") && gpu.nvenc.includes(o.format);
+  return `${gpu.device}: draws every frame on the GPU${nv ? " and encodes on it too (files come out a little larger than CPU encodes)" : `; ${codecName(o.format)} is encoded on the CPU`}. Typically 10–30× faster.`;
+}
+const codecName = (f: ExportFormat) => ({ h264: "H.264", hevc: "HEVC", av1: "AV1", vp9: "VP9", prores: "ProRes", gif: "GIF" })[f];
 
 const same = (o: ExportOptions, p: Partial<ExportOptions>) =>
   (Object.keys(p) as (keyof ExportOptions)[]).every((k) => (k === "scale" ? Math.abs(o.scale - (p.scale ?? 0)) < 1e-3 : o[k] === p[k]));
@@ -78,6 +89,9 @@ export function ExportPanel() {
       </Field>
       <Field label="Quality" hint={qualityHint}>
         <Segmented size="sm" value={o.quality} onChange={(quality) => setExport({ quality })} options={m.qualities.map((q) => [q, QUALITY[q]])} />
+      </Field>
+      <Field label="Render with" hint={accelHint(o, m.gpu)}>
+        <Segmented size="sm" value={o.accel} onChange={(accel) => setExport({ accel })} options={m.accels.map((a) => [a, ACCEL[a]])} />
       </Field>
       <Field label="Sound" hint={f.audio && o.audio_kbps ? "The take's own sound, cut with the picture and normalised to −16 LUFS." : undefined}>
         <Select value={f.audio ? (f.audio === "pcm" && o.audio_kbps ? 256 : o.audio_kbps) : 0} onChange={(v) => setExport({ audio_kbps: +v })} disabled={!f.audio} options={soundOptions} />

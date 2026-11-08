@@ -48,6 +48,28 @@ export function fitZoom(spec: Spec, geo: Pick<Geo, "W" | "H" | "g">, S: State): 
   return +Math.min(4, Math.max(1, (W * 0.94) / sw)).toFixed(3);
 }
 
+// Where the phone's centre lands in the frame for a given phone_x / phone_y:
+// out = O + z·Rcam·(P0 − C), so the tilt, the phone's size and its screen
+// offset do not move it.
+export function phoneCentre(geo: Pick<Geo, "W" | "H">, S: State, px: number, py: number): [number, number] {
+  const { W, H } = geo, [c, s] = rot(S.rotate);
+  const vx = S.zoom * (W / 2 + px * W - S.pan_x * W), vy = S.zoom * (H / 2 + py * H - S.pan_y * H);
+  return [W / 2 + c * vx - s * vy, H / 2 + s * vx + c * vy];
+}
+
+// Snap a dragged phone's centre to the frame's vertical and horizontal centre
+// lines. Each axis snaps on its own once within `thr` output px of its line,
+// measured in the frame (not the camera's rotated space), so the guides the
+// editor draws are the lines it snaps to. Returns the adjusted phone_x / phone_y.
+export function snapPhoneToCentre(geo: Pick<Geo, "W" | "H">, S: State, px: number, py: number, thr: number) {
+  const { W, H } = geo, [cx, cy] = phoneCentre(geo, S, px, py);
+  const ox = W / 2 - cx, oy = H / 2 - cy;
+  const snapX = Math.abs(ox) < thr, snapY = Math.abs(oy) < thr;
+  const ux = snapX ? ox : 0, uy = snapY ? oy : 0, [c, s] = rot(S.rotate);
+  // frame delta -> world delta: Rcam⁻¹ · u / z
+  return { x: px + (c * ux + s * uy) / (S.zoom * W), y: py + (-s * ux + c * uy) / (S.zoom * H), snapX, snapY };
+}
+
 export function invert(m: M): M {
   const [a, b, c, d, e, f] = m, det = a * d - b * c;
   return [d / det, -b / det, -c / det, a / det, (c * f - d * e) / det, (b * e - a * f) / det];

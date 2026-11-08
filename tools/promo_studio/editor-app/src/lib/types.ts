@@ -100,7 +100,10 @@ export interface ExportFile { file: string; bytes: number; mtime: number; revisi
 // Export settings (formats.py): what the editor offers and what it sends.
 export type ExportFormat = "h264" | "hevc" | "av1" | "vp9" | "prores" | "gif";
 export type ExportQuality = "best" | "high" | "balanced" | "small";
-export interface ExportOptions { format: ExportFormat; quality: ExportQuality; scale: number; fps: number | null; audio_kbps: number }
+export type Accel = "auto" | "gpu" | "cpu";
+export interface ExportOptions { format: ExportFormat; quality: ExportQuality; scale: number; fps: number | null; audio_kbps: number; accel: Accel }
+/** What the server found when it probed the GPU export (gpu_env.status). */
+export interface GpuStatus { available: boolean; device: string | null; reason: string | null; nvenc: string[]; checking?: boolean }
 export interface ExportFormatInfo {
   label: string; ext: string; audio: "aac" | "opus" | "pcm" | null; hint: string;
   q: Record<ExportQuality, number>; q_label: string; q_names?: Record<ExportQuality, string>;
@@ -108,7 +111,7 @@ export interface ExportFormatInfo {
 }
 export interface ExportMeta {
   formats: Record<ExportFormat, ExportFormatInfo>; qualities: ExportQuality[]; fps: number[]; gif_fps: number[];
-  audio_kbps: number[]; scales: number[]; defaults: ExportOptions; h264_high_kbps: number;
+  audio_kbps: number[]; scales: number[]; accels: Accel[]; gpu: GpuStatus; defaults: ExportOptions; h264_high_kbps: number;
 }
 
 export type JobState = "queued" | "running" | "done" | "error" | "cancelled";

@@ -29,6 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import audio
 import emus
 import formats
+import gpu_env
 import library
 import phone as phone_mod
 import spec as S
@@ -645,7 +646,7 @@ class Handler(BaseHTTPRequestHandler):
                 "phones": sorted(phone_mod.COLORS), "defaults": S.DEFAULTS, "props": S.PROPS,
                 "backgrounds": {k: {"title": v["title"], "label": v.get("label", v["title"]), "suits": v["suits"], "thumb": f"/media/thumb/{k}.jpg"}
                                 for k, v in bgs.items()},
-                "surahs": surahs(), "out_dir": S.OUT, "export": formats.meta(), "apk": emus.DEFAULT_APK,
+                "surahs": surahs(), "out_dir": S.OUT, "export": {**formats.meta(), "gpu": gpu_env.status(wait=False)}, "apk": emus.DEFAULT_APK,
                 "apk_exists": os.path.exists(emus.DEFAULT_APK), "apk_info": emus.apk_info()})
         if p == "/api/health":
             return self.send_json({"ok": True, "jobs": len(JOBS.jobs)})
@@ -893,6 +894,7 @@ def ensure_built(force=False):
 
 
 def serve(port=8765, build=True, host="127.0.0.1"):
+    threading.Thread(target=gpu_env.status, daemon=True).start()     # probe the GPU once, off the request path
     global JOBS
     os.makedirs(S.SPECS, exist_ok=True)
     if build:

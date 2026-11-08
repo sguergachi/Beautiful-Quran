@@ -152,3 +152,24 @@ test("the fade in starts with the first sound, after the take's silent lead", ()
   const short = resolve({ edit: [{ in: 0, out: 0.5 }], audio: { fade_in: 0, fade_out: 4 } }, meta);
   assert.equal(fadeAt(short, 0, 1), 1, "a fade longer than the video spans it, like ffmpeg's");
 });
+
+test("deleting a piece closes the video up: later keys move back, keys inside go", () => {
+  // pieces: 0-4 (take 0-4), gap 1 + 4-7 (video 4-8), 10-13 (video 8-11)
+  const mk = () => ({
+    edit: [{ in: 0, out: 4 }, { in: 4, out: 7, gap: 1 }, { in: 10, out: 13 }],
+    tracks: { zoom: [{ t: 1, v: 1 }, { t: 4, v: 2 }, { t: 6, v: 5 }, { t: 8, v: 3, ease: "hold" }, { t: 10, v: 4 }], pan_x: [{ t: 5, v: .2 }, { t: 7, v: .9 }] },
+    props: {} as Record<string, number>,
+  });
+  const raw = mk();
+  assert.equal(E.deletePiece(raw, 1), true);
+  assert.deepEqual(raw.tracks.zoom, [{ t: 1, v: 1 }, { t: 4, v: 2 }, { t: 6, v: 4 }],
+    "keys inside 4-8 go; the one at the cut's start stays and the one landing on it yields; the later key moves 10 -> 6");
+  assert.equal(raw.tracks.pan_x, undefined, "a track whose keys all sat inside the cut becomes static");
+  assert.equal(raw.props.pan_x, .9, "holding its last value");
+  const tail = mk();
+  E.deletePiece(tail, 2);
+  assert.deepEqual(tail.tracks.zoom, mk().tracks.zoom.filter((k) => k.t <= 8), "deleting the last piece moves nothing, and drops keys past the end");
+  const first = mk();
+  E.deletePiece(first, 0);
+  assert.deepEqual(first.tracks.zoom.map((k) => k.t), [0, 2, 4, 6], "the first piece takes 4 s with it; the key at 4 lands on 0 and the key at 1 goes");
+});

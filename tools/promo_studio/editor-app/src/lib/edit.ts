@@ -154,9 +154,29 @@ export function splitAt(raw: RawSpec, c: Ctx, t: number): number | null {
   return i + 1;
 }
 
+// Deleting a piece ripples: the video closes up over it, so every key after
+// it moves earlier by the time it took (its silent lead-in gap included), and
+// keys inside it go with it. A key right at the cut's start stays, and one
+// that lands on it yields to it. Only a delete does this; a trim or a split
+// leaves keys in video time. A track left with no keys holds its last value.
 export function deletePiece(raw: RawSpec, i: number): boolean {
   if (raw.edit.length <= 1) return false;
+  const len = (p: { in: number; out: number; gap?: number }) => (p.gap || 0) + p.out - p.in;
+  let t0 = 0;
+  for (let j = 0; j < i; j++) t0 += len(raw.edit[j]);
+  const d = len(raw.edit[i]), t1 = t0 + d, eps = 1e-6;
   raw.edit.splice(i, 1);
+  for (const name of Object.keys(raw.tracks || {})) {
+    const keys: Key[] = raw.tracks[name], kept: Key[] = [];
+    for (const k of keys) {
+      if (k.t > t0 + eps && k.t < t1 - eps) continue;                     // inside the cut
+      const t = k.t >= t1 - eps ? r3(k.t - d) : k.t;
+      if (kept.length && Math.abs(kept[kept.length - 1].t - t) < eps) continue;   // landed on a key that stays
+      kept.push({ ...k, t });
+    }
+    if (kept.length) raw.tracks[name] = kept;
+    else { raw.tracks[name] = []; dropEmpty(raw, name, keys[keys.length - 1].v); }
+  }
   return true;
 }
 
