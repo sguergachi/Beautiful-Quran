@@ -40,12 +40,13 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -127,6 +128,9 @@ private const val OPEN_DEGREES = -95f
  */
 private const val OPEN_CAMERA_DISTANCE = 8f
 
+/** Fraction of the swing over which the board's corners round in from square. */
+private const val COVER_ROUND_IN_TURN = 0.06f
+
 /** Same decelerating settle as the paper stack's page turns / web cover. */
 private val CoverOpenEasing = CubicBezierEasing(0.24f, 0.02f, 0.12f, 1f)
 
@@ -207,18 +211,22 @@ fun EntranceCover(
     val frameGeometry = remember(screenRadii, localDensity.density) {
         coverFrameGeometry(screenRadii, localDensity.density)
     }
-    val coverShape = remember(screenRadii, localDensity.density) {
+    // Display silhouette (scaled in by `k` as the cover starts to swing); falls
+    // back to the same designed radius coverFrameGeometry invents for sharp
+    // screens.
+    val coverShape: (Float) -> Shape = remember(screenRadii, localDensity.density) {
         val d = localDensity.density
-        // Match the display silhouette when closed; fall back to the same
-        // designed radius coverFrameGeometry invents for sharp screens.
         val fallback = 36f * d
-        fun r(px: Float) = ((if (screenRadii.max > 0f) px else fallback) / d).dp
-        AbsoluteRoundedCornerShape(
-            topLeft = r(screenRadii.topLeft),
-            topRight = r(screenRadii.topRight),
-            bottomRight = r(screenRadii.bottomRight),
-            bottomLeft = r(screenRadii.bottomLeft),
-        )
+        fun r(px: Float, k: Float) =
+            (((if (screenRadii.max > 0f) px else fallback) * k) / d).dp
+        ({ k: Float ->
+            AbsoluteRoundedCornerShape(
+                topLeft = r(screenRadii.topLeft, k),
+                topRight = r(screenRadii.topRight, k),
+                bottomRight = r(screenRadii.bottomRight, k),
+                bottomLeft = r(screenRadii.bottomLeft, k),
+            )
+        })
     }
 
     // The isti'adha is the widest thing the frame must enclose, so measure it
@@ -387,7 +395,19 @@ fun EntranceCover(
                     // face is visible through the heart of the swing.
                     alpha = sheetAlpha.value * (1f - openFade(t))
                 }
-                .clip(coverShape)
+                // Closed, the board is a plain full-bleed rectangle: the
+                // display's own corners do the rounding on a phone, and in
+                // Recents / task snapshots (which scale the window under the
+                // system's own card radius) a baked-in radius left a rim of
+                // the paper/window behind it showing. The silhouette rounds
+                // in only as the cover starts to swing.
+                .graphicsLayer {
+                    val t = turn.value
+                    shape = if (t <= 0f) RectangleShape else coverShape(
+                        (t / COVER_ROUND_IN_TURN).coerceAtMost(1f),
+                    )
+                    clip = true
+                }
                 .drawWithCache {
                     val leather = Brush.radialGradient(
                         0f to CoverLeatherCenter,
