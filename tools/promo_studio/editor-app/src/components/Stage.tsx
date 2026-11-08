@@ -4,12 +4,14 @@
 import { useEffect, useRef, useState } from "react";
 import { track } from "../lib/drag.ts";
 import { sourceTime, stateAt } from "../lib/model.ts";
-import { phoneMatrix } from "../lib/geometry.ts";
+import { phoneMatrix, snapPhoneToCentre } from "../lib/geometry.ts";
 import { previewContext } from "../lib/inspector.ts";
 import { Preview } from "../lib/render.ts";
 import { clock, media } from "../state/clock.ts";
 import { cancelJob, endGesture, hideExact, inspect, record, select, setProp, setUI, useStore } from "../state/store.ts";
 import { Button, Icon, Progress } from "./ui.tsx";
+
+const SNAP_PX = 12;   // screen px within which Shift snaps the phone to a centre line
 
 export function Stage() {
   const wrap = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
@@ -20,6 +22,9 @@ export function Stage() {
   // The recording in flight for this video: the pill below turns into its status.
   const capture = useStore((s) => s.jobs.find((j) => j.kind === "capture" && j.name === s.name && (j.state === "running" || j.state === "queued")));
   const box = useRef({ w: 0, h: 0 });
+  // Shift while moving the phone: its centre snaps to the frame's centre lines.
+  // null = no guides; else which of the two lines the phone is snapped to.
+  const [guides, setGuides] = useState<{ v: boolean; h: boolean } | null>(null);
 
   // Keep the video in the browser's video compositor. Copying a full 1080 ×
   // 2400 video through Canvas every tick dominated preview time on CPU decode.
@@ -94,9 +99,17 @@ export function Stage() {
       moved = true;
       const sx = (m.clientX - x0) * outPerPx, sy = (m.clientY - y0) * outPerPx;
       const dx = c * sx - sn * sy, dy = sn * sx + c * sy, W = s.geo!.W, H = s.geo!.H;
-      if (phone) { setProp("phone_x", S0.phone_x + dx / (S0.zoom * W), tag); setProp("phone_y", S0.phone_y + dy / (S0.zoom * H), tag); }
-      else { setProp("pan_x", S0.pan_x - dx / (S0.zoom * W), tag); setProp("pan_y", S0.pan_y - dy / (S0.zoom * H), tag); }
+      if (phone) {
+        let px = S0.phone_x + dx / (S0.zoom * W), py = S0.phone_y + dy / (S0.zoom * H);
+        if (m.shiftKey) {
+          const sn = snapPhoneToCentre(s.geo!, S0, px, py, SNAP_PX * outPerPx);
+          px = sn.x; py = sn.y;
+          setGuides((g) => (g && g.v === sn.snapX && g.h === sn.snapY ? g : { v: sn.snapX, h: sn.snapY }));
+        } else setGuides(null);
+        setProp("phone_x", px, tag); setProp("phone_y", py, tag);
+      } else { setProp("pan_x", S0.pan_x - dx / (S0.zoom * W), tag); setProp("pan_y", S0.pan_y - dy / (S0.zoom * H), tag); }
     }, (up) => {
+      setGuides(null);
       endGesture(); if (up.type === "pointercancel") return;
       inspect(moved ? (phone ? "phone-motion" : "camera") : sourceTime(s.spec!, clock.t)[1] < 0 ? "background-look" : previewContext(s.spec!, s.geo!, S0, (x0 - rect.left) * outPerPx, (y0 - rect.top) * outPerPx), !moved || innerWidth > 1000);
     }, { cursor: "grab" });
@@ -128,11 +141,17 @@ export function Stage() {
     <div ref={wrap} onPointerDown={(e) => { if (e.button === 0 && e.target === e.currentTarget && spec) inspect("canvas", true); }} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#0c0b0a]">
       <div ref={scene} className="relative shrink-0 overflow-hidden rounded-sm shadow-[0_0_0_1px_var(--color-line)]">
         <canvas ref={canvas} onPointerDown={onPointerDown} className="block cursor-grab"
-          title="Click phone / background: appearance · Drag: pan · Scroll: zoom · Shift-scroll: rotate · Alt-drag / Alt-scroll: move / scale the phone" />
+          title="Click phone / background: appearance · Drag: pan · Scroll: zoom · Shift-scroll: rotate · Alt-drag / Alt-scroll: move / scale the phone (add Shift to snap to the centre)" />
         <div ref={phone} className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: geo?.g.W, height: geo?.g.H, visibility: geo ? "visible" : "hidden" }}>
           <div ref={screen} className="absolute overflow-hidden" style={{ left: geo?.g.sx0, top: geo?.g.sy0, width: geo?.g.sw, height: geo?.g.sh, borderRadius: geo?.g.screen_r }} />
         </div>
       </div>
+      {guides && (
+        <div className="pointer-events-none absolute" style={{ width: box.current.w, height: box.current.h }}>
+          <span className={`absolute inset-y-0 left-1/2 w-px -translate-x-1/2 ${guides.v ? "bg-gold" : "bg-gold/35"}`} />
+          <span className={`absolute inset-x-0 top-1/2 h-px -translate-y-1/2 ${guides.h ? "bg-gold" : "bg-gold/35"}`} />
+        </div>
+      )}
       {exact && (
         <img src={exact} alt="exact frame" onClick={hideExact} style={{ width: box.current.w, height: box.current.h }}
           className="absolute cursor-pointer rounded-sm outline outline-2 outline-gold" title="The exporter's own frame (with motion blur) · click to hide" />

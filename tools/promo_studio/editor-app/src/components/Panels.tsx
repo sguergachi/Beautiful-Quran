@@ -219,6 +219,7 @@ const SHORTCUTS: [string, string][] = [
   [", / .", "Nudge selected keys a frame (Shift: ten)"], ["Ctrl A · C · V", "Select all keys · copy · paste at the playhead"],
   ["Ctrl Z · Ctrl Shift Z", "Undo · redo"], ["Ctrl S", "Save now"], ["Ctrl E", "Export"], ["Ctrl B · Ctrl .", "Hide / show the videos · the inspector"],
   ["Drag · scroll the picture", "Pan · zoom the camera"], ["Shift-scroll the picture", "Rotate"], ["Alt-drag · Alt-scroll", "Move · scale the phone"],
+  ["Shift while Alt-dragging", "Snap the phone to the frame's centre lines"],
   ["Alt while dragging a key", "No snapping"], ["Double-click a lane", "Add a key there"], ["Right-click", "Ease, copy, split, delete"],
   ["Ctrl-scroll the timeline", "Zoom around the pointer"], ["Drag a divider", "Resize panes (double-click: reset)"],
 ];
