@@ -29,6 +29,12 @@ export function keysAt(raw: RawSpec, c: Ctx, t: number): KeyRef[] {
   for (const [prop, keys] of Object.entries(raw.tracks || {})) for (const k of keys as Key[]) if (Math.abs(k.t - t) < half(c)) out.push({ prop, t: k.t });
   return out;
 }
+/** Every key, on any property, from time a to b (inclusive). */
+export function keysWithin(raw: RawSpec, a: number, b: number): KeyRef[] {
+  const out: KeyRef[] = [];
+  for (const [prop, keys] of Object.entries(raw.tracks || {})) for (const k of keys as Key[]) if (k.t >= a - 1e-9 && k.t <= b + 1e-9) out.push({ prop, t: k.t });
+  return out;
+}
 /** Whether two key lists hold the same keys (order aside). */
 export const sameKeys = (a: KeyRef[], b: KeyRef[]) => a.length === b.length && a.every((x) => b.some((y) => sameKey(x, y)));
 function dropEmpty(raw: RawSpec, name: string, lastValue: number) {
