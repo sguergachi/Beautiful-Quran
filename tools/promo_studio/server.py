@@ -35,6 +35,7 @@ import service
 import spec_store
 import library
 import phone as phone_mod
+import preview
 import spec as S
 import timeline
 
@@ -156,6 +157,10 @@ def take_peaks(key):
     return body
 
 
+def _recording():
+    return any(j["kind"] == "capture" and j["state"] == "running" for j in JOBS.jobs.values())
+
+
 def geometry(s):
     """Everything the browser needs to draw the scene like compose.Renderer."""
     W, H = S.size(s)
@@ -173,7 +178,14 @@ def geometry(s):
             heal = f"-{rec['mtime_ns']}" if rec and rec["dropouts"] else ""
         except Exception as e:
             print(f"audio repair skipped: {e}", flush=True)
-    return {"W": W, "H": H, "fps": s["fps"], "g": g, "take": meta,
+    d = S.take_dir(s)
+    light, pending = None, False                 # the editor's light copy of the take (exports never use it)
+    if meta:
+        if preview.fresh(d):
+            light = f"/media/take/{key}/{preview.NAME}?v={os.stat(preview.path(d)).st_mtime_ns}"
+        else:
+            pending = preview.ensure(d, busy=_recording)
+    return {"W": W, "H": H, "fps": s["fps"], "g": g, "take": meta, "preview": light, "preview_pending": pending,
             "build": emus.build_check(meta.get("build")) if meta else None,
             "frame": "/media/phone/" + os.path.basename(fp),
             "clip": f"/media/take/{key}/clip.mp4?v={revision}" if meta else None,
@@ -702,7 +714,7 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             body = take_peaks(m.group(1))
             return self.send_bytes(body, "application/json", cache="no-cache") if body else self.send_json({"error": "no take"}, 404)
-        m = re.fullmatch(r"/media/take/([\w.-]+)/(clip\.mp4|audio\.wav)", p)
+        m = re.fullmatch(r"/media/take/([\w.-]+)/(clip\.mp4|audio\.wav|preview\.mp4)", p)
         if m:
             return self.send_file(os.path.join(S.CACHE, "takes", m.group(1), m.group(2)))
         m = re.fullmatch(r"/media/phone/([\w.-]+\.png)", p)

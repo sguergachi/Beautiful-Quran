@@ -1080,6 +1080,60 @@ class TakeBuildTests(unittest.TestCase):
         self.assertEqual(self._check({"version": "weird", "commit": "deadbeef0"}, in_repo=False)["state"], "unknown")
 
 
+class PreviewCopyTests(unittest.TestCase):
+    """The editor's light copy of a take: same frames and clock, a quarter of the pixels, never during a recording."""
+
+    def _clip(self, d, w, h, secs=1):
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", f"testsrc2=s={w}x{h}:r=60:d={secs}",
+                        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(Path(d, "clip.mp4"))], check=True)
+
+    def _probe(self, f):
+        out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries",
+                              "stream=width,height,nb_read_packets,r_frame_rate", "-of", "csv=p=0", str(f)],
+                             capture_output=True, text=True, check=True).stdout.strip()
+        w, h, rate, n = out.split(",")
+        return int(w), int(h), rate, int(n)
+
+    def test_a_large_take_gets_a_frame_exact_copy_at_preview_height(self):
+        import preview
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            self._clip(d, 720, 3200)
+            self.assertTrue(preview.needed(d))
+            self.assertFalse(preview.fresh(d))
+            preview.make(d, log=lambda _: None)
+            self.assertTrue(preview.fresh(d))
+            w, h, rate, n = self._probe(Path(d, preview.NAME))
+            self.assertEqual((h, rate), (preview.HEIGHT, "60/1"))
+            self.assertEqual(n, self._probe(Path(d, "clip.mp4"))[3], "same frames on the same clock")
+            self.assertAlmostEqual(w / h, 720 / 3200, delta=0.01)
+            os.utime(Path(d, "clip.mp4"), (time.time() + 5, time.time() + 5))
+            self.assertFalse(preview.fresh(d), "a re-recorded take makes the copy stale")
+
+    def test_a_small_take_plays_as_it_is(self):
+        import preview
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            self._clip(d, 320, 640)
+            self.assertFalse(preview.needed(d))
+            self.assertFalse(preview.ensure(d, log=lambda _: None))
+
+    def test_the_copy_waits_while_a_take_is_recording(self):
+        import preview
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            self._clip(d, 360, 1800)
+            busy = [True]
+            with patch.object(preview, "BUSY_POLL", 0.05), patch.object(preview, "make") as make:
+                self.assertTrue(preview.ensure(d, busy=lambda: busy[0], log=lambda _: None))
+                self.assertTrue(preview.ensure(d, busy=lambda: busy[0], log=lambda _: None), "one copy at a time")
+                time.sleep(0.3)
+                make.assert_not_called()
+                busy[0] = False
+                for _ in range(100):
+                    if make.called:
+                        break
+                    time.sleep(0.02)
+                make.assert_called_once()
+
+
 class ApkTests(unittest.TestCase):
     """The Build Latest card: what the APK was built from, and rebuilding it."""
 

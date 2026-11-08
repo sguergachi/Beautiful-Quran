@@ -10,6 +10,7 @@ import { clamp, plateLook, resolve, soundOnset, takeKey } from "../lib/model.ts"
 import { loadSubmitted, recordingReference, saveSubmitted, staleRecordingFields } from "../lib/recorded.ts";
 import type { Ease, Emulator, ExportFile, ExportOptions, Geo, Job, Meta, Plate, RawSpec, Selection, Spec, SpecStatus, Timeline, Wave } from "../lib/types.ts";
 import { clock, media } from "./clock.ts";
+import { sound } from "./sound.ts";
 import { videoSlug } from "../lib/videos.ts";
 import { activeContext, INSPECTOR, selectionContext, type InspectorContext } from "../lib/inspector.ts";
 
@@ -66,7 +67,7 @@ let lastTimelineKey = "", verseRequest = 0;
 clock.bind(() => {
   const s = get();
   return {
-    spec: s.spec, hasClip: !!s.geo?.clip, hasPlate: !!s.plate, offset: +(s.spec?.background.offset || 0),
+    spec: s.spec, hasClip: !!s.geo?.clip, hasPlate: !!s.plate, offset: +(s.spec?.background.offset || 0), audio: s.geo?.audio ?? null,
     onset: s.spec ? soundOnset(s.spec, s.geo?.take?.lead ?? 1) : 0,
   };
 });
@@ -338,13 +339,44 @@ export async function loadGeometry() {
   lastGeoKey = key;
   media.frame.src = geo.frame;
   if (geo.clip) {
-    if (!media.screen.src.endsWith(geo.clip)) { media.screen.src = geo.clip; media.audio.src = geo.audio!; }
+    const src = previewSrc(geo)!;
+    if (!media.screen.src.endsWith(src)) { media.screen.src = src; }
+    if (!media.audio.src.endsWith(geo.audio!)) media.audio.src = geo.audio!;
   } else {
     media.screen.removeAttribute("src"); media.audio.removeAttribute("src"); media.screen.load(); media.audio.load();
   }
+  void sound.load(geo.clip ? geo.audio : null);       // decoded once: playback then never waits on the network
+  if (geo.clip && !geo.preview && geo.preview_pending) watchPreview(name, key);
   set({ geo });
   clock.seek(clock.t);
   void loadWave(geo.peaks);
+}
+
+// The picture the preview plays: the take's light preview copy once the
+// server has made it (a quarter of the pixels to decode, already scaled with
+// an area filter), the full recording until then.
+export const previewSrc = (geo: Geo | null) => geo?.preview ?? geo?.clip ?? null;
+
+// The preview copy is made in the background on first open; swap it in once
+// it lands, but never under a playing playhead (the swap reloads the picture).
+let previewTimer: number | undefined;
+function watchPreview(name: string, key: string) {
+  clearTimeout(previewTimer);
+  previewTimer = window.setTimeout(async () => {
+    const s = get();
+    if (s.name !== name || !s.spec || geoKey(s.spec) !== key) return;
+    if (clock.playing) return watchPreview(name, key);
+    try {
+      const geo = await api.geometry(name);
+      if (get().name !== name || geoKey(get().spec!) !== key) return;
+      if (geo.preview && !clock.playing) {
+        const t = clock.t;
+        media.screen.src = geo.preview;
+        set({ geo });
+        clock.seek(t);
+      } else watchPreview(name, key);
+    } catch { watchPreview(name, key); }
+  }, 4000);
 }
 
 let waveUrl: string | null = null;

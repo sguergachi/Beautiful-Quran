@@ -75,6 +75,40 @@ cover preview cadence, API latency and export throughput. Exports default to
 four background workers with bounded FFmpeg pools, preserving full output
 resolution and motion blur. The CLI's `--workers` can override that budget.
 
+## Playback: no hitches, no shimmer
+
+The preview is built so playback never stutters, drifts or flashes, and slow
+camera moves stay still:
+
+- **The sound leads.** The take's sound is fetched once and decoded to PCM
+  (`state/sound.ts`); play schedules one Web Audio buffer source per piece at
+  its video time, sample-exact through cuts and gaps. Nothing seeks while
+  playing. The playhead runs on the wall clock eased onto the sound card's
+  clock, so picture and sound cannot part. The `<audio>` element is only the
+  fallback while the decode lands (or without Web Audio).
+- **The picture starts first.** Play lands the recording on the playhead,
+  starts it, holds the playhead until frames flow (a cold decoder can take
+  most of a second), then schedules the sound for the frame on screen. A
+  split that carries straight on never seeks; a real jump cut seeks the light
+  copy, which has a keyframe every half second.
+- **The background never blinks.** Its loop is eased with the playback rate
+  while playing (a seek blanks a plate for frames); a plate still seeking
+  keeps showing its last frame.
+- **One GPU pass draws the scene** (`lib/glpreview.ts`): background (plus any
+  extra blur, as compose.py does it), shadow, screen and bezel with the same
+  matrices as the exporter, in one WebGL2 pass at their exact sub-pixel
+  places, every texture mipmapped. A browser compositor shrinks a
+  1440 x 3200 recording with plain bilinear filtering, so its text shimmers
+  as the camera eases, and a DOM phone is snapped apart from the canvas
+  behind it; neither happens here. Videos upload only when they present a new
+  frame. Without WebGL2 the canvas path in `lib/render.ts` takes over.
+- **A light copy of the take** (`preview.py`): the same frames on the same
+  60 fps clock, area-scaled to 1600 tall (`preview.mp4` beside `clip.mp4`),
+  made in the background on first open and never while a take is recording.
+  The full recording plays until it lands; exports always use the full one.
+
+`window.__promo` exposes the clock, media and sound for the browser console.
+
 ## Export
 
 **Export…** opens the export settings. They are the editor's own,

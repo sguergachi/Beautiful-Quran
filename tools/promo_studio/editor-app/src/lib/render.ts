@@ -67,7 +67,9 @@ export class Preview {
     ctx.fillStyle = sc.themeBg; ctx.fillRect(0, 0, cw, ch);
     // background: the plate holds the least blur; the rest is added here, in
     // plate space, before the camera transform, as the exporter does
-    if (plate && sc.plateVideo.readyState >= 2) {
+    // A plate that is seeking keeps showing its last frame instead of flashing the theme colour.
+    const ready = sc.plateVideo.readyState >= 2;
+    if (plate && (ready || (this.bgKey && this.bgKey.startsWith(sc.plateVideo.src + "|")))) {
       const { w, h, k } = plate;
       const extra = Math.sqrt(Math.max(0, S.bg_blur ** 2 - plate.blur ** 2)) * k;
       const m = bgMatrix(spec, geo, plate, S), inv = invert(m);
@@ -78,7 +80,7 @@ export class Preview {
       const pad = Math.ceil((edge + extra * 4 + 2) / 64) * 64;
       const bw = w + 2 * pad, bh = h + 2 * pad;
       const key = [sc.plateVideo.src, sc.plateVideo.currentTime.toFixed(3), extra.toFixed(2), bw, bh].join("|");
-      if (key !== this.bgKey) {
+      if (ready && key !== this.bgKey) {
         this.bgKey = key;
         if (this.tiles.width !== bw || this.tiles.height !== bh) { this.tiles.width = bw; this.tiles.height = bh; this.bg.width = bw; this.bg.height = bh; }
         const tc = this.tiles.getContext("2d")!;
@@ -100,7 +102,7 @@ export class Preview {
       }
       ctx.save();
       ctx.setTransform(ps, 0, 0, ps, 0, 0); ctx.transform(...m);
-      ctx.drawImage(this.bg, -pad, -pad);
+      ctx.drawImage(this.bg, -(this.bg.width - w) / 2, -(this.bg.height - h) / 2);
       ctx.restore();
     }
     ctx.setTransform(ps, 0, 0, ps, 0, 0);
