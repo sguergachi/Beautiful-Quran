@@ -481,16 +481,20 @@ export function selectAll() {
   inspectSelection();
 }
 /** The keys at the playhead, on every property. */
-export function keysAtPlayhead(t = clock.t): E.KeyRef[] {
-  const spec = get().spec, raw = get().raw;
-  return spec && raw ? E.keysAt(raw, { spec, props: get().meta!.props, fps: spec.fps }, t) : [];
+/** How far either side of the playhead its key button reaches: a key just off the playhead still counts. */
+export const PLAYHEAD_REACH = 0.1;
+/** The keys, on every property, within reach of the span a..b (a single time when b is left out). */
+export function keysNear(a: number, b = a): E.KeyRef[] {
+  const raw = get().raw;
+  return raw ? E.keysWithin(raw, Math.min(a, b) - PLAYHEAD_REACH, Math.max(a, b) + PLAYHEAD_REACH) : [];
 }
+export const keysAtPlayhead = (t = clock.t) => keysNear(t);
 /** Whether exactly the keys at the playhead are selected (the toggle is on). */
 export function playheadKeysSelected(sel: Selection, t = clock.t): boolean {
   const here = keysAtPlayhead(t);
   return sel?.type === "keys" && here.length > 0 && E.sameKeys(sel.items, here);
 }
-/** Toggle: select every key at the playhead, across all properties, or deselect them if they already are. */
+/** Toggle: select every key at the playhead (within reach), across all properties, or deselect them if they already are. */
 export function togglePlayheadKeys() {
   if (playheadKeysSelected(get().sel)) return select(null);
   const items = keysAtPlayhead();
@@ -498,6 +502,8 @@ export function togglePlayheadKeys() {
   selectKeys(items);
   inspectSelection();
 }
+/** Select every key the playhead has passed over while dragged from a to b. */
+export function sweepPlayheadKeys(a: number, b: number) { selectKeys(keysNear(a, b)); }
 export function split(t = clock.t) {
   let at: number | null = null;
   mutate((raw, c) => { at = E.splitAt(raw, c, t); });

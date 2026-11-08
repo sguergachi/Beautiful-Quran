@@ -11,20 +11,43 @@ import { motionContext, type InspectorContext } from "../lib/inspector.ts";
 import { clock, useTime } from "../state/clock.ts";
 import {
   copy, deleteSelection, endGesture, inspect, inspectSelection, mutate, paste, select, selectAll, selectKeys, selKeys, setEase, setUI, split,
-  playheadKeysSelected, toggleKey, togglePlayheadKeys, useStore,
+  playheadKeysSelected, sweepPlayheadKeys, toggleKey, togglePlayheadKeys, useStore,
 } from "../state/store.ts";
 import { openMenu, type MenuItem } from "./Menu.tsx";
 import { SoundLane } from "./SoundLane.tsx";
 import { EditorToolbar } from "./Transport.tsx";
 import { TimelineVerseControls } from "./VerseEditor.tsx";
 
-// ◆ at the foot of the playhead: on while exactly the keys at the playhead are selected; click selects / deselects them.
-function PlayheadKeysToggle() {
-  const sel = useStore((s) => s.sel), t = useTime(60), on = playheadKeysSelected(sel, t);
+// ◆ at the foot of the playhead. Click: select the keys at the playhead
+// (within 100 ms either side), or deselect them if they already are; lit while
+// they are. Drag: move the playhead and collect every key it passes.
+function PlayheadKeysToggle({ timeAt, host, edge }: { timeAt: (x: number) => number; host: () => HTMLElement; edge: () => { box: HTMLElement; left: number } }) {
+  const sel = useStore((s) => s.sel), t = useTime(60), [sweeping, setSweeping] = useState(false);
+  const on = sweeping || playheadKeysSelected(sel, t);
+  const down = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const x0 = e.clientX, was = clock.playing, start = clock.t;
+    let moved = false, lo = start, hi = start;
+    track(e, host(), (m) => {
+      if (!moved && Math.abs(m.clientX - x0) < 3) return;
+      if (!moved) { moved = true; clock.pause(); setSweeping(true); }
+      const at = clamp(timeAt(m.clientX), 0, clock.duration());
+      clock.seek(at);
+      lo = Math.min(lo, at); hi = Math.max(hi, at);
+      sweepPlayheadKeys(lo, hi);
+    }, (up) => {
+      setSweeping(false);
+      if (up.type === "pointercancel") return;
+      if (!moved) return togglePlayheadKeys();
+      inspectSelection();
+      if (was) clock.play();
+    }, { cursor: "ew", edge: edge() });
+  };
   return (
-    <button onClick={togglePlayheadKeys} aria-pressed={on} aria-label="Select every key at the playhead"
-      title={on ? "Deselect the keys at the playhead" : "Select every key at the playhead"}
-      className={`pointer-events-auto sticky bottom-4 -ml-[8px] grid size-[17px] place-items-center rounded-[4px] border border-gold text-[10px] leading-none ${on ? "bg-gold text-bg" : "bg-panel text-gold hover:bg-gold/25"}`}>◆</button>
+    <button onPointerDown={down} onClick={(e) => { if (e.detail === 0) togglePlayheadKeys(); }} aria-pressed={on} aria-label="Select every key at the playhead"
+      title={`${on ? "Deselect the keys at the playhead" : "Select the keys at the playhead (100 ms either side)"} · drag to move the playhead and collect every key it passes`}
+      className={`pointer-events-auto sticky bottom-4 -ml-[8px] grid size-[17px] cursor-ew-resize place-items-center rounded-[4px] border border-gold text-[10px] leading-none ${on ? "bg-gold text-bg" : "bg-panel text-gold hover:bg-gold/25"}`}>◆</button>
   );
 }
 
@@ -372,7 +395,7 @@ export function Timeline() {
           {/* the line lets clicks through to keys and trim handles under it; grab it by its head in the ruler */}
           <div ref={playhead} className="pointer-events-none absolute top-0 bottom-0 z-[25] -ml-px flex w-0.5 flex-col justify-end bg-gold" style={{ left: 0 }}>
             {/* the foot of the line stays in view when the lanes scroll: a toggle for selecting every key at the playhead */}
-            <PlayheadKeysToggle />
+            <PlayheadKeysToggle timeAt={timeAt} host={() => box.current!} edge={edgeOpt} />
           </div>
           <div ref={hover} className="pointer-events-none absolute top-0 bottom-0 z-[24] hidden w-px bg-white/20" style={{ left: 0 }} />
           {marquee && <div className="pointer-events-none absolute z-[26] border border-blue bg-blue/15" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}

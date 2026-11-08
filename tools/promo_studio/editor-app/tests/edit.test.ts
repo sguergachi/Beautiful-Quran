@@ -199,3 +199,11 @@ test("placePhone sets the pan key at the time and leaves the other pan alone whe
   const k = raw.tracks.pan_x.find((x: any) => x.t === 4);
   assert.ok(Math.abs(k.v - (.5 + 1 / 6)) < 2e-3, `pan ${k.v}`);
 });
+
+test("keysWithin collects every key a swept playhead passed, on any property, ends included", () => {
+  const base = { edit: [{ in: 0, out: 10 }], tracks: { zoom: [{ t: 1, v: 2 }, { t: 3, v: 4 }], pan_x: [{ t: 2.95, v: .4 }], rotate: [{ t: 5, v: 5 }] } };
+  const within = (a: number, b: number) => (run(base, (r) => E.keysWithin(r, a, b)).out as E.KeyRef[]).map((k) => `${k.prop}@${k.t}`).sort();
+  assert.deepEqual(within(0.9, 3.1), ["pan_x@2.95", "zoom@1", "zoom@3"]);
+  assert.deepEqual(within(3, 5), ["rotate@5", "zoom@3"], "both ends count");
+  assert.deepEqual(within(3.2, 4.9), []);
+});
