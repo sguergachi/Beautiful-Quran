@@ -181,3 +181,10 @@ test("keysAt finds every key at the playhead, on any property, within half a fra
   assert.deepEqual(at(2), [{ prop: "rotate", t: 2 }]);
   assert.deepEqual(at(2.5), []);
 });
+
+test("sameKeys compares key lists regardless of order", () => {
+  const a = [{ prop: "zoom", t: 3 }, { prop: "pan_x", t: 3 }];
+  assert.ok(E.sameKeys(a, [{ prop: "pan_x", t: 3 }, { prop: "zoom", t: 3 }]));
+  assert.ok(!E.sameKeys(a, [{ prop: "zoom", t: 3 }]), "a subset is not the same");
+  assert.ok(!E.sameKeys(a, [{ prop: "zoom", t: 3 }, { prop: "pan_y", t: 3 }]));
+});
