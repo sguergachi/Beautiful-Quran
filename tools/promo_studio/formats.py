@@ -47,7 +47,12 @@ FPS = (24, 25, 30, 50, 60)
 GIF_FPS = (10, 20, 25)          # GIF delays are whole 1/100 s: these play at their true speed
 AUDIO_KBPS = (0, 128, 192, 256, 320)
 SCALES = (2.0, 4 / 3, 1.0, 2 / 3, 0.5, 1 / 3)
-DEFAULTS = {"format": "h264", "quality": "high", "scale": 1.0, "fps": None, "audio_kbps": 256}
+DEFAULTS = {"format": "h264", "quality": "high", "scale": 1.0, "fps": None, "audio_kbps": 256, "accel": "auto"}
+ACCELS = ("auto", "gpu", "cpu")   # auto: composite (and, for H.264 / HEVC, encode) on the GPU when there is one
+# NVENC's constant-quality scale (-cq) next to each CPU encoder's CRF. Calibrated on real
+# frames: x264 CRF 14 ("high") measured SSIM 0.99894 at 1.5 MB, NVENC cq 22 0.99919 at 2.7 MB
+# (cq 18: 0.99937, cq 14: 0.99951); so NVENC runs 8 higher than x264's CRF, 6 than x265's.
+NVENC_CQ_OFFSET = {"h264": 8, "hevc": 6}
 H264_HIGH_KBPS = 3000           # 1080 x 1080, 60 fps, measured on the drafts
 
 
@@ -70,9 +75,16 @@ def options(o=None):
         raise ValueError(f"fps must be one of {FPS} (or null for the video's own)")
     if o["audio_kbps"] not in AUDIO_KBPS:
         raise ValueError(f"audio_kbps must be one of {AUDIO_KBPS}")
+    if o["accel"] not in ACCELS:
+        raise ValueError(f"accel must be one of {ACCELS}")
     if not FORMATS[o["format"]]["audio"]:
         o["audio_kbps"] = 0
     return o
+
+
+def nvenc_cq(fmt, quality):
+    """The NVENC -cq that looks like this format's CPU quality."""
+    return FORMATS[fmt]["q"][quality] + NVENC_CQ_OFFSET[fmt]
 
 
 def frame_size(s, scale):
@@ -108,5 +120,5 @@ def meta():
     keep = ("label", "ext", "audio", "hint", "q", "q_label", "q_names", "rate", "mbps", "kbs")
     return {"formats": {k: {f: v[f] for f in keep if f in v} for k, v in FORMATS.items()},
             "qualities": list(QUALITIES), "fps": list(FPS), "gif_fps": list(GIF_FPS),
-            "audio_kbps": list(AUDIO_KBPS), "scales": list(SCALES), "defaults": DEFAULTS,
+            "audio_kbps": list(AUDIO_KBPS), "scales": list(SCALES), "accels": list(ACCELS), "defaults": DEFAULTS,
             "h264_high_kbps": H264_HIGH_KBPS}

@@ -30,6 +30,34 @@ parallel. Four workers beat six and eight in that comparison (15.31, 16.64,
 load and the number of motion-blur samples. Export speed is still sensitive
 to concurrent applications and emulator work.
 
+## GPU export (November 7)
+
+The CPU export was bound by the compositor, not the encoder: ~20 full-frame
+float32 passes per sub-frame at 2160×3840, up to 24 sub-frames a frame for
+motion blur, ≈1.1 s a frame per core, 3.5 fps across four workers (a 151 s
+9:16 video took ~43 min). `gpu_compose.py` runs the same maths as one fused
+CUDA kernel per sub-frame (plate sample with reflect border, brightness,
+vignette, shadow, phone, average, dither), with the phone's area-filter
+downscale as two box-weight matrix products (CuPy), then converts to NV12 on
+the GPU (BT.601 limited, the same matrix swscale uses for the CPU export) and
+pipes to NVENC. Two decoder threads per worker keep the GPU fed.
+
+Measured on the real 4K spec, with the CPU export running alongside:
+
+| | CPU (4 workers) | GPU |
+|---|---|---|
+| typical frame | 3.5 fps | 24.6 fps (decode-bound) |
+| worst motion-blur stretch (≈13 sub-frames) | far slower | 15.5 fps |
+
+Fidelity: frames match the CPU compositor within 1–2 of 255 levels (PSNR
+54–57 dB; the dither is a per-pixel hash instead of numpy's RNG, so the noise
+differs, not the picture), and the NV12 conversion matches swscale's to 0–2
+levels. `test_studio.GpuCompositorTests` pins both; they need CuPy, so they run
+under the GPU venv (`~/.cache/bq-promo/gpu-venv/bin/python -m unittest ...`) and
+skip on the system Python. NVENC quality vs x264 on identical frames (SSIM vs a
+lossless copy): x264 CRF 14 0.99894 at 1.5 MB; NVENC cq 22 0.99919 at 2.7 MB;
+cq 18 0.99937; cq 14 0.99951. `formats.NVENC_CQ_OFFSET` maps CRF to cq from that.
+
 ## Changes
 
 - Cached playlist WAVs expose an exact sample count in their headers. Reading
