@@ -11,12 +11,22 @@ import { motionContext, type InspectorContext } from "../lib/inspector.ts";
 import { clock, useTime } from "../state/clock.ts";
 import {
   copy, deleteSelection, endGesture, inspect, inspectSelection, mutate, paste, select, selectAll, selectKeys, selKeys, setEase, setUI, split,
-  toggleKey, useStore,
+  playheadKeysSelected, toggleKey, togglePlayheadKeys, useStore,
 } from "../state/store.ts";
 import { openMenu, type MenuItem } from "./Menu.tsx";
 import { SoundLane } from "./SoundLane.tsx";
 import { EditorToolbar } from "./Transport.tsx";
 import { TimelineVerseControls } from "./VerseEditor.tsx";
+
+// ◆ at the foot of the playhead: on while exactly the keys at the playhead are selected; click selects / deselects them.
+function PlayheadKeysToggle() {
+  const sel = useStore((s) => s.sel), t = useTime(60), on = playheadKeysSelected(sel, t);
+  return (
+    <button onClick={togglePlayheadKeys} aria-pressed={on} aria-label="Select every key at the playhead"
+      title={on ? "Deselect the keys at the playhead" : "Select every key at the playhead"}
+      className={`pointer-events-auto sticky bottom-4 -ml-[8px] grid size-[17px] place-items-center rounded-[4px] border border-gold text-[10px] leading-none ${on ? "bg-gold text-bg" : "bg-panel text-gold hover:bg-gold/25"}`}>◆</button>
+  );
+}
 
 let lastFadePress = { side: "", at: 0 };
 
@@ -360,7 +370,10 @@ export function Timeline() {
             );
           })}
           {/* the line lets clicks through to keys and trim handles under it; grab it by its head in the ruler */}
-          <div ref={playhead} className="pointer-events-none absolute top-0 bottom-0 z-[25] -ml-px w-0.5 bg-gold" style={{ left: 0 }} />
+          <div ref={playhead} className="pointer-events-none absolute top-0 bottom-0 z-[25] -ml-px flex w-0.5 flex-col justify-end bg-gold" style={{ left: 0 }}>
+            {/* the foot of the line stays in view when the lanes scroll: a toggle for selecting every key at the playhead */}
+            <PlayheadKeysToggle />
+          </div>
           <div ref={hover} className="pointer-events-none absolute top-0 bottom-0 z-[24] hidden w-px bg-white/20" style={{ left: 0 }} />
           {marquee && <div className="pointer-events-none absolute z-[26] border border-blue bg-blue/15" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
         </div>

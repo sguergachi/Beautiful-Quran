@@ -481,6 +481,25 @@ export function selectAll() {
   inspectSelection();
   if (items.length) toast(`${items.length} key${items.length > 1 ? "s" : ""} selected`);
 }
+/** The keys at the playhead, on every property. */
+export function keysAtPlayhead(t = clock.t): E.KeyRef[] {
+  const spec = get().spec, raw = get().raw;
+  return spec && raw ? E.keysAt(raw, { spec, props: get().meta!.props, fps: spec.fps }, t) : [];
+}
+/** Whether exactly the keys at the playhead are selected (the toggle is on). */
+export function playheadKeysSelected(sel: Selection, t = clock.t): boolean {
+  const here = keysAtPlayhead(t);
+  return sel?.type === "keys" && here.length > 0 && E.sameKeys(sel.items, here);
+}
+/** Toggle: select every key at the playhead, across all properties, or deselect them if they already are. */
+export function togglePlayheadKeys() {
+  if (playheadKeysSelected(get().sel)) return select(null);
+  const items = keysAtPlayhead();
+  if (!items.length) return toast("No keys at the playhead");
+  selectKeys(items);
+  inspectSelection();
+  toast(`${items.length} key${items.length > 1 ? "s" : ""} at the playhead`);
+}
 export function split(t = clock.t) {
   let at: number | null = null;
   mutate((raw, c) => { at = E.splitAt(raw, c, t); });

@@ -174,6 +174,21 @@ test("deleting a piece closes the video up: later keys move back, keys inside go
   assert.deepEqual(first.tracks.zoom.map((k) => k.t), [0, 2, 4, 6], "the first piece takes 4 s with it; the key at 4 lands on 0 and the key at 1 goes");
 });
 
+test("keysAt finds every key at the playhead, on any property, within half a frame", () => {
+  const base = { edit: [{ in: 0, out: 10 }], tracks: { zoom: [{ t: 1, v: 2 }, { t: 3, v: 4 }], pan_x: [{ t: 3.004, v: .4 }], rotate: [{ t: 2, v: 5 }] } };
+  const at = (t: number) => run(base, (r, c) => E.keysAt(r, c, t)).out as E.KeyRef[];
+  assert.deepEqual(at(3).map((k) => k.prop).sort(), ["pan_x", "zoom"], "3.004 is inside half a frame of 3");
+  assert.deepEqual(at(2), [{ prop: "rotate", t: 2 }]);
+  assert.deepEqual(at(2.5), []);
+});
+
+test("sameKeys compares key lists regardless of order", () => {
+  const a = [{ prop: "zoom", t: 3 }, { prop: "pan_x", t: 3 }];
+  assert.ok(E.sameKeys(a, [{ prop: "pan_x", t: 3 }, { prop: "zoom", t: 3 }]));
+  assert.ok(!E.sameKeys(a, [{ prop: "zoom", t: 3 }]), "a subset is not the same");
+  assert.ok(!E.sameKeys(a, [{ prop: "zoom", t: 3 }, { prop: "pan_y", t: 3 }]));
+});
+
 test("placePhone sets the pan key at the time and leaves the other pan alone when the camera is level", () => {
   const geo: any = { W: 1080, H: 1920, g: meta.g };
   const base = { edit: [{ in: 0, out: 10 }], tracks: { pan_x: [{ t: 0, v: .5 }, { t: 4, v: .6 }], pan_y: [{ t: 0, v: .5 }, { t: 4, v: .5 }] } };
