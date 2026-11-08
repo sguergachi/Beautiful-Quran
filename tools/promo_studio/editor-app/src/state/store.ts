@@ -481,6 +481,16 @@ export function selectAll() {
   inspectSelection();
   if (items.length) toast(`${items.length} key${items.length > 1 ? "s" : ""} selected`);
 }
+/** Select every key at the playhead, across all properties. */
+export function selectAtPlayhead() {
+  const spec = get().spec, raw = get().raw;
+  if (!spec || !raw) return;
+  const items = E.keysAt(raw, { spec, props: get().meta!.props, fps: spec.fps }, clock.t);
+  if (!items.length) return toast("No keys at the playhead");
+  selectKeys(items);
+  inspectSelection();
+  toast(`${items.length} key${items.length > 1 ? "s" : ""} at the playhead`);
+}
 export function split(t = clock.t) {
   let at: number | null = null;
   mutate((raw, c) => { at = E.splitAt(raw, c, t); });

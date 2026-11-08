@@ -23,6 +23,12 @@ export function findKey(raw: RawSpec, ref: KeyRef): Key | undefined {
 export function keyIndexNear(raw: RawSpec, c: Ctx, name: string, t: number): number {
   return (raw.tracks?.[name] || []).findIndex((k: Key) => Math.abs(k.t - t) < half(c));
 }
+/** Every key, on any property, that sits at time t (within half a frame). */
+export function keysAt(raw: RawSpec, c: Ctx, t: number): KeyRef[] {
+  const out: KeyRef[] = [];
+  for (const [prop, keys] of Object.entries(raw.tracks || {})) for (const k of keys as Key[]) if (Math.abs(k.t - t) < half(c)) out.push({ prop, t: k.t });
+  return out;
+}
 function dropEmpty(raw: RawSpec, name: string, lastValue: number) {
   // the last key gone: the property keeps that value for the whole video
   if (raw.tracks?.[name] && !raw.tracks[name].length) {

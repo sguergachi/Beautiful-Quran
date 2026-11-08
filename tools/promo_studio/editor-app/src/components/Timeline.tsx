@@ -10,7 +10,7 @@ import { fitTimelineScale } from "../lib/timeline.ts";
 import { motionContext, type InspectorContext } from "../lib/inspector.ts";
 import { clock, useTime } from "../state/clock.ts";
 import {
-  copy, deleteSelection, endGesture, inspect, inspectSelection, mutate, paste, select, selectAll, selectKeys, selKeys, setEase, setUI, split,
+  copy, deleteSelection, endGesture, inspect, inspectSelection, mutate, paste, select, selectAll, selectAtPlayhead, selectKeys, selKeys, setEase, setUI, split,
   toggleKey, useStore,
 } from "../state/store.ts";
 import { openMenu, type MenuItem } from "./Menu.tsx";
@@ -360,7 +360,11 @@ export function Timeline() {
             );
           })}
           {/* the line lets clicks through to keys and trim handles under it; grab it by its head in the ruler */}
-          <div ref={playhead} className="pointer-events-none absolute top-0 bottom-0 z-[25] -ml-px w-0.5 bg-gold" style={{ left: 0 }} />
+          <div ref={playhead} className="pointer-events-none absolute top-0 bottom-0 z-[25] -ml-px flex w-0.5 flex-col justify-end bg-gold" style={{ left: 0 }}>
+            {/* the foot of the line stays in view when the lanes scroll: one click selects every key at the playhead */}
+            <button onClick={selectAtPlayhead} title="Select every key at the playhead" aria-label="Select every key at the playhead"
+              className="pointer-events-auto sticky bottom-1 -ml-[8px] grid size-[17px] place-items-center rounded-[4px] border border-gold bg-panel text-[10px] leading-none text-gold hover:bg-gold hover:text-bg">◆</button>
+          </div>
           <div ref={hover} className="pointer-events-none absolute top-0 bottom-0 z-[24] hidden w-px bg-white/20" style={{ left: 0 }} />
           {marquee && <div className="pointer-events-none absolute z-[26] border border-blue bg-blue/15" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
         </div>
