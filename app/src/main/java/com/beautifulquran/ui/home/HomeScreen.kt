@@ -799,7 +799,7 @@ fun HomeScreen(
                     PaperSearchField(
                         value = uiState.query,
                         onValueChange = viewModel::onQueryChange,
-                        placeholder = "Search concept, “exact phrase”, or 2:255",
+                        placeholder = "Concept, “exact phrase”, or 2:255",
                         contentDescription = "Search",
                         onFocusChanged = { focused ->
                             searchFocused = focused

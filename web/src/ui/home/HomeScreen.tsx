@@ -456,7 +456,7 @@ export function HomeScreen({
                     id="chapter-search"
                     name="chapter-search"
                     type="search"
-                    placeholder="Search concept, “exact phrase”, or 2:255"
+                    placeholder="Concept, “exact phrase”, or 2:255"
                     value={search}
                     onValueChange={setSearch}
                     aria-label="Search concepts, exact phrases, or ayah reference"

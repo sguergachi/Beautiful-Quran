@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
@@ -100,6 +101,10 @@ fun PaperSearchField(
                             placeholder,
                             style = MaterialTheme.typography.bodyLarge,
                             color = mutedInk.copy(alpha = 0.5f),
+                            // The pill is one line tall: a long hint must
+                            // trim, never wrap onto a second line.
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                     field()
