@@ -37,15 +37,22 @@ def python(cache, log=print):
     return str(root / 'bin/python')
 
 
-def audio_position(timestamp_us, origin_us, next_sample, samples, rate=48000):
-    """Keep PCM contiguous through small delivery jitter; preserve real gaps.
+JITTER_S = .5     # delivery-time jitter the audio clock ignores (seconds)
 
-    Both media clocks are emulator host timestamps. Corrections over 30 ms
-    preserve pauses/discontinuities instead of shifting later sound in time.
-    Returns (output start, leading samples to trim, silence to insert).
+
+def audio_position(timestamp_us, origin_us, next_sample, samples, rate=48000):
+    """Place one audio packet. The emulator's audio is a continuous stream (a
+    pause in the app arrives as silent samples), but its packet timestamps
+    jitter by tens of ms whenever the host is busy. Treating a late timestamp as
+    a real gap inserted ~35 ms of silence (a click) and the packet that followed
+    then trimmed real sound to catch up (a second click): the recording's timing
+    wandered by tens of ms and its sound was riddled with dropouts. So PCM stays
+    contiguous through anything under JITTER_S; only a discontinuity larger than
+    that (a reconnect, a stalled emulator) is preserved, so later sound is not
+    shifted in time. Returns (output start, leading samples to trim, silence to insert).
     """
     target = round((timestamp_us - origin_us) * rate / 1_000_000)
-    if abs(target - next_sample) <= round(rate * .03):
+    if abs(target - next_sample) <= round(rate * JITTER_S):
         return next_sample, 0, 0
     trim = min(samples, max(0, next_sample - target))
     return max(target, next_sample), trim, max(0, target - next_sample)
@@ -178,7 +185,12 @@ def record(args):
         stats['audio_samples'] += count
 
     def audio_packet(message, end_sample=None):
+        # how far the emulator's timestamp ran from the contiguous stream: jitter is expected, a resync is not
+        late = round((message.timestamp - origin) * 48000 / 1_000_000) - next_audio
+        stats['audio_jitter_max_ms'] = max(stats.get('audio_jitter_max_ms', 0), round(abs(late) / 48))
         position, trim, gap = audio_position(message.timestamp, origin, next_audio, len(message.audio) // 4)
+        if gap or trim: stats['audio_resyncs'] = stats.get('audio_resyncs', 0) + 1
+        stats['audio_drift_ms'] = round(late / 48)
         if end_sample is not None and position >= end_sample: return
         if gap:
             while next_audio < position:

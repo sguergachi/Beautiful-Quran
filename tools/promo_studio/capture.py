@@ -20,6 +20,7 @@ import subprocess
 import sys
 import time
 
+import audio
 from spec import CACHE, RECITERS, REPO, take_dir, take_needed
 
 sys.path.insert(0, os.path.join(REPO, "tools", "key_art"))
@@ -213,6 +214,9 @@ def prep():
         raise RuntimeError('Could not set the capture emulator media volume to 15: ' + volume.strip())
     for k in ("animator_duration_scale", "transition_animation_scale", "window_animation_scale"):
         adb("shell", "settings", "put", "global", k, "1")
+    # The recorder's own taps would otherwise tick in the take's sound (Android's touch sounds)
+    for k in ("sound_effects_enabled", "haptic_feedback_enabled", "dtmf_tone"):
+        adb("shell", "settings", "put", "system", k, "0", check=False)
 
 
 # ---------------------------------------------------------------- recording
@@ -489,8 +493,8 @@ def _tap_play_bar():
         at.tap(b)
 
 
-def record(s, log=print, force=False):
-    """Record (or reuse) the take a spec needs. Returns the take directory.
+def _record_once(s, log=print, force=False):
+    """One recording attempt; see record().
 
     `log` may be a report.Report: then each step is a named stage with
     overall progress, which the editor shows as the capture runs.
@@ -625,6 +629,63 @@ def record(s, log=print, force=False):
     return d
 
 
+BUSY_CPU = 0.65       # host CPU use above which the emulator's audio stream starts to jitter
+TAKE_ATTEMPTS = 3
+
+
+def host_cpu_busy(seconds=3.0):
+    """Fraction (0..1) of the host's CPU in use over `seconds`, from /proc/stat."""
+    def read():
+        with open("/proc/stat") as f:
+            v = [int(x) for x in f.readline().split()[1:]]
+        return sum(v), v[3] + v[4]                    # total, idle + iowait
+    t0, i0 = read(); time.sleep(seconds); t1, i1 = read()
+    return 1.0 - (i1 - i0) / max(1, t1 - t0)
+
+
+def wait_for_quiet(log=print, patience=120.0):
+    """A busy host makes the emulator deliver audio late and in bursts, which is
+    how takes get clicks. Wait (up to `patience` s) for it to calm, say what is
+    running, and go ahead anyway rather than hang."""
+    t0 = time.monotonic()
+    while True:
+        busy = host_cpu_busy()
+        if busy < BUSY_CPU:
+            return busy
+        if time.monotonic() - t0 > patience:
+            log(f"host is still {busy:.0%} busy after {patience:.0f} s: recording anyway (the sound is checked afterwards)")
+            return busy
+        log(f"host is {busy:.0%} busy: waiting for it to calm before recording (exports and builds disturb the audio)")
+
+
+def take_audio_problems(d):
+    """What is wrong with a finished take's sound: the dropouts the capture left
+    (healing records them), or [] when it recorded clean."""
+    rec = audio.heal_wav(os.path.join(d, "audio.wav"))
+    return [] if not rec else [x for x in rec["dropouts"]]
+
+
+def record(s, log=print, force=False):
+    """Record (or reuse) the take a spec needs; returns the take directory. The
+    machine is given time to settle first, and the take's sound is checked
+    afterwards: a take with dropouts is recorded again (up to TAKE_ATTEMPTS
+    times), because repairing sound is a poorer thing than recording it clean."""
+    d = take_dir(s)
+    for attempt in range(1, TAKE_ATTEMPTS + 1):
+        existing = (not force or attempt > 1) and os.path.exists(os.path.join(d, "meta.json"))
+        if not existing:
+            wait_for_quiet(log)
+        d = _record_once(s, log, force=force or attempt > 1)
+        problems = take_audio_problems(d)
+        if not problems:
+            if attempt > 1: log(f"take recorded clean on attempt {attempt}")
+            return d
+        log(f"take has {len(problems)} audio dropouts (attempt {attempt} of {TAKE_ATTEMPTS})")
+        if attempt == TAKE_ATTEMPTS:
+            log("keeping the last take: its dropouts were filled, but a recording on a quieter machine would be cleaner")
+    return d
+
+
 def conform(d, log=print, marks=None, capture_info=None, app=None):
     """raw.mkv -> clip.mp4 (60 fps CFR) + audio.wav on one timeline.
 
@@ -657,6 +718,8 @@ def conform(d, log=print, marks=None, capture_info=None, app=None):
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-threads", "2", "-filter_threads", "1", "-i", raw, "-ss", f"{start:.3f}", "-map", "0:v",
                     "-vf", "fps=60,format=yuv420p", *codec,
                     "-g", "30", "-an", clip], check=True)
+    for stale in ("audio.orig.wav", "audio.heal.json"):        # the previous take's repair, if this dir held one
+        if os.path.exists(os.path.join(d, stale)): os.remove(os.path.join(d, stale))
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", raw, "-ss", f"{start:.3f}", "-map", "0:a",
                     "-ar", "48000", "-ac", "2", wav], check=True)
     length = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
@@ -670,5 +733,7 @@ def conform(d, log=print, marks=None, capture_info=None, app=None):
     if app is not None: meta["app"] = app
     with open(os.path.join(d, "meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
+    # The emulator's audio tap drops and skips buffers under load: rebuild the sound from the clean recitation
+    audio.heal_wav(wav, log=log)
     log(f"take ready: {d} ({length:.1f}s, active cadence {rates['active_fps']:.1f} fps, p90 frame interval {rates['frame_p90_ms']:.0f} ms)")
     return meta

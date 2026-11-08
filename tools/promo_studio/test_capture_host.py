@@ -3,7 +3,8 @@ import tempfile
 import unittest
 
 from capture_host import audio_position
-from capture import centered_cutout
+from capture import centered_cutout, record, take_audio_problems
+from unittest.mock import patch
 import phone
 import spec
 
@@ -19,8 +20,31 @@ class CaptureHostTests(unittest.TestCase):
     def test_audio_clock_absorbs_jitter_but_preserves_pauses_and_reconnects(self):
         origin = 1_000_000
         self.assertEqual(audio_position(origin + 100_100, origin, 4800, 480), (4800, 0, 0))
-        self.assertEqual(audio_position(origin + 200_000, origin, 4800, 480), (9600, 0, 4800))
-        self.assertEqual(audio_position(origin, origin, 4800, 480), (4800, 480, 0))
+        # a packet stamped 35-45 ms late or early is jitter, not a gap: no silence inserted, no sound trimmed
+        self.assertEqual(audio_position(origin + 100_000 + 40_000, origin, 4800, 480), (4800, 0, 0))
+        self.assertEqual(audio_position(origin + 100_000 - 45_000, origin, 4800, 480), (4800, 0, 0))
+        self.assertEqual(audio_position(origin + 400_000, origin, 4800, 480), (4800, 0, 0), "up to half a second is still jitter")
+        # a real discontinuity (a reconnect, a stalled emulator) is preserved so later sound is not shifted
+        self.assertEqual(audio_position(origin + 900_000, origin, 4800, 480), (43200, 0, 38400))
+        self.assertEqual(audio_position(origin, origin, 40000, 480), (40000, 480, 0))
+
+    def test_a_take_with_dropouts_is_recorded_again_and_a_clean_one_is_kept(self):
+        import capture
+        s = spec.resolve({})
+        calls = []
+        def fake_once(sp, log=print, force=False):
+            calls.append(force); return '/take'
+        with patch.object(capture, '_record_once', fake_once), patch.object(capture, 'wait_for_quiet', lambda log=print: .1), \
+                patch.object(capture, 'take_audio_problems', side_effect=[[[1.0, 35.0, True]], [[2.0, 35.0, True]], []]), \
+                patch.object(capture, 'take_dir', return_value='/nonexistent'):
+            self.assertEqual(record(s, log=lambda m: None, force=True), '/take')
+        self.assertEqual(calls, [True, True, True], 'recorded until one came out clean, each time forced')
+        calls.clear()
+        with patch.object(capture, '_record_once', fake_once), patch.object(capture, 'wait_for_quiet', lambda log=print: .1), \
+                patch.object(capture, 'take_audio_problems', return_value=[[1.0, 35.0, True]]), \
+                patch.object(capture, 'take_dir', return_value='/nonexistent'):
+            record(s, log=lambda m: None, force=True)
+        self.assertEqual(len(calls), capture.TAKE_ATTEMPTS, 'gives up after TAKE_ATTEMPTS and keeps the healed take')
 
     def test_resolution_never_reuses_or_invalidates_a_legacy_take(self):
         plain = spec.resolve({})

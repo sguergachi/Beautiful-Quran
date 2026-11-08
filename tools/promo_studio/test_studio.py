@@ -321,6 +321,171 @@ class FormatTests(unittest.TestCase):
             self.assertEqual([e["file"] for e in server.exports("a-b")], ["a-b.mp4"])
 
 
+class AudioRepairTests(unittest.TestCase):
+    RATE = 48000
+
+    def voice(self, seconds, f0=140.0, seed=0):
+        """A vowel-like tone: a few harmonics, a little breath noise, 16-bit safe."""
+        t = np.arange(int(seconds * self.RATE)) / self.RATE
+        x = sum(a * np.sin(2 * np.pi * f0 * k * t + k) for k, a in enumerate((.5, .3, .2, .12, .08), 1))
+        x = x + np.random.default_rng(seed).normal(0, .004, len(t))
+        return np.stack([x, .9 * x], axis=1).astype(np.float32) * .5
+
+    def test_a_dropout_cut_into_sound_is_found_and_a_pause_is_not(self):
+        x = self.voice(1.0)
+        x[20000:21700] = 0                                  # 35 ms of exact silence mid-sound
+        quiet = self.voice(1.0); quiet[:] *= .001; quiet[10000:14000] = 0
+        self.assertEqual(audio.find_dropouts(x, self.RATE), [(20000, 21700)])
+        self.assertEqual(audio.find_dropouts(quiet, self.RATE), [], "a quiet passage is not a dropout")
+        lead = np.concatenate([np.zeros((30000, 2), np.float32), self.voice(.5)])
+        self.assertEqual(audio.find_dropouts(lead, self.RATE), [], "silence before the sound starts is not a dropout")
+        short = self.voice(1.0); short[20000:20040] = 0     # 0.8 ms: a glitch, found even though it is brief
+        self.assertEqual(audio.find_dropouts(short, self.RATE), [(20000, 20040)])
+
+    def test_the_fill_follows_the_voice_and_joins_both_edges(self):
+        x = self.voice(1.0)
+        for n in (600, 1700):                               # 12 ms and 35 ms
+            hole = x.copy(); hole[20000:20000 + n] = 0
+            y, rep = audio.conceal(hole, [(20000, 20000 + n)], self.RATE)
+            truth, got = x[20000:20000 + n], y[20000:20000 + n]
+            snr = 10 * np.log10(np.mean(truth ** 2) / np.mean((got - truth) ** 2))
+            self.assertGreater(snr, 12, f"{n} samples: the fill is close to the real sound ({snr:.1f} dB)")
+            mid = got[n // 3:2 * n // 3, 0]
+            self.assertGreater(float(np.sqrt(np.mean(mid ** 2))), .6 * float(np.sqrt(np.mean(truth[n // 3:2 * n // 3, 0] ** 2))), "the level does not pinch mid-gap")
+            steps = np.abs(np.diff(y[:, 0]))
+            self.assertLess(steps[19990:20010 + n].max(), 1.5 * np.abs(np.diff(x[:, 0])).max(), "no click at either edge")
+            np.testing.assert_array_equal(y[:20000], hole[:20000])
+            np.testing.assert_array_equal(y[20000 + n:], hole[20000 + n:])
+            self.assertEqual(rep, [(20000 / self.RATE, n * 1000 / self.RATE, True)])
+
+    def test_a_long_hole_is_faded_not_invented(self):
+        x = self.voice(2.0); x[30000:30000 + 24000] = 0     # half a second missing
+        y, rep = audio.conceal(x, audio.find_dropouts(x, self.RATE), self.RATE)
+        self.assertFalse(rep[0][2])
+        self.assertEqual(float(np.abs(y[30000:30000 + 24000]).max()), 0.0, "nothing made up")
+        self.assertLess(abs(float(y[29999, 0])), abs(float(x[29999, 0])) + 1e-9, "the sound ahead of the hole fades out")
+        self.assertLess(abs(float(y[54000, 0])), abs(float(x[54000, 0])) + 1e-9, "and in")
+
+    def test_heal_wav_repairs_in_place_once_and_keeps_the_original(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            path = os.path.join(d, "audio.wav")
+            x = self.voice(1.5); x[30000:31700] = 0
+            import wave
+            with wave.open(path, "wb") as w:
+                w.setnchannels(2); w.setsampwidth(2); w.setframerate(self.RATE)
+                w.writeframes((x * 32768).astype(np.int16).tobytes())
+            rec = audio.heal_wav(path)
+            self.assertEqual([(r[0], round(r[1])) for r in rec["dropouts"]], [(round(30000 / self.RATE, 3), 35)])
+            with wave.open(path) as w: healed = np.frombuffer(w.readframes(w.getnframes()), np.int16)
+            with wave.open(os.path.join(d, "audio.orig.wav")) as w: orig = np.frombuffer(w.readframes(w.getnframes()), np.int16)
+            self.assertEqual(len(healed), len(orig), "same length: the take's clock is untouched")
+            self.assertTrue(np.all(orig.reshape(-1, 2)[30000:31700] == 0), "the original keeps its hole")
+            self.assertGreater(np.abs(healed.reshape(-1, 2)[30000:31700]).max(), 1000, "the repaired file does not")
+            stamp = os.stat(path).st_mtime_ns
+            self.assertEqual(audio.heal_wav(path), rec)
+            self.assertEqual(os.stat(path).st_mtime_ns, stamp, "an already-healed take is not rewritten")
+            self.assertIsNone(audio.heal_wav(os.path.join(d, "missing.wav")))
+
+    def test_a_new_take_never_inherits_the_previous_takes_backup(self):
+        import wave
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            path = os.path.join(d, "audio.wav")
+            def write(x):
+                with wave.open(path, "wb") as w:
+                    w.setnchannels(2); w.setsampwidth(2); w.setframerate(self.RATE); w.writeframes((x * 32768).astype(np.int16).tobytes())
+            first = self.voice(1.5); first[30000:31700] = 0
+            write(first); audio.heal_wav(path)
+            self.assertTrue(os.path.exists(os.path.join(d, "audio.orig.wav")))
+            second = self.voice(1.5, f0=170.0, seed=3)               # a re-take lands in the same directory
+            write(second)
+            rec = audio.heal_wav(path)
+            self.assertEqual(rec["dropouts"], [], "the new take is clean and is left alone")
+            with wave.open(path) as w: got = np.frombuffer(w.readframes(w.getnframes()), np.int16)
+            np.testing.assert_array_equal(got, (second * 32768).astype(np.int16).reshape(-1))
+            self.assertFalse(os.path.exists(os.path.join(d, "audio.orig.wav")), "the old take's backup is gone")
+
+    def test_intro_ticks_are_silenced_but_a_real_intro_is_kept(self):
+        import wave
+        for intro_level, silenced in ((.004, True), (.3, False)):
+            with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+                path = os.path.join(d, "audio.wav")
+                x = np.concatenate([self.voice(3.0) * intro_level / .15, self.voice(2.0)])        # 3 s before the recitation
+                x[48000 * 1, :] += .004                                                           # a tick
+                with wave.open(path, "wb") as w:
+                    w.setnchannels(2); w.setsampwidth(2); w.setframerate(self.RATE); w.writeframes((x * 32768).astype(np.int16).tobytes())
+                Path(d, "meta.json").write_text(json.dumps({"lead": 3.0, "length": 5.0, "marks": {}}))
+                rec = audio.heal_wav(path)
+                with wave.open(path) as w: got = np.frombuffer(w.readframes(w.getnframes()), np.int16).reshape(-1, 2)
+                self.assertEqual(rec["muted_before_s"] > 0, silenced)
+                self.assertEqual(int(np.abs(got[:int(2.5 * self.RATE)]).max()) == 0, silenced)
+                np.testing.assert_array_equal(got[3 * self.RATE:], (x * 32768).astype(np.int16)[3 * self.RATE:], "the recitation is never touched")
+
+    def speech(self, seconds, seed=0):
+        """Aperiodic, voice-like sound (wandering pitch, syllable envelope, breath): every moment is unique, so alignment has one answer."""
+        rng = np.random.default_rng(seed)
+        n = int(seconds * self.RATE); t = np.arange(n) / self.RATE
+        f0 = 120 + 40 * np.cumsum(rng.normal(0, .0004, n)).clip(-1, 1)
+        phase = 2 * np.pi * np.cumsum(f0) / self.RATE
+        env = np.clip(np.sin(2 * np.pi * np.cumsum(2.5 + rng.normal(0, .002, n)) / self.RATE) ** 2 + .15, 0, 1)
+        x = env * sum(a * np.sin(k * phase) for k, a in enumerate((.5, .3, .2, .1), 1)) + .02 * rng.normal(0, 1, n)
+        return np.stack([x, x], axis=1).astype(np.float32) * .6
+
+    def test_a_take_that_slipped_off_the_apps_clock_is_put_back_at_its_starting_offset(self):
+        import wave
+        rate, lead, offset = self.RATE, 3.0, .140
+        ref = self.speech(40.0)
+        at = int((lead - offset) * rate)
+        # what the recorder produced: the recitation from `at`, with ~22.7 ms of it dropped every 5 s from 12 s on, and a zero gap
+        take = np.zeros((int(38 * rate), 2), np.float32)
+        pos, src = at, 0
+        pieces = []
+        for t_drop in (12, 17, 22, 27, 32):
+            n = int((t_drop - pos / rate) * rate)
+            pieces.append(ref[src:src + n]); src += n + int(.0227 * rate); pos += n
+        pieces.append(ref[src:src + int(5 * rate)])
+        body = np.concatenate(pieces)
+        take[at:at + len(body)] = body[:len(take) - at]
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            path = os.path.join(d, "audio.wav")
+            with wave.open(path, "wb") as w:
+                w.setnchannels(2); w.setsampwidth(2); w.setframerate(rate); w.writeframes((take * 32768).astype(np.int16).tobytes())
+            Path(d, "meta.json").write_text(json.dumps({"lead": lead, "length": 38.0, "app": {"reciter": "alafasy", "surah": 2, "ayah": 156, "repeat": "off"}, "marks": {}}))
+            before = audio.recitation_lags(take, ref, lead, step=2.0)
+            self.assertGreater(max(l for _, l, _ in before) - min(l for _, l, _ in before), 100, "the recording slipped by ~113 ms")
+            with patch.object(audio, "clean_recitation", return_value=ref):
+                rec = audio.heal_wav(path)
+            self.assertAlmostEqual(rec["app_clock"]["offset_ms"], 140.0, delta=.1)
+            self.assertGreater(rec["app_clock"]["drift_ms"], 100)
+            self.assertEqual(rec["dropouts"], [], "a rebuilt take has nothing left to report, so it is not recorded again")
+            with wave.open(path) as w: got = np.frombuffer(w.readframes(w.getnframes()), np.int16).reshape(-1, 2).astype(np.float32) / 32768
+            self.assertEqual(len(got), len(take), "same length")
+            after = audio.recitation_lags(got, ref, lead, step=2.0)
+            self.assertLess(max(l for _, l, _ in after) - min(l for _, l, _ in after), .1, "one constant offset from the first word to the last")
+            self.assertEqual(float(np.abs(got[:at]).max()), 0.0, "nothing before the recitation")
+            i0, i1 = int((lead + 1) * rate), int((lead + 8) * rate)                       # before the first slip: the recording is untouched in effect
+            err = got[i0:i1] - take[i0:i1]
+            self.assertGreater(10 * np.log10(np.mean(take[i0:i1] ** 2) / np.mean(err ** 2)), 40)
+
+    def test_a_take_that_never_left_the_apps_clock_is_left_alone(self):
+        import wave
+        rate, lead = self.RATE, 3.0
+        ref = self.speech(30.0, seed=2)
+        take = np.zeros((int(28 * rate), 2), np.float32)
+        at = int((lead - .1) * rate); take[at:] = ref[:len(take) - at]
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as d:
+            path = os.path.join(d, "audio.wav")
+            with wave.open(path, "wb") as w:
+                w.setnchannels(2); w.setsampwidth(2); w.setframerate(rate); w.writeframes((take * 32768).astype(np.int16).tobytes())
+            Path(d, "meta.json").write_text(json.dumps({"lead": lead, "length": 28.0, "app": {"reciter": "alafasy", "surah": 2, "ayah": 156, "repeat": "off"}, "marks": {}}))
+            with patch.object(audio, "clean_recitation", return_value=ref):
+                rec = audio.heal_wav(path)
+            self.assertEqual(rec["app_clock"], {}, "no slip, nothing rebuilt")
+            with wave.open(path) as w: got = np.frombuffer(w.readframes(w.getnframes()), np.int16)
+            want = (take * 32768).astype(np.int16).reshape(-1, 2)
+            k = int(lead * rate)
+            np.testing.assert_array_equal(got.reshape(-1, 2)[k:], want[k:], "the recitation is exactly as recorded")
+
+
 class AccelTests(unittest.TestCase):
     def test_accel_option_validates_and_defaults_to_auto(self):
         self.assertEqual(formats.options(None)["accel"], "auto")
