@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { apply, phoneCentre, phoneMatrix, snapPhoneToCentre } from "../src/lib/geometry.ts";
+import { apply, phoneCentre, phoneMatrix, snapPanToPhone, snapPhoneToCentre } from "../src/lib/geometry.ts";
 import type { Geo, Spec, State } from "../src/lib/types.ts";
 
 const spec = { phone: { height: .8 } } as Spec;
@@ -32,4 +32,23 @@ test("Shift snaps each axis to the frame's centre line, only when close", () => 
   assert.ok(Math.abs(one.x) < 1e-12, "and lands exactly on the line");
   const none = snapPhoneToCentre(geo, S, .2, .2, thr);
   assert.deepEqual([none.snapX, none.snapY, none.x, none.y], [false, false, .2, .2], "nothing snaps when far");
+});
+
+test("Shift on a plain drag pans the camera so the phone lands on the centre lines", () => {
+  for (const o of [{}, { rotate: 30, zoom: 1.4, phone_x: .05, phone_y: -.1 }, { rotate: -80, zoom: 2, phone_x: -.1 }]) {
+    const S = state({ pan_x: .5, pan_y: .5, ...o });
+    // pan a few px off the centre cross, then snap
+    const [x, y] = phoneCentre(geo, S, S.phone_x, S.phone_y), thr = 40;
+    const q = snapPanToPhone(geo, S, S.pan_x + 3 / (S.zoom * geo.W), S.pan_y + 3 / (S.zoom * geo.H), thr);
+    const [cx, cy] = phoneCentre(geo, S, S.phone_x, S.phone_y, q.x, q.y);
+    if (Math.hypot(x - geo.W / 2, y - geo.H / 2) < thr) {
+      assert.ok(q.snapX && q.snapY, JSON.stringify(o));
+      assert.ok(Math.abs(cx - geo.W / 2) < 1e-6 && Math.abs(cy - geo.H / 2) < 1e-6, "lands on the centre cross");
+    }
+  }
+  const S = state({}), near = snapPanToPhone(geo, S, S.pan_x + 5 / geo.W, S.pan_y + 400 / geo.H, 12);
+  assert.deepEqual([near.snapX, near.snapY], [true, false], "each axis on its own");
+  assert.ok(Math.abs(phoneCentre(geo, S, 0, 0, near.x, near.y)[0] - geo.W / 2) < 1e-6);
+  const far = snapPanToPhone(geo, S, .9, .9, 12);
+  assert.deepEqual([far.snapX, far.snapY, far.x, far.y], [false, false, .9, .9]);
 });
