@@ -20,7 +20,9 @@ real motion blur on zooms and whips, none when the camera is still.
 import json
 import math
 import os
+import queue
 import subprocess
+import threading
 import time
 from concurrent.futures import ProcessPoolExecutor
 
@@ -49,6 +51,8 @@ def plate_settings(s):
 
 
 class Renderer:
+    cpu_buffers = True      # the full-frame float working buffers; the GPU renderer keeps its own
+
     def __init__(self, s, scale=1.0):
         self.s = s
         if not math.isfinite(scale) or not 0.05 <= scale <= 2: raise ValueError("scale must be 0.05..2")
@@ -93,15 +97,16 @@ class Renderer:
         self.plate = library.plate(self.bg, self.W, self.H)
         self.pw, self.ph, self.pk = library.plate_geometry(self.bg, self.W, self.H)
         self.plate_len = library.probe(self.plate)[2]
-        yy, xx = np.mgrid[0:self.H, 0:self.W].astype(np.float32)
-        r = np.hypot((xx - self.W / 2) / (self.W / 2), (yy - self.H / 2) / (self.H / 2)) / math.sqrt(2)
-        self.vig = (1 - s["background"]["vignette"] * np.clip(r, 0, 1) ** 2)[..., None].astype(np.float32)
         self._alpha_cache = {}
-        self._phone_rgb = self.Fp.copy()
-        self._blend = np.empty((self.H, self.W, 3), np.float32)
-        self._vig_rgb = np.repeat(self.vig, 3, axis=2)
-        self._acc = np.empty((self.H, self.W, 3), np.float32)
         self._resized_phone = None
+        if self.cpu_buffers:
+            yy, xx = np.mgrid[0:self.H, 0:self.W].astype(np.float32)
+            r = np.hypot((xx - self.W / 2) / (self.W / 2), (yy - self.H / 2) / (self.H / 2)) / math.sqrt(2)
+            self.vig = (1 - s["background"]["vignette"] * np.clip(r, 0, 1) ** 2)[..., None].astype(np.float32)
+            self._phone_rgb = self.Fp.copy()
+            self._blend = np.empty((self.H, self.W, 3), np.float32)
+            self._vig_rgb = np.repeat(self.vig, 3, axis=2)
+            self._acc = np.empty((self.H, self.W, 3), np.float32)
 
     # -- geometry (editor.js phoneMatrix / bgMatrix mirror these) ---------
 
@@ -136,6 +141,25 @@ class Renderer:
         pts = np.array([[g["sx0"], g["sy0"], 1], [g["sx0"] + g["sw"], g["sy0"], 1],
                         [g["sx0"], g["sy0"] + g["sh"], 1], [g["sx0"] + g["sw"], g["sy0"] + g["sh"], 1]])
         return pts @ M.T
+
+    # -- motion blur ------------------------------------------------------
+
+    def subframe_count(self, t):
+        """How many shutter samples frame t averages: one more per 1.5 px the
+        phone's screen travels while the shutter is open (at most 24)."""
+        shutter = float(self.s.get("motion_blur", 1.0)) / self.fps       # 1.0 = open for the whole frame
+        if shutter <= 0:
+            return 1
+        a = self.screen_corners(state_at(self.s, t - shutter / 2))
+        b = self.screen_corners(state_at(self.s, t + shutter / 2))
+        return int(min(24, max(1, math.ceil(float(np.abs(a - b).max()) / 1.5))))
+
+    def shutter_states(self, t):
+        s, n = self.s, self.subframe_count(t)
+        if n == 1:
+            return [state_at(s, t)]
+        shutter = float(s.get("motion_blur", 1.0)) / self.fps
+        return [state_at(s, t + shutter * (i / (n - 1) - 0.5)) for i in range(n)]
 
     # -- layers -----------------------------------------------------------
 
@@ -205,14 +229,7 @@ class Renderer:
         plate /= 255
         P = self._phone_layers(screen) if screen is not None else None
         self._resized_phone = None   # a new recording frame invalidates RGB
-        shutter = float(s.get("motion_blur", 1.0)) / self.fps       # 1.0 = open for the whole frame
-        states = [state_at(s, t)]
-        if shutter > 0:
-            a = self.screen_corners(state_at(s, t - shutter / 2))
-            b = self.screen_corners(state_at(s, t + shutter / 2))
-            n = int(min(24, max(1, math.ceil(float(np.abs(a - b).max()) / 1.5))))
-            if n > 1:
-                states = [state_at(s, t + shutter * (i / (n - 1) - 0.5)) for i in range(n)]
+        states = self.shutter_states(t)
         acc = self._acc
         acc.fill(0)
         sh_strength = float(s["phone"]["shadow"])
@@ -265,12 +282,14 @@ class Renderer:
 class Frames:
     """Sequential rgb24 frames from a video via ffmpeg, starting at `start` s."""
 
-    def __init__(self, path, w, h, fps, start=0.0, loop=False, loop_len=None):
+    def __init__(self, path, w, h, fps, start=0.0, loop=False, loop_len=None, threads=1):
         self.path, self.w, self.h = path, w, h
         self.has_frame = False
         if loop and loop_len:
             start = start % loop_len
         cmd = FFMPEG.copy()
+        if threads > 1:                  # the GPU path has idle cores and a decoder to keep ahead of the GPU
+            cmd[cmd.index("-threads") + 1] = str(threads)
         if loop:
             cmd += ["-stream_loop", "-1"]
         cmd += ["-ss", f"{start:.4f}", "-i", path, "-vf", f"fps={fps},scale={w}:{h}", "-f", "rawvideo",
@@ -298,8 +317,8 @@ class EditFrames:
     """The take's frames in video order: reads sequentially inside an edit
     piece and re-seeks at each cut."""
 
-    def __init__(self, s, path, w, h, fps):
-        self.s, self.path, self.w, self.h, self.fps = s, path, w, h, fps
+    def __init__(self, s, path, w, h, fps, threads=1):
+        self.s, self.path, self.w, self.h, self.fps, self.threads = s, path, w, h, fps, threads
         self.cur, self.piece = None, None
 
     def read(self, t):
@@ -312,7 +331,7 @@ class EditFrames:
         if piece is not self.piece:
             if self.cur:
                 self.cur.close()
-            self.cur, self.piece = Frames(self.path, self.w, self.h, self.fps, src), piece
+            self.cur, self.piece = Frames(self.path, self.w, self.h, self.fps, src, threads=self.threads), piece
         return self.cur.read()
 
     def close(self):
@@ -408,6 +427,106 @@ def _render_chunk(args):
     finally:
         if enc.poll() is None: enc.kill(); enc.wait()
         scr.close(); pl.close()
+    return path
+
+
+def gpu_video_args(o, fps):
+    """(pipe pixel format, encoder arguments) for a chunk the GPU composited.
+    H.264 and HEVC encode on the GPU too (NVENC, fed NV12 straight from the
+    compositor); every other format takes rgb24 and its CPU encoder."""
+    import gpu_compose
+    f = o["format"]
+    if f in ("h264", "hevc") and gpu_compose.nvenc_ok(f + "_nvenc"):
+        cq = str(formats.nvenc_cq(f, o["quality"]))
+        a = ["-c:v", f + "_nvenc", "-preset", "p4", "-tune", "hq", "-rc", "vbr", "-cq", cq, "-b:v", "0",
+             "-spatial-aq", "1", "-g", str(fps), "-pix_fmt", "nv12"]
+        return "nv12", a
+    return "rgb24", video_args(o, fps)
+
+
+class _Feed(threading.Thread):
+    """Decodes one video on its own thread, a few frames ahead of the GPU
+    (the ffmpeg pipes block outside the GIL, so the decoders overlap)."""
+
+    def __init__(self, produce, depth=6):
+        super().__init__(daemon=True)
+        self.q, self.stop, self.produce = queue.Queue(depth), threading.Event(), produce
+
+    def run(self):
+        try:
+            for item in self.produce():
+                while not self.stop.is_set():
+                    try:
+                        self.q.put(item, timeout=0.2)
+                        break
+                    except queue.Full:
+                        pass
+                if self.stop.is_set():
+                    return
+        except BaseException as e:           # surfaced to the consumer, not lost on this thread
+            self.q.put(e)
+            return
+        self.q.put(None)
+
+    def get(self):
+        item = self.q.get()
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+
+def _render_chunk_gpu(args):
+    """_render_chunk on the GPU: frames f0..f1 composited by gpu_compose,
+    encoded by NVENC (H.264 / HEVC) or the format's CPU encoder."""
+    import gpu_compose as G
+    s, f0, f1, path, scale, o = args
+    r = G.GpuRenderer(s, scale)
+    fps = r.fps
+    off = float(s["background"].get("offset", 0))
+    pix, vargs = gpu_video_args(o, fps)
+    enc = subprocess.Popen([*FFMPEG, "-y", "-f", "rawvideo", "-pix_fmt", pix, "-s", f"{r.W}x{r.H}", "-r", str(fps),
+                            "-i", "-", *vargs, path], stdin=subprocess.PIPE, env=dict(os.environ, SVT_LOG="1"))
+
+    def screens():
+        d = EditFrames(s, r.clip, r.sw, r.sh, fps, threads=2)
+        try:
+            for f in range(f0, f1):
+                yield d.read(f / fps)
+        finally:
+            d.close()
+
+    def plates():
+        d = Frames(r.plate, r.pw, r.ph, fps, off + f0 / fps, loop=True, loop_len=r.plate_len)
+        try:
+            for _ in range(f0, f1):
+                yield d.read()
+        finally:
+            d.close()
+
+    scr, pl = _Feed(screens), _Feed(plates)
+    scr.start(); pl.start()
+    nbytes = r.W * r.H * 3 // 2 if pix == "nv12" else r.W * r.H * 3
+    dev = G.cp.empty(nbytes, G.cp.uint8)
+    pinned = G.cp.cuda.alloc_pinned_memory(nbytes)
+    host = np.frombuffer(pinned, np.uint8, nbytes)
+    try:
+        for f in range(f0, f1):
+            a, b = scr.get(), pl.get()
+            n = r.compose(f / fps, None if a is None else G.cp.asarray(a), G.cp.asarray(b))
+            if pix == "nv12":
+                r.finish_nv12(n, f, dev)
+            else:
+                r.finish_rgb(n, f, dev.reshape(r.H, r.W, 3))
+            dev.get(out=host)                # waits for the frame
+            enc.stdin.write(host)               # the pinned buffer itself; the write completes before the next frame reuses it
+            if (f - f0) % 15 == 14:
+                with open(path + ".progress", "w") as pf:
+                    pf.write(str(f - f0 + 1))
+        enc.stdin.close()
+        if enc.wait(): raise RuntimeError(f"video encoder failed for {path}")
+    finally:
+        scr.stop.set(); pl.stop.set()
+        if enc.poll() is None: enc.kill(); enc.wait()
     return path
 
 
@@ -515,6 +634,48 @@ def gif(video_input, out, o):
     return out
 
 
+class _Prep(Renderer):
+    """The parent's renderer: validates the take, builds the plate and the
+    geometry, and prices frames. It never draws one, so no float buffers."""
+    cpu_buffers = False
+
+
+COST_STEP = 3          # frames between cost samples; the blur varies smoothly
+
+
+def frame_costs(r, n, base):
+    """Relative cost of each of n frames: `base` (decode, upload, encode) plus
+    one unit per motion-blur sample. A zoom or whip costs up to 24 times a
+    still frame, so equal frame counts make unequal chunks."""
+    ts = list(range(0, n, COST_STEP)) + [n - 1]
+    c = np.interp(np.arange(n), ts, [base + r.subframe_count(t / r.fps) for t in ts])
+    return c
+
+
+def balanced_bounds(costs, parts):
+    """Frame boundaries cutting `costs` into `parts` runs of near-equal total."""
+    n = len(costs)
+    cum = np.cumsum(costs)
+    cuts = np.searchsorted(cum, cum[-1] * np.arange(1, parts) / parts)
+    b = sorted({0, n, *(int(c) + 1 for c in cuts if 0 < c + 1 < n)})
+    return b
+
+
+def _pick_accel(accel):
+    """(use the GPU, why not / which) for an export's `accel` choice. "auto"
+    falls back to the CPU with the reason; "gpu" refuses rather than quietly
+    taking ten times as long."""
+    if accel == "cpu":
+        return False, "chosen"
+    import gpu_compose
+    ok, info = gpu_compose.available()
+    if ok:
+        return True, info
+    if accel == "gpu":
+        raise RuntimeError(f"GPU export is not available: {info}")
+    return False, f"no GPU export: {info}"
+
+
 def export(s, out=None, workers=None, scale=None, log=print, progress=None, options=None):
     """Render the whole spec in an export format (formats.options: format,
     quality, scale, fps, audio_kbps; H.264 MP4 at full size by default).
@@ -533,43 +694,54 @@ def export(s, out=None, workers=None, scale=None, log=print, progress=None, opti
         s = {**s, "fps": o["fps"]}
     scale = o["scale"]
     rep and rep.stage("prepare", "Preparing the background and the phone", 0.01)
-    r = Renderer(s, scale)          # validates the take and builds the plate once, up front
+    r = _Prep(s, scale)             # validates the take and builds the plate once, up front
     if s["duration"] > 0 and max(float(p["out"]) for p in s["edit"]) > r.meta["length"] + 0.05:
         log(f"warning: the edit reads past the take's end ({r.meta['length']:.1f}s): the last frame holds")
     fps, dur = r.fps, float(s["duration"])
     n = max(1, int(math.ceil(dur * fps - 1e-9)))
-    workers = workers or max(1, min(4, (os.cpu_count() or 4) // 2))
+    use_gpu, why = _pick_accel(o["accel"])
+    log(f"rendering on the {'GPU' if use_gpu else 'CPU'}" + (f" ({why})" if why else ""))
+    workers = workers or (2 if use_gpu else max(1, min(4, (os.cpu_count() or 4) // 2)))
     out = out or os.path.join(OUT, filename)
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     work = os.path.join(CACHE, "render", s["name"])
     os.makedirs(work, exist_ok=True)
-    bounds = [round(n * i / workers) for i in range(workers + 1)]
-    chunks = [(s, bounds[i], bounds[i + 1], os.path.join(work, f"part{i:02d}.mkv"), scale, o)
-              for i in range(workers) if bounds[i + 1] > bounds[i]]
+    # Chunks of equal *cost*, several per worker: a worker that finishes a light
+    # stretch takes the next chunk instead of idling while another grinds through
+    # a zoom (the heaviest are handed out first).
+    costs = frame_costs(r, n, base=4.0 if use_gpu else 0.3)
+    parts = workers if n < 240 else min(workers * 3, max(workers, n // 60))
+    bounds = balanced_bounds(costs, parts)
+    cum = np.concatenate([[0.0], np.cumsum(costs)])
+    chunks = [(s, bounds[i], bounds[i + 1], os.path.join(work, f"part{i:02d}.mkv"), scale, o) for i in range(len(bounds) - 1)]
     for c in chunks:
         if os.path.exists(c[3] + ".progress"):
             os.remove(c[3] + ".progress")
     t0 = time.time()
-    rep and rep.stage("render", f"Rendering {n} frames at {r.W}×{r.H}, {fps} fps ({label})", 0.03)
-    log(f"rendering {s['name']}: {n} frames {r.W}x{r.H}@{fps} in {len(chunks)} parts")
+    rep and rep.stage("render", f"Rendering {n} frames at {r.W}×{r.H}, {fps} fps ({label}{', GPU' if use_gpu else ''})", 0.03)
+    log(f"rendering {s['name']}: {n} frames {r.W}x{r.H}@{fps} in {len(chunks)} parts on {workers} workers")
     del r     # workers own their render buffers; the parent only prepares assets
-    with ProcessPoolExecutor(len(chunks), initializer=_render_priority) as ex:
-        futures = [ex.submit(_render_chunk, c) for c in chunks]
-        while not all(f.done() for f in futures):
-            done = 0
-            for c, f in zip(chunks, futures):
-                if f.done():
-                    done += c[2] - c[1]
+    order = sorted(range(len(chunks)), key=lambda i: -(cum[chunks[i][2]] - cum[chunks[i][1]]))
+    with ProcessPoolExecutor(workers, initializer=_render_priority) as ex:
+        futures = {i: ex.submit(_render_chunk_gpu if use_gpu else _render_chunk, chunks[i]) for i in order}
+        while not all(f.done() for f in futures.values()):
+            frames = 0
+            work_done = 0.0
+            for i, c in enumerate(chunks):
+                if futures[i].done():
+                    k = c[2] - c[1]
                 else:
                     try:
-                        done += int(open(c[3] + ".progress").read() or 0)
+                        k = min(c[2] - c[1], int(open(c[3] + ".progress").read() or 0))
                     except (OSError, ValueError):
-                        pass
+                        k = 0
+                frames += k
+                work_done += cum[c[1] + k] - cum[c[1]]
             el = time.time() - t0
-            eta = el / done * (n - done) if done else None
-            tell(0.03 + 0.9 * done / n, f"{done} / {n} frames" + (f" · {eta:.0f} s left" if eta else ""))
+            eta = el / work_done * (cum[-1] - work_done) if work_done else None     # cost, not frames: a zoom takes longer than a still
+            tell(0.03 + 0.9 * work_done / cum[-1], f"{frames} / {n} frames" + (f" · {eta:.0f} s left" if eta else ""))
             time.sleep(0.5)
-        for f in futures:
+        for f in futures.values():
             f.result()                      # surface a worker's error
     lst = os.path.join(work, "parts.txt")
     with open(lst, "w") as f:

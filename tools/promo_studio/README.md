@@ -98,6 +98,17 @@ video's own or 60/50/30/25/24 fps. **Sound** is AAC 128 to 320 kbps, Opus
 lists this video's earlier exports to open or download (handy from another
 device on the LAN).
 
+**Render with** picks where the frames are made: **Auto** (default) uses the
+NVIDIA GPU when it works and falls back to the CPU with the reason shown,
+**GPU** refuses to run without it, **CPU** is the original path and the picture
+reference. On the GPU every frame is composited by `gpu_compose.py` (the same
+maths as `compose.py`, within 1–2 of 255 levels) and H.264 / HEVC are encoded by
+NVENC too; the other formats take the GPU's frames and use their CPU encoder.
+A 151 s 4K 60 fps video with camera moves took 144 s instead of 70 minutes. One-time setup:
+`tools/promo_studio/setup_gpu.sh` (a venv with CuPy; render jobs re-exec into
+it, see `gpu_env.py`). NVENC files run a little larger than x264's at the same
+look (quality maps CRF + 8 for H.264, + 6 for HEVC, calibrated by SSIM).
+
 Under **Exports of this video**, each file has Open, Download and **Delete**.
 Delete asks for confirmation in its row, then permanently removes only that
 export. The file count and total size update immediately; the take and edit

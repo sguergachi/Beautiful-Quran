@@ -19,6 +19,8 @@ import anim
 import audio
 import compose
 import formats
+import gpu_compose
+import gpu_env
 import library
 import phone
 import server
@@ -317,6 +319,128 @@ class FormatTests(unittest.TestCase):
         with patch.object(spec, "OUT", str(d)):
             self.assertEqual(sorted(e["file"] for e in server.exports("a")), ["a-720p-30fps.gif", "a-720p.webm", "a.mp4"])
             self.assertEqual([e["file"] for e in server.exports("a-b")], ["a-b.mp4"])
+
+
+class AccelTests(unittest.TestCase):
+    def test_accel_option_validates_and_defaults_to_auto(self):
+        self.assertEqual(formats.options(None)["accel"], "auto")
+        for a in formats.ACCELS:
+            self.assertEqual(formats.options({"accel": a})["accel"], a)
+        with self.assertRaises(ValueError):
+            formats.options({"accel": "tpu"})
+
+    def test_nvenc_quality_follows_the_cpu_scale(self):
+        self.assertEqual([formats.nvenc_cq("h264", q) for q in formats.QUALITIES], [19, 22, 26, 31])
+        self.assertEqual([formats.nvenc_cq("hevc", q) for q in formats.QUALITIES], [21, 24, 28, 33])
+
+    def test_accel_choice_falls_back_only_when_asked_to(self):
+        with patch.object(gpu_compose, "available", return_value=(False, "CuPy is not installed")):
+            self.assertEqual(compose._pick_accel("auto"), (False, "no GPU export: CuPy is not installed"))
+            self.assertEqual(compose._pick_accel("cpu")[0], False)
+            with self.assertRaisesRegex(RuntimeError, "not available: CuPy"):
+                compose._pick_accel("gpu")
+        with patch.object(gpu_compose, "available", return_value=(True, "RTX")):
+            self.assertEqual(compose._pick_accel("auto"), (True, "RTX"))
+            self.assertEqual(compose._pick_accel("cpu")[0], False, "CPU stays an explicit choice")
+
+    def test_chunks_have_equal_cost_not_equal_frames(self):
+        # still frames cost 1, a camera move 24: equal frame counts would hand two workers 90% of the work
+        costs = np.array([1.] * 100 + [24.] * 50 + [1.] * 100 + [24.] * 50)
+        for parts in (4, 8):
+            b = compose.balanced_bounds(costs, parts)
+            self.assertEqual((b[0], b[-1]), (0, len(costs)))
+            self.assertTrue(all(x < y for x, y in zip(b, b[1:])), "boundaries strictly increase")
+            share = [costs[b[i]:b[i + 1]].sum() / costs.sum() for i in range(len(b) - 1)]
+            self.assertLess(max(share) * parts, 1.25, f"{parts} parts: {share}")
+        self.assertEqual(compose.balanced_bounds(np.ones(10), 1), [0, 10])
+        self.assertEqual(compose.balanced_bounds(np.ones(3), 5)[0::len(compose.balanced_bounds(np.ones(3), 5)) - 1], [0, 3], "more parts than frames still covers every frame")
+
+    def test_frame_costs_price_motion_blur_samples(self):
+        r = compose.Renderer.__new__(compose.Renderer)
+        r.fps = 60
+        r.subframe_count = lambda t: 24 if 1 <= t < 2 else 1
+        c = compose.frame_costs(r, 240, base=4)
+        self.assertEqual(c[0], 5)
+        self.assertEqual(c[90], 28)
+        self.assertEqual(len(c), 240)
+
+    def test_chunk_encoder_is_nvenc_for_h264_and_hevc_only(self):
+        o = lambda f, **k: formats.options({"format": f, **k})
+        with patch.object(gpu_compose, "nvenc_ok", return_value=True):
+            pix, a = compose.gpu_video_args(o("h264", quality="high"), 60)
+            self.assertEqual((pix, a[a.index("-c:v") + 1], a[a.index("-cq") + 1]), ("nv12", "h264_nvenc", "22"))
+            self.assertEqual(compose.gpu_video_args(o("hevc"), 60)[1][1], "hevc_nvenc")
+            pix, a = compose.gpu_video_args(o("prores"), 60)
+            self.assertEqual((pix, a), ("rgb24", compose.video_args(o("prores"), 60)), "other formats keep their CPU encoder")
+        with patch.object(gpu_compose, "nvenc_ok", return_value=False):
+            self.assertEqual(compose.gpu_video_args(o("h264"), 60), ("rgb24", compose.video_args(o("h264"), 60)))
+
+    def test_render_jobs_stay_on_the_system_python_without_the_gpu_venv(self):
+        with patch.object(gpu_env, "VENV", "/nonexistent/venv"), patch("os.execv") as ex:
+            self.assertIsNone(gpu_env.python())
+            gpu_env.reexec_if_needed()
+            ex.assert_not_called()
+            self.assertFalse(gpu_env.status(refresh=True)["available"])
+        gpu_env.status(refresh=True)
+
+
+@unittest.skipUnless(gpu_compose.available()[0], "needs CuPy and an NVIDIA GPU (tools/promo_studio/setup_gpu.sh)")
+class GpuCompositorTests(unittest.TestCase):
+    """The GPU frame is the CPU frame: same maths, so within a couple of
+    levels of 255 (the dither noise differs, the picture does not)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(dir=SCRATCH)
+        self.d = Path(self.tmp.name)
+        (self.d / 'meta.json').write_text(json.dumps({'width': 96, 'height': 212, 'length': 8, 'lead': 1}))
+        self.addCleanup(self.tmp.cleanup)
+
+    def renderers(self, s, scale=.12):
+        with patch.object(compose, 'take_dir', return_value=str(self.d)), patch.object(compose, 'CACHE', str(self.d)), \
+                patch.object(library, 'plate', return_value='unused'), patch.object(library, 'probe', return_value=(64, 64, 1)):
+            return compose.Renderer(s, scale), gpu_compose.GpuRenderer(s, scale)
+
+    def gpu_frame(self, g, t, screen, plate, n_frame=0):
+        cp = gpu_compose.cp
+        n = g.compose(t, None if screen is None else cp.asarray(screen), cp.asarray(plate))
+        return cp.asnumpy(g.finish_rgb(n, n_frame))
+
+    def assert_same(self, cpu, gpu, label):
+        d = np.abs(cpu.astype(np.int16) - gpu.astype(np.int16))
+        self.assertLessEqual(int(d.max()), 4, f"{label}: worst pixel differs by {int(d.max())}")
+        self.assertLess(float(d.mean()), .6, f"{label}: mean difference {float(d.mean()):.3f}")
+
+    def test_gpu_frames_match_the_cpu_compositor(self):
+        s = spec.resolve({'motion_blur': 2, 'props': {'bg_brightness': .2}, 'tracks': {
+            'pan_x': [{'t': 0, 'v': .3}, {'t': 1, 'v': .8}], 'rotate': [{'t': 0, 'v': 0}, {'t': 1, 'v': 20}],
+            'zoom': [{'t': 1, 'v': 1}, {'t': 2, 'v': 1.8}], 'phone_tilt': [{'t': 0, 'v': 0}, {'t': 2, 'v': 25}]}})
+        c, g = self.renderers(s)
+        yy, xx = np.mgrid[0:c.ph, 0:c.pw]
+        plate = np.stack([xx * 255 // c.pw, yy * 255 // c.ph, (xx + yy) * 255 // (c.pw + c.ph)], axis=2).astype(np.uint8)
+        yy, xx = np.mgrid[0:212, 0:96]
+        screen = np.stack([xx * 2, yy, 255 - yy], axis=2).astype(np.uint8)
+        for t, scr, label in [(.5, screen, 'moving, blurred'), (1.5, screen, 'zooming'), (.5, None, 'a gap shows no phone')]:
+            self.assert_same(c.frame(t, scr, plate), self.gpu_frame(g, t, scr, plate), label)
+
+    def test_extra_background_blur_matches(self):
+        s = spec.resolve({'motion_blur': 0, 'tracks': {'bg_blur': [{'t': 0, 'v': 0}, {'t': 1, 'v': 12}]}})
+        c, g = self.renderers(s)
+        yy, xx = np.mgrid[0:c.ph, 0:c.pw]
+        plate = (((xx // 4 + yy // 4) % 2) * 255).astype(np.uint8)[..., None].repeat(3, axis=2)
+        self.assert_same(c.frame(.8, None, plate), self.gpu_frame(g, .8, None, plate), 'blur ramps up past the plate\'s own')
+
+    def test_nv12_has_the_cpu_exports_colours(self):
+        s = spec.resolve({'motion_blur': 0})
+        c, g = self.renderers(s)
+        plate = np.full((c.ph, c.pw, 3), (200, 90, 40), np.uint8)
+        cp = gpu_compose.cp
+        n = g.compose(.5, None, cp.asarray(plate))
+        rgb, nv = cp.asnumpy(g.finish_rgb(n, 3)), cp.asnumpy(g.finish_nv12(n, 3))
+        def yuv(raw, fmt):
+            return np.frombuffer(subprocess.run(['ffmpeg', '-v', 'error', '-f', 'rawvideo', '-pix_fmt', fmt, '-s', f'{c.W}x{c.H}', '-i', '-',
+                                                 '-f', 'rawvideo', '-pix_fmt', 'yuv420p', '-'], input=raw.tobytes(), capture_output=True, check=True).stdout, np.uint8).astype(int)
+        d = np.abs(yuv(rgb, 'rgb24') - yuv(nv, 'nv12'))
+        self.assertLessEqual(int(d.max()), 3, "the GPU's RGB->NV12 is swscale's default BT.601 conversion")
 
 
 class ServerTests(unittest.TestCase):
