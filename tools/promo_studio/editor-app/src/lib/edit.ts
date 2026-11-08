@@ -1,7 +1,7 @@
 // Edits as pure functions on a draft of the raw spec. The store wraps each in
 // an undo step (store.mutate); the tests call them directly.
 import { clamp, pieceStart, r3, sourceTime, stateAt, valueAt } from "./model.ts";
-import { fitZoom, screenPointWorld } from "./geometry.ts";
+import { fitZoom, panToPlacePhone, screenPointWorld } from "./geometry.ts";
 import type { Ease, Geo, Key, PropDef, RawSpec, Spec } from "./types.ts";
 
 export const MIN_PIECE = 0.05;
@@ -142,6 +142,13 @@ export function preset(raw: RawSpec, c: Ctx, geo: Geo, kind: "push" | "pull" | "
     const at = Math.min(c.spec.duration, kind === "push" ? t + d : t + 1 / (c.fps || 60));
     keyAll(raw, c, cam, at, { zoom: z, pan_x: px, pan_y: py }, kind === "push" ? "inOutCubic" : "hold");
   }
+}
+
+/** Put the phone's centre at `frac` of the frame across (x) or down (y) at time t, setting the pan key there. The other
+ *  axis keeps its place, which only needs the other pan to change when the camera is rotated. */
+export function placePhone(raw: RawSpec, c: Ctx, geo: Geo, axis: "x" | "y", frac: number, t: number) {
+  const S = stateAt(c.spec, c.props, t), p = panToPlacePhone(geo, S, axis, frac);
+  for (const [name, v] of [["pan_x", p.x], ["pan_y", p.y]] as const) if (Math.abs(v - S[name]) > 1e-6) setProp(raw, c, name, v, t);
 }
 
 // Recording edit ---------------------------------------------------------

@@ -70,6 +70,17 @@ export function snapPhoneToCentre(geo: Pick<Geo, "W" | "H">, S: State, px: numbe
   return { x: px + (c * ux + s * uy) / (S.zoom * W), y: py + (-s * ux + c * uy) / (S.zoom * H), snapX, snapY };
 }
 
+// The pan that puts the phone's centre at `frac` of the frame across (axis "x",
+// 0 = left edge) or down (axis "y") while it keeps its place on the other
+// axis. With the camera rotated the two pans are coupled, so both are returned.
+export function panToPlacePhone(geo: Pick<Geo, "W" | "H">, S: State, axis: "x" | "y", frac: number) {
+  const { W, H } = geo, [cx, cy] = phoneCentre(geo, S, S.phone_x, S.phone_y), [c, s] = rot(S.rotate);
+  const dx = (axis === "x" ? frac * W : cx) - W / 2, dy = (axis === "y" ? frac * H : cy) - H / 2;
+  // frame offset -> camera space: Rcam⁻¹ · d
+  const vx = c * dx + s * dy, vy = -s * dx + c * dy;
+  return { x: 0.5 + S.phone_x - vx / (S.zoom * W), y: 0.5 + S.phone_y - vy / (S.zoom * H) };
+}
+
 // The same snap for a plain drag, which pans the camera: the phone's centre is
 // brought onto the frame's centre lines by adjusting pan_x / pan_y instead of
 // the phone's own position. Returns the adjusted pan.
