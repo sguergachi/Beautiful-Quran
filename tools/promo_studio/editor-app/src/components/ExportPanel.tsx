@@ -24,7 +24,7 @@ function accelHint(o: ExportOptions, gpu: { available: boolean; device: string |
   if (gpu.checking) return "Checking for a GPU…";
   if (!gpu.available) return `${o.accel === "gpu" ? "Not available" : "Auto uses the CPU"}: ${gpu.reason ?? "no GPU found"}`;
   const nv = (o.format === "h264" || o.format === "hevc") && gpu.nvenc.includes(o.format);
-  return `${gpu.device}: draws every frame on the GPU${nv ? " and encodes on it too (files come out a little larger than CPU encodes)" : `; ${codecName(o.format)} is encoded on the CPU`}. About 7× faster.`;
+  return `${gpu.device}: draws every frame on the GPU${nv ? " and encodes on it too (files come out a little larger than CPU encodes)" : `; ${codecName(o.format)} is encoded on the CPU`}. Typically 10–30× faster.`;
 }
 const codecName = (f: ExportFormat) => ({ h264: "H.264", hevc: "HEVC", av1: "AV1", vp9: "VP9", prores: "ProRes", gif: "GIF" })[f];
 

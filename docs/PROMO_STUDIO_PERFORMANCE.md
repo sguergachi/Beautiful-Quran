@@ -42,12 +42,41 @@ downscale as two box-weight matrix products (CuPy), then converts to NV12 on
 the GPU (BT.601 limited, the same matrix swscale uses for the CPU export) and
 pipes to NVENC. Two decoder threads per worker keep the GPU fed.
 
-Measured on the real 4K spec, with the CPU export running alongside:
+Measured on the real 4K 9:16 spec (151.7 s, 9102 frames, 14 camera keys, H.264
+"high"), same machine, same settings:
 
-| | CPU (4 workers) | GPU |
+| | CPU, 4 workers | GPU, 2 workers |
 |---|---|---|
-| typical frame | 3.5 fps | 24.6 fps (decode-bound) |
-| worst motion-blur stretch (≈13 sub-frames) | far slower | 15.5 fps |
+| whole export | 4220 s (70 min) | 144 s |
+| rate | 2.2 fps overall | 63 fps overall |
+| file | 223 MB | 248 MB |
+
+Output compared with the CPU export segment by segment: SSIM 0.9954 (opening),
+0.9993 (zoom-in), 0.9990 (still), 0.9994 (final zoom). These differences are
+the encoder (NVENC vs x264) and the dither noise.
+
+What it took beyond the port, in the order it mattered:
+
+- **Equal-cost chunks.** The CPU export cut the video into equal frame counts,
+  but a frame with the camera moving costs up to 24 times a still one (one
+  motion-blur sample each). Two of four workers held ~7,650 sub-frames each, the
+  others ~2,275, and the light ones sat idle for the last 20 minutes. Chunks now
+  have equal cost (1 + samples), three per worker, heaviest first, and progress
+  and the ETA are weighted by cost. This also applies to the CPU path.
+- **Phone downscale as a kernel.** The first version area-filtered the phone with
+  two matrix products (5.9 ms per size at 4K, once per motion-blur sample on a
+  zoom). A direct box-average kernel does it in 0.25 ms, within 0.16 of a level
+  of `cv2.INTER_AREA`. (First attempt used double precision: consumer GPUs run
+  FP64 at 1/64 rate, so it was no faster than the matrices.)
+- **NVENC preset p4.** On identical frames p4 gave p5's SSIM and size
+  (0.999126 vs 0.999132, 671 vs 658 kB) at 90 fps instead of 54; p1 reaches
+  140 fps but loses quality. The GPU has one NVENC engine, so encode speed caps
+  the whole machine, however many workers feed it.
+- **Smaller costs.** The pinned frame is written to the encoder without a copy;
+  the take decodes on two threads.
+
+The per-frame GPU time for an ordinary (one-sample) frame is now ~6 ms (upload
+3.1, composite 1.2, convert 0.2, download 1.1), so decoding and NVENC set the pace.
 
 Fidelity: frames match the CPU compositor within 1–2 of 255 levels (PSNR
 54–57 dB; the dither is a per-pixel hash instead of numpy's RNG, so the noise
