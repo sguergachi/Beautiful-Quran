@@ -11,6 +11,7 @@ Audio stays -no-audio: capture taps the emulator's PCM stream, so nothing
 plays through the host speakers. The ordinary test pool keeps its warm snapshot.
 """
 import io
+import functools
 import json
 import os
 import queue
@@ -336,6 +337,60 @@ def gradle_version():
     return f"{name.group(1)} ({code.group(1)})"
 
 
+# What a rebuild of the app reads: a commit that touches none of these did not change the app.
+APP_PATHS = ("app", "data", "gradle", "baselineprofile", "build.gradle.kts", "settings.gradle.kts", "gradle.properties")
+
+
+def _version_code(version):
+    m = re.search(r"\((\d+)\)", version or "")
+    return int(m.group(1)) if m else None
+
+
+@functools.lru_cache(maxsize=64)
+def _compare_build(version, commit, head, head_version):
+    """build_check for one (take build, HEAD) pair; HEAD is part of the key, so it refreshes when HEAD moves."""
+    out = {"state": "unknown", "behind": None, "changes": []}
+    if commit and _git("cat-file", "-e", f"{commit}^{{commit}}") is not None and head:
+        out["behind"] = int(_git("rev-list", "--count", f"{commit}..{head}", "--", *APP_PATHS) or 0)
+        out["state"] = "older" if out["behind"] else "current"
+        if out["behind"]:
+            log = _git("log", "-n", "6", "--format=%s", f"{commit}..{head}", "--", *APP_PATHS)
+            out["changes"] = [l for l in (log or "").splitlines() if l]
+        return out
+    a, b = _version_code(version), _version_code(head_version)
+    if a is not None and b is not None and a != b:
+        out["state"] = "older" if a < b else "current"       # a newer build than this checkout is not a warning
+    return out
+
+
+_HEAD = [0.0, None, None]
+
+
+def _head():
+    """HEAD's short commit and the app version in this checkout, re-read every few seconds (the video list asks per video)."""
+    if time.monotonic() - _HEAD[0] > 5:
+        _HEAD[:] = [time.monotonic(), _git("rev-parse", "--short=9", "HEAD"), gradle_version()]
+    return _HEAD[1], _HEAD[2]
+
+
+def build_check(build):
+    """How a take's app build compares with the app as it is now (HEAD).
+
+    `build` is what the take recorded ({version, commit}) or None for a take
+    from before builds were tracked. State: `older` (the app has changed since
+    — warn), `current`, `unknown` (the build is recorded but cannot be ordered:
+    a hand-installed app has no commit, or the commit is not in this checkout),
+    or `untracked` (nothing recorded). `behind` counts app commits since,
+    scoped to the paths a rebuild reads, so studio-only commits never warn."""
+    head, head_version = _head()
+    build = build or {}
+    out = {"take": {"version": build.get("version"), "commit": build.get("commit")},
+           "current": {"version": head_version, "commit": head}}
+    if not build.get("version") and not build.get("commit"):
+        return {**out, "state": "untracked", "behind": None, "changes": []}
+    return {**out, **_compare_build(build.get("version"), build.get("commit"), head, head_version)}
+
+
 def apk_info():
     """Everything the editor shows about the release APK: which version and
     commit the file on disk came from, and what HEAD has moved to since.
@@ -349,8 +404,7 @@ def apk_info():
     head_short = _git("rev-parse", "--short=9", "HEAD")
     head_msg = _git("log", "-1", "--format=%s", "HEAD")
     head_version = gradle_version()
-    dirty = bool(_git("status", "--porcelain=v1", "--", "app", "data", "gradle", "baselineprofile",
-                       "build.gradle.kts", "settings.gradle.kts", "gradle.properties"))
+    dirty = bool(_git("status", "--porcelain=v1", "--", *APP_PATHS))
     info = {"path": DEFAULT_APK, "exists": False, "version": None, "commit": None,
             "commit_message": None, "built_at": None, "size_bytes": None, "exact": False,
             "head_version": head_version, "head_commit": head_short,

@@ -13,6 +13,7 @@ import {
   useStaleRecordingFields, useStore, wholeTake, type Tab,
 } from "../state/store.ts";
 import { Button, Dot, Empty, Field, Icon, Progress, Section, Segmented, Select, Slider, StaleDot, TextInput } from "./ui.tsx";
+import { BuildLine } from "./BuildNotice.tsx";
 import { Opening } from "./Opening.tsx";
 import { PhoneLookPreview } from "./PhoneLookPreview.tsx";
 import { ClipEditor } from "./ClipEditor.tsx";
@@ -217,6 +218,7 @@ function Recording({ contentsOnly = false }: { contentsOnly?: boolean }) {
               <p className="mb-2.5 text-[12px] text-gold">The active frames are slow. Use 6 cores and record one take at a time for smoother ink.</p>
             )}
             {take?.frame_p90_ms != null && <p className="mb-2.5 text-[11.5px] text-faint">90% of active frame intervals are within {take.frame_p90_ms} ms. Still holds are excluded.</p>}
+            {take && geo && <BuildLine check={geo.build} />}
             {takeShort && (
               <p className="mb-2.5 text-[12px] text-orange">This edit needs a longer take. The recording length is set to include it; record the full range to preview and export the added verses.</p>
             )}

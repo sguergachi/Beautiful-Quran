@@ -228,7 +228,9 @@ class MediaTests(unittest.TestCase):
                         '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=5',
                         '-filter_complex', "[0:v]drawbox=color=red:t=fill:enable='gte(t,3)',select='eq(n,0)+gte(t,3)'[v];[1:a]volume=0:enable='lt(t,3)'[a]",
                         '-map', '[v]', '-map', '[a]', '-fps_mode', 'vfr', '-c:v', 'libx264', '-g', '1', '-bf', '0', '-c:a', 'flac', raw], check=True)
-        meta = capture.conform(str(self.d), log=lambda _: None, marks={'intro': .5, 'play': 2.9, 'dwell': 1})
+        meta = capture.conform(str(self.d), log=lambda _: None, marks={'intro': .5, 'play': 2.9, 'dwell': 1},
+                               build={'version': '0.12 (13)', 'commit': 'ac1246014', 'extra': 'dropped'})
+        self.assertEqual(meta['build'], {'version': '0.12 (13)', 'commit': 'ac1246014'}, 'the take records the app build it shows')
         self.assertAlmostEqual(meta['length'], 4.65, delta=.04)
         self.assertLess(meta['lead'], meta['length'])
         first = compose.grab(str(self.d / 'clip.mp4'), 32, 32, 0)[16, 16]
@@ -1035,6 +1037,47 @@ class ServerTests(unittest.TestCase):
             with ThreadPoolExecutor(8) as pool:
                 list(pool.map(lambda _: jobs._save(), range(80)))
             self.assertEqual(json.loads(Path(d, "jobs.json").read_text()), [])
+
+
+class TakeBuildTests(unittest.TestCase):
+    """A take remembers the app build it was recorded with; the editor warns once the app has moved on."""
+
+    def _check(self, build, *, in_repo=True, behind=0, head_version="0.13 (14)"):
+        def fake(*args, **kwargs):
+            if args[:2] == ("rev-parse", "--short=9"):
+                return "b" * 9
+            if args[0] == "cat-file":
+                return "" if in_repo else None
+            if args[0] == "rev-list":
+                self.assertIn("app", args, "only commits that touch the app count")
+                return str(behind)
+            if args[0] == "log":
+                return "\n".join(f"app change {i}" for i in range(behind))
+            raise AssertionError(f"unexpected git call: {args}")
+        server.emus._compare_build.cache_clear()
+        server.emus._HEAD[0] = 0.0
+        with patch.object(server.emus, "_git", fake), patch.object(server.emus, "gradle_version", lambda: head_version):
+            return server.emus.build_check(build)
+
+    def test_a_take_with_no_recorded_build_is_untracked_not_stale(self):
+        for b in (None, {}, {"version": None, "commit": None}):
+            self.assertEqual(self._check(b)["state"], "untracked")
+
+    def test_app_commits_since_the_takes_commit_make_it_older(self):
+        r = self._check({"version": "0.12 (13)", "commit": "ac1246014"}, behind=3)
+        self.assertEqual((r["state"], r["behind"], len(r["changes"])), ("older", 3, 3))
+        self.assertEqual((r["take"]["commit"], r["current"]["commit"]), ("ac1246014", "b" * 9))
+
+    def test_no_app_commits_since_means_current_even_if_head_moved(self):
+        r = self._check({"version": "0.13 (14)", "commit": "ac1246014"}, behind=0)
+        self.assertEqual((r["state"], r["behind"], r["changes"]), ("current", 0, []))
+
+    def test_without_a_known_commit_the_version_code_orders_the_builds(self):
+        self.assertEqual(self._check({"version": "0.12 (13)", "commit": None})["state"], "older")
+        self.assertEqual(self._check({"version": "0.13 (14)", "commit": None})["state"], "unknown", "same version: cannot tell")
+        self.assertEqual(self._check({"version": "0.14 (15)", "commit": None})["state"], "current", "newer than this checkout is no warning")
+        self.assertEqual(self._check({"version": "0.12 (13)", "commit": "deadbeef0"}, in_repo=False)["state"], "older", "a commit this checkout lacks falls back to the version")
+        self.assertEqual(self._check({"version": "weird", "commit": "deadbeef0"}, in_repo=False)["state"], "unknown")
 
 
 class ApkTests(unittest.TestCase):

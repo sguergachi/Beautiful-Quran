@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import type { Accel, ExportFile, ExportFormat, ExportOptions, ExportQuality } from "../lib/types.ts";
 import { estimateBytes, exportFilename, exportFps, fmtBytes, frameSize, scaleLabel } from "../lib/exporting.ts";
 import { cancelJob, deleteExport, exportOptions, exportVideo, openPanel, refreshSpecs, setExport, toast, useStore } from "../state/store.ts";
+import { OldTakeNotice } from "./BuildNotice.tsx";
 import { Drawer } from "./Panels.tsx";
 import { Button, Field, Icon, Progress, Segmented, Select } from "./ui.tsx";
 
@@ -69,6 +70,7 @@ export function ExportPanel() {
 
   return (
     <Drawer title="Export" onClose={() => openPanel(null)} width={480}>
+      <OldTakeNotice check={geo?.build} />
       <div className="mb-4 flex flex-wrap gap-1.5">
         {PRESETS.map(([label, hint, p]) => (
           <button key={label} title={hint} onClick={() => setExport(p)}

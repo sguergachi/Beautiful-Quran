@@ -112,6 +112,7 @@ function VideoItem({ s, active, onAction }: { s: SpecStatus; active: boolean; on
       <div className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-faint">
         <span className="flex items-center gap-1"><Dot tone={s.take ? (s.take_short ? "orange" : "green") : "faint"} />{s.take_short ? "take too short" : s.take ? "take" : "no take"}</span>
         <span className="flex items-center gap-1"><Dot tone={s.video ? "gold" : "faint"} />{s.video ? "exported" : "not exported"}</span>
+        {s.take_build === "older" && <span className="flex items-center gap-1 text-gold" title="The app has changed since this take was recorded"><Dot tone="gold" />older app</span>}
       </div>
     </li>
   );

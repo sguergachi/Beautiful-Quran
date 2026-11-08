@@ -6,6 +6,7 @@ import { track } from "../lib/drag.ts";
 import { sourceTime, stateAt } from "../lib/model.ts";
 import { phoneMatrix, snapPanToPhone, snapPhoneToCentre } from "../lib/geometry.ts";
 import { previewContext } from "../lib/inspector.ts";
+import { oldTakeWarning } from "../lib/build.ts";
 import { Preview } from "../lib/render.ts";
 import { clock, media } from "../state/clock.ts";
 import { cancelJob, endGesture, hideExact, inspect, record, select, setProp, setUI, useStore } from "../state/store.ts";
@@ -19,6 +20,7 @@ export function Stage() {
   const [preview] = useState(() => new Preview());
   const spec = useStore((s) => s.spec), geo = useStore((s) => s.geo), plate = useStore((s) => s.plate);
   const meta = useStore((s) => s.meta), exact = useStore((s) => s.exact);
+  const oldTake = oldTakeWarning(geo?.build);
   // The recording in flight for this video: the pill below turns into its status.
   const capture = useStore((s) => s.jobs.find((j) => j.kind === "capture" && j.name === s.name && (j.state === "running" || j.state === "queued")));
   const box = useRef({ w: 0, h: 0 });
@@ -164,6 +166,14 @@ export function Stage() {
         <div className="pointer-events-none absolute" style={{ width: box.current.w, height: box.current.h }}>
           <span className={`absolute inset-y-0 left-1/2 w-px -translate-x-1/2 ${guides.v ? "bg-gold" : "bg-gold/35"}`} />
           <span className={`absolute inset-x-0 top-1/2 h-px -translate-y-1/2 ${guides.h ? "bg-gold" : "bg-gold/35"}`} />
+        </div>
+      )}
+      {oldTake && !capture && (
+        <div role="status" title={`${oldTake}\n${geo!.build!.changes.map((c) => "· " + c).join("\n")}`}
+          className="absolute left-1/2 top-3 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-2 rounded-full border border-gold/50 bg-panel/95 py-1 pl-3 pr-1 text-[12px] shadow-lg">
+          <span className="size-1.5 shrink-0 rounded-full bg-gold" />
+          <span className="truncate text-ink">Take is from an older app</span>
+          <Button size="sm" variant="ghost" onClick={() => { setUI({ tab: "recording", hideR: false }); void record(null, true); }}>Record again</Button>
         </div>
       )}
       {exact && (
