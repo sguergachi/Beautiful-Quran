@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api.ts";
 import * as E from "../lib/edit.ts";
-import { clamp, r3, valueAt } from "../lib/model.ts";
+import { fitZoom, phoneCentre } from "../lib/geometry.ts";
+import { clamp, r3, stateAt, valueAt } from "../lib/model.ts";
 import { activeContext, INSPECTOR, type InspectorContext } from "../lib/inspector.ts";
 import type { Ease, Emulator, Job } from "../lib/types.ts";
 import { clock, useTime } from "../state/clock.ts";
@@ -12,6 +13,7 @@ import {
   useStaleRecordingFields, useStore, wholeTake, type Tab,
 } from "../state/store.ts";
 import { Button, Dot, Empty, Field, Icon, Progress, Section, Segmented, Select, Slider, StaleDot, TextInput } from "./ui.tsx";
+import { BuildLine } from "./BuildNotice.tsx";
 import { Opening } from "./Opening.tsx";
 import { PhoneLookPreview } from "./PhoneLookPreview.tsx";
 import { ClipEditor } from "./ClipEditor.tsx";
@@ -41,9 +43,9 @@ export function Inspector() {
       </div>
       {context && <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-4 py-2">
         <span role="status" className="text-[12px] text-gold">{INSPECTOR[context].title}</span>
-        <button className="shrink-0 text-[11px] text-mute hover:text-ink" onClick={() => setUI({ tab })}>All {tab === "look" ? "Look" : tab === "animate" ? "Animate" : "Recording"}</button>
+        {context !== "keys" && <button className="shrink-0 text-[11px] text-mute hover:text-ink" onClick={() => setUI({ tab })}>All {tab === "look" ? "Look" : tab === "animate" ? "Animate" : "Recording"}</button>}
       </div>}
-      <div key={`${tab}:${context ?? "all"}`} data-inspector-context={context ?? "all"} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
+      <div key={`${tab}:${context === "keys" ? "all" : context ?? "all"}`} data-inspector-context={context ?? "all"} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
         {!spec ? <Empty>No video open.</Empty> : context === "clip" ? <ClipEditor /> : tab === "animate" ? <Animate context={context} /> : tab === "recording" ? <Recording contentsOnly={context === "contents"} /> : <Look context={context} />}
       </div>
     </div>
@@ -59,7 +61,6 @@ function Animate({ context }: { context: InspectorContext | null }) {
   for (const [n, p] of Object.entries(meta.props)) (groups[p.group] = groups[p.group] || []).push(n);
   const items = sel?.type === "keys" ? sel.items : [];
   const group = context === "camera" ? "Camera" : context === "phone-motion" ? "Phone" : context === "background-motion" ? "Background" : null;
-  if (context === "keys") return <KeyCard items={items} />;
   return (
     <>
       {items.length > 0 && <KeyCard items={items} />}
@@ -74,6 +75,7 @@ function Animate({ context }: { context: InspectorContext | null }) {
                 <span className="truncate text-mute" title={`${d.label} · ${keys.length ? `${keys.length} key${keys.length > 1 ? "s" : ""}` : "one value for the whole video"}`}>{d.label}</span>
                 <Slider label={d.label} value={valueAt(spec, meta.props, n, t)} min={d.min} max={d.max} step={d.step} digits={d.step < 0.01 ? 3 : 2}
                   onChange={(v) => setProp(n, v)} onDone={endGesture} />
+                {QUICK_PROPS.includes(n) && <div className="col-span-3 -mt-0.5 mb-1 pl-[116px]"><QuickValues prop={n} /></div>}
               </div>
             );
           })}
@@ -84,6 +86,41 @@ function Animate({ context }: { context: InspectorContext | null }) {
         {raw.tracks && Object.keys(raw.tracks).length === 0 && " Try Push in under the picture."}
       </p>
     </>
+  );
+}
+
+// Quick values for Pan X, Pan Y and Zoom, under the slider and on selected keys. Pan puts the phone's centre
+// at a quarter, third or the middle of the frame (left to right for X, top to bottom for Y); Zoom is a set of scales.
+export const QUICK_PROPS = ["zoom", "pan_x", "pan_y"];
+const PAN_STOPS: [string, number, string][] = [["¼", 1 / 4, "a quarter"], ["⅓", 1 / 3, "a third"], ["●", 1 / 2, "the centre"], ["⅔", 2 / 3, "two thirds"], ["¾", 3 / 4, "three quarters"]];
+const ZOOM_STOPS: [string, number][] = [["1×", 1], ["1.5×", 1.5], ["2×", 2], ["3×", 3]];
+/** `times`: the keys' times when editing selected keys; absent: the playhead. */
+function QuickValues({ prop, times }: { prop: string; times?: number[] }) {
+  const meta = useStore((s) => s.meta)!, spec = useStore((s) => s.spec)!, geo = useStore((s) => s.geo);
+  const live = useTime(60);
+  if (!geo) return null;
+  const at = times ?? [live], S = stateAt(spec, meta.props, at[0]);
+  const go = (apply: (raw: any, c: E.Ctx, t: number) => void) => mutate((raw, c) => { for (const t of times ?? [clock.t]) apply(raw, c, t); });
+  if (prop === "zoom") {
+    const stops: [string, number | "fit", string][] = [["1×", 1, "No zoom"], ["Fit", "fit", "The phone fills the frame's width"], ...ZOOM_STOPS.slice(1).map(([l, v]): [string, number, string] => [l, v, `${l} zoom`])];
+    return (
+      <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Zoom shortcuts">
+        {stops.map(([label, z, title]) => (
+          <button key={label} onClick={() => go((raw, c, t) => E.setProp(raw, c, "zoom", z === "fit" ? fitZoom(c.spec, geo, stateAt(c.spec, c.props, t)) : z, t))} title={title} aria-label={`Zoom ${label}`}
+            className={`h-5 min-w-8 rounded border px-1.5 text-[11px] ${at.length === 1 && Math.abs(S.zoom - (z === "fit" ? fitZoom(spec, geo, S) : z)) < 0.005 ? "border-gold/60 text-gold" : "border-line text-faint hover:text-ink"}`}>{label}</button>
+        ))}
+      </div>
+    );
+  }
+  const axis = prop === "pan_x" ? "x" : "y", where = axis === "x" ? ["left", "right"] : ["top", "bottom"];
+  const cur = phoneCentre(geo, S, S.phone_x, S.phone_y)[axis === "x" ? 0 : 1] / (axis === "x" ? geo.W : geo.H);
+  return (
+    <div className="flex flex-wrap items-center gap-1" role="group" aria-label={`Place the phone across the frame (${where[0]} to ${where[1]})`}>
+      {PAN_STOPS.map(([label, f, name]) => (
+        <button key={label} onClick={() => go((raw, c, t) => E.placePhone(raw, c, geo, axis, f, t))} title={`Phone's centre at ${name} of the frame, from the ${where[0]}`} aria-label={`Phone at ${name} from the ${where[0]}`}
+          className={`h-5 min-w-8 rounded border px-1.5 text-[11px] ${at.length === 1 && Math.abs(cur - f) < 0.002 ? "border-gold/60 text-gold" : "border-line text-faint hover:text-ink"}`}>{label}</button>
+      ))}
+    </div>
   );
 }
 
@@ -117,6 +154,11 @@ function KeyCard({ items }: { items: E.KeyRef[] }) {
           </Field>
         </>
       )}
+      {QUICK_PROPS.filter((n) => items.some((x) => x.prop === n)).map((n) => (
+        <Field key={n} label={`${meta.props[n].label} to`}>
+          <QuickValues prop={n} times={items.filter((x) => x.prop === n).map((x) => x.t)} />
+        </Field>
+      ))}
       <Field label={one ? "Ease into it" : "Ease into them"}>
         <Select value={eases.size > 1 ? "" : [...eases][0]} options={[...(eases.size > 1 ? [["", "(mixed)"] as [string, string]] : []), ...EASES]} onChange={(v) => v && setEase(v as Ease)} />
       </Field>
@@ -176,6 +218,7 @@ function Recording({ contentsOnly = false }: { contentsOnly?: boolean }) {
               <p className="mb-2.5 text-[12px] text-gold">The active frames are slow. Use 6 cores and record one take at a time for smoother ink.</p>
             )}
             {take?.frame_p90_ms != null && <p className="mb-2.5 text-[11.5px] text-faint">90% of active frame intervals are within {take.frame_p90_ms} ms. Still holds are excluded.</p>}
+            {take && geo && <BuildLine check={geo.build} />}
             {takeShort && (
               <p className="mb-2.5 text-[12px] text-orange">This edit needs a longer take. The recording length is set to include it; record the full range to preview and export the added verses.</p>
             )}

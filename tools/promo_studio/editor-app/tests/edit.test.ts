@@ -188,3 +188,14 @@ test("sameKeys compares key lists regardless of order", () => {
   assert.ok(!E.sameKeys(a, [{ prop: "zoom", t: 3 }]), "a subset is not the same");
   assert.ok(!E.sameKeys(a, [{ prop: "zoom", t: 3 }, { prop: "pan_y", t: 3 }]));
 });
+
+test("placePhone sets the pan key at the time and leaves the other pan alone when the camera is level", () => {
+  const geo: any = { W: 1080, H: 1920, g: meta.g };
+  const base = { edit: [{ in: 0, out: 10 }], tracks: { pan_x: [{ t: 0, v: .5 }, { t: 4, v: .6 }], pan_y: [{ t: 0, v: .5 }, { t: 4, v: .5 }] } };
+  const { raw } = run(base, (r, c) => E.placePhone(r, c, geo, "x", 1 / 3, 4));
+  assert.equal(raw.tracks.pan_y.length, 2, "no new key on the untouched axis");
+  assert.equal(raw.tracks.pan_x.length, 2, "the key at 4 was edited, not duplicated");
+  // level camera, zoom 1, phone at the middle: a third across is a sixth of the frame left of centre, so the pan moves right by that much
+  const k = raw.tracks.pan_x.find((x: any) => x.t === 4);
+  assert.ok(Math.abs(k.v - (.5 + 1 / 6)) < 2e-3, `pan ${k.v}`);
+});

@@ -71,9 +71,18 @@ export interface ApkInfo {
 }
 
 export interface PhoneGeometry { W: number; H: number; bw: number; bh: number; body_r: number; sx0: number; sy0: number; sw: number; sh: number; screen_r: number; k: number }
+/** An app build as the take recorded it. */
+export interface AppBuild { version?: string | null; commit?: string | null }
+/** `older`: the app has changed since the take; `untracked`: the take predates build tracking; `unknown`: recorded but cannot be ordered. */
+export interface BuildCheck {
+  state: "older" | "current" | "unknown" | "untracked";
+  take: AppBuild; current: AppBuild; behind: number | null; changes: string[];
+}
 export interface Geo {
   W: number; H: number; fps: number; g: PhoneGeometry;
-  take: { length: number; lead: number; capture_fps: number; active_fps?: number; frame_p90_ms?: number; width: number; height: number; recorded: string; app?: Spec["app"] } | null;
+  take: { length: number; lead: number; capture_fps: number; active_fps?: number; frame_p90_ms?: number; width: number; height: number; recorded: string; app?: Spec["app"]; build?: AppBuild } | null;
+  /** The take's app build against the app now (emus.build_check); null with no take. */
+  build?: BuildCheck | null;
   frame: string; clip: string | null; audio: string | null; peaks: string | null;
   plate: { w: number; h: number; k: number };
 }
@@ -92,7 +101,7 @@ export interface VersePlan {
 
 export interface SpecStatus {
   name: string; title?: string; aspect?: string; fps?: number; error?: string;
-  app?: Spec["app"]; duration?: number; take?: boolean; take_length?: number | null; take_short?: boolean;
+  app?: Spec["app"]; duration?: number; take?: boolean; take_length?: number | null; take_short?: boolean; take_build?: BuildCheck["state"] | null;
   video?: boolean; video_mtime?: number | null; exports?: ExportFile[];
 }
 export interface ExportFile { file: string; bytes: number; mtime: number; revision: string }
