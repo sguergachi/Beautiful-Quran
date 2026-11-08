@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { apply, phoneCentre, phoneMatrix, snapPanToPhone, snapPhoneToCentre } from "../src/lib/geometry.ts";
+import { apply, panToPlacePhone, phoneCentre, phoneMatrix, snapPanToPhone, snapPhoneToCentre } from "../src/lib/geometry.ts";
 import type { Geo, Spec, State } from "../src/lib/types.ts";
 
 const spec = { phone: { height: .8 } } as Spec;
@@ -51,4 +51,16 @@ test("Shift on a plain drag pans the camera so the phone lands on the centre lin
   assert.ok(Math.abs(phoneCentre(geo, S, 0, 0, near.x, near.y)[0] - geo.W / 2) < 1e-6);
   const far = snapPanToPhone(geo, S, .9, .9, 12);
   assert.deepEqual([far.snapX, far.snapY, far.x, far.y], [false, false, .9, .9]);
+});
+
+test("pan presets put the phone's centre at a third / quarter of the frame, leaving the other axis", () => {
+  for (const o of [{}, { zoom: 1.6, phone_x: .04, phone_y: -.08, pan_x: .45 }, { rotate: 30, zoom: 1.4, pan_x: .4, pan_y: .6 }, { rotate: -80, zoom: 2, phone_y: .1 }]) {
+    const S = state(o);
+    for (const axis of ["x", "y"] as const) for (const f of [1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4]) {
+      const [bx, by] = phoneCentre(geo, S, S.phone_x, S.phone_y), p = panToPlacePhone(geo, S, axis, f);
+      const [x, y] = phoneCentre(geo, S, S.phone_x, S.phone_y, p.x, p.y);
+      assert.ok(Math.abs(axis === "x" ? x - f * geo.W : y - f * geo.H) < 1e-6, `${axis} ${f} ${JSON.stringify(o)}`);
+      assert.ok(Math.abs(axis === "x" ? y - by : x - bx) < 1e-6, "the other axis stays put");
+    }
+  }
 });

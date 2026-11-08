@@ -10,6 +10,7 @@ Long work (captures, renders, emulator boots) runs as separate processes,
 the server tails. A job that crashes cannot take the server down, and a
 server restart finds jobs that are still running and follows them again.
 """
+import errno
 import io
 import json
 import math
@@ -30,6 +31,8 @@ import audio
 import emus
 import formats
 import gpu_env
+import service
+import spec_store
 import library
 import phone as phone_mod
 import spec as S
@@ -47,20 +50,11 @@ def spec_path(name):
     return os.path.join(S.SPECS, name + ".json")
 
 
-def write_spec(name, raw):
-    """Readers see either complete revision, never a half-written JSON file."""
-    path = spec_path(name)
-    with SPEC_LOCK:
-        tmp = None
-        try:
-            with tempfile.NamedTemporaryFile(mode="w", dir=S.SPECS, suffix=".json.part", delete=False) as f:
-                tmp = f.name
-                json.dump(raw, f, indent=2, ensure_ascii=False, allow_nan=False)
-                f.write("\n")
-            os.replace(tmp, path)
-        finally:
-            if tmp and os.path.exists(tmp):
-                os.remove(tmp)
+def write_spec(name, raw, expect=None, force=False):
+    """Save a spec through spec_store: atomic and fsynced, refused when it was
+    made against an out-of-date revision, with the replaced version kept in the
+    history. Returns the new revision."""
+    return spec_store.write(name, raw, expect=expect, force=force)
 
 
 def render_scale(value):
@@ -610,10 +604,19 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/spec/([\w.-]+)", self.path)
         if not m:
             return self.send_json({"error": "not found"}, 404)
-        raw = S.migrate(self.body())                     # an old editor tab may still send v1
+        name = m.group(1)
+        if int(self.headers.get("Content-Length") or 0) <= 0:
+            raise ValueError("an empty save was refused")           # never turn a video into defaults by accident
+        body = self.body()
+        if not isinstance(body, dict) or (not body and spec_store.current_revision(name)):
+            raise ValueError("refusing to replace a video with an empty one")
+        raw = S.migrate(body)                            # an old editor tab may still send v1
         S.resolve(raw)                                   # validate before saving
-        write_spec(m.group(1), raw)
-        self.send_json({"ok": True, "status": spec_status(m.group(1))})
+        try:
+            rev = write_spec(name, raw, expect=self.headers.get("If-Match") or None, force=self.headers.get("X-Force") == "1")
+        except spec_store.SpecConflict as c:
+            return self.send_json({"error": str(c), "conflict": True, "rev": c.rev, "raw": c.raw}, 409)
+        self.send_json({"ok": True, "rev": rev, "status": spec_status(name)})
 
     def route_delete(self):
         m = re.fullmatch(r"/api/exports/([\w.-]+)/([\w.-]+)", urllib.parse.unquote(self.path))
@@ -625,10 +628,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/spec/([\w.-]+)", self.path)
         if not m:
             return self.send_json({"error": "not found"}, 404)
-        p = spec_path(m.group(1))
-        with SPEC_LOCK:
-            if os.path.exists(p):
-                os.remove(p)
+        spec_path(m.group(1))
+        if os.path.exists(spec_path(m.group(1))):
+            spec_store.delete(m.group(1))          # kept in the history: restore it from there
         self.send_json({"ok": True})
 
     def route_get(self):
@@ -657,8 +659,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json([spec_status(n) for n in names])
         m = re.fullmatch(r"/api/spec/([\w.-]+)", p)
         if m:
-            raw = S.migrate(json.load(open(spec_path(m.group(1)))))
-            return self.send_json({"raw": raw, "status": spec_status(m.group(1))})
+            raw, rev = spec_store.read(m.group(1))
+            return self.send_json({"raw": raw, "rev": rev, "status": spec_status(m.group(1))})
+        m = re.fullmatch(r"/api/spec/([\w.-]+)/history", p)
+        if m:
+            return self.send_json({"versions": spec_store.history(m.group(1)), "rev": spec_store.current_revision(m.group(1))})
+        if p == "/api/trash":
+            return self.send_json({"deleted": spec_store.deleted()})
         m = re.fullmatch(r"/api/geometry/([\w.-]+)", p)
         if m:
             return self.send_json(geometry(S.load(m.group(1))))
@@ -753,22 +760,30 @@ class Handler(BaseHTTPRequestHandler):
             pw, ph, pk = library.plate_geometry(bg, W, H)
             return self.send_json({"url": "/media/plate/" + os.path.basename(path), "w": pw, "h": ph, "k": pk,
                                    "blur": bg["blur"]})
+        m = re.fullmatch(r"/api/spec/([\w.-]+)/restore", p)
+        if m:
+            raw, rev = spec_store.restore(m.group(1), self.body().get("id"))
+            return self.send_json({"ok": True, "raw": raw, "rev": rev, "status": spec_status(m.group(1))})
+        m = re.fullmatch(r"/api/spec/([\w.-]+)/stash", p)
+        if m:                                           # keep a version that was not saved (a draft, another tab's edits) in the history only
+            body = self.body()
+            reason = body.get("reason") if body.get("reason") in ("unsaved", "replaced") else "unsaved"
+            return self.send_json({"ok": True, "id": spec_store.stash(m.group(1), S.migrate(body.get("raw") or {}), reason)})
         m = re.fullmatch(r"/api/copy/([\w.-]+)/([\w.-]+)", p)
         if m:
-            src, dst = spec_path(m.group(1)), spec_path(m.group(2))
-            with SPEC_LOCK:
-                if os.path.exists(dst):
-                    return self.send_json({"error": f"{m.group(2)} already exists"}, 409)
-                with open(src, "rb") as a, open(dst, "xb") as b:
-                    shutil.copyfileobj(a, b)
+            spec_path(m.group(1)), spec_path(m.group(2))
+            try:
+                spec_store.duplicate(m.group(1), m.group(2))
+            except FileExistsError:
+                return self.send_json({"error": f"{m.group(2)} already exists"}, 409)
             return self.send_json({"ok": True})
         m = re.fullmatch(r"/api/rename/([\w.-]+)/([\w.-]+)", p)
         if m:
-            src, dst = spec_path(m.group(1)), spec_path(m.group(2))
-            with SPEC_LOCK:
-                if os.path.exists(dst):
-                    return self.send_json({"error": f"{m.group(2)} already exists"}, 409)
-                os.rename(src, dst)
+            spec_path(m.group(1)), spec_path(m.group(2))
+            try:
+                spec_store.rename(m.group(1), m.group(2))
+            except FileExistsError:
+                return self.send_json({"error": f"{m.group(2)} already exists"}, 409)
             for e in exports(m.group(1)):                # every export follows its video
                 renamed = m.group(2) + e["file"][len(m.group(1)):]
                 if not os.path.exists(os.path.join(S.OUT, renamed)):
@@ -781,15 +796,14 @@ class Handler(BaseHTTPRequestHandler):
             base, title = body.get("from"), body.get("title")
             if title is not None and (not isinstance(title, str) or not title.strip()):
                 raise ValueError("Give the video a title")
-            with SPEC_LOCK:
-                if os.path.exists(dst):
-                    return self.send_json({"error": f"{m.group(1)} already exists"}, 409)
-                raw = {"title": m.group(1).replace("-", " ")}
-                if base:
-                    with open(spec_path(base)) as source: raw = json.load(source)
-                if title is not None: raw["title"] = title.strip()
-                with open(dst, "x") as f:
-                    json.dump(raw, f, indent=2, ensure_ascii=False)
+            raw = {"title": m.group(1).replace("-", " ")}
+            if base:
+                raw, _ = spec_store.read(base)
+            if title is not None: raw["title"] = title.strip()
+            try:
+                spec_store.create(m.group(1), raw)
+            except FileExistsError:
+                return self.send_json({"error": f"{m.group(1)} already exists"}, 409)
             return self.send_json({"ok": True})
         m = re.fullmatch(r"/api/capture/([\w.-]+)", p)
         if m:
@@ -874,7 +888,9 @@ def thumb(bg_id):
 
 
 def ensure_built(force=False):
-    """Build the editor when its sources are newer than the last build."""
+    """Build the editor when its sources are newer than the last build. A build
+    that fails (a half-saved source, no network for `npm install`) never stops
+    the server: the last good build is served and the problem is printed."""
     index = os.path.join(DIST, "index.html")
     src = [os.path.join(r, f) for r, _, fs in os.walk(os.path.join(APP_DIR, "src")) for f in fs]
     if os.path.isdir(os.path.join(APP_DIR, "public")):
@@ -886,26 +902,66 @@ def ensure_built(force=False):
     if not shutil.which("npm"):
         print("warning: npm not found; the editor cannot be built", file=sys.stderr)
         return
-    if not os.path.isdir(os.path.join(APP_DIR, "node_modules")):
-        print("installing the editor's dependencies…", flush=True)
-        subprocess.run(["npm", "install", "--no-audit", "--no-fund"], cwd=APP_DIR, check=True)
-    print("building the editor…", flush=True)
-    subprocess.run(["npm", "run", "build"], cwd=APP_DIR, check=True)
+    try:
+        if not os.path.isdir(os.path.join(APP_DIR, "node_modules")):
+            print("installing the editor's dependencies…", flush=True)
+            subprocess.run(["npm", "install", "--no-audit", "--no-fund"], cwd=APP_DIR, check=True, timeout=600)
+        print("building the editor…", flush=True)
+        subprocess.run(["npm", "run", "build"], cwd=APP_DIR, check=True, timeout=600)
+    except (subprocess.SubprocessError, OSError) as e:
+        if not os.path.exists(index):
+            raise
+        print(f"warning: the editor did not build ({e}); serving the last build", file=sys.stderr, flush=True)
+
+
+def bind(host, port, patience=30.0):
+    """The HTTP server on host:port, waiting up to `patience` s for the port to
+    free up (a previous instance still closing) instead of dying on the spot."""
+    t0 = time.monotonic()
+    while True:
+        try:
+            return ThreadingHTTPServer((host, port), Handler)
+        except OSError as e:
+            if e.errno != errno.EADDRINUSE or time.monotonic() - t0 > patience:
+                raise
+            time.sleep(0.5)
 
 
 def serve(port=8765, build=True, host="127.0.0.1"):
+    """Run the studio. Built not to die: a hangup (the launching terminal or
+    session closing) and a broken pipe are ignored, a failed build serves the
+    last good one, a busy port is waited for, an error that escapes the HTTP loop
+    restarts the loop, and under systemd (service.py) a hung server is restarted."""
+    for sig in (getattr(signal, "SIGHUP", None), getattr(signal, "SIGPIPE", None)):
+        if sig is not None:
+            signal.signal(sig, signal.SIG_IGN)
     threading.Thread(target=gpu_env.status, daemon=True).start()     # probe the GPU once, off the request path
     global JOBS
     os.makedirs(S.SPECS, exist_ok=True)
     if build:
         ensure_built()
+    for name, version in spec_store.recover(lambda m: print(m, flush=True)):    # a broken spec is put back before anything reads it
+        pass
     JOBS = Jobs()
-    httpd = ThreadingHTTPServer((host, port), Handler)
+    httpd = bind(host, port)
     httpd.daemon_threads = True
     print(f"promo studio: http://{host}:{port}/  (specs in {S.SPECS}, videos to {S.OUT})", flush=True)
+    service.notify("READY=1")
+    service.start_watchdog(host, port)
     try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        pass
+        failures = 0
+        while True:
+            try:
+                httpd.serve_forever()
+                break
+            except KeyboardInterrupt:
+                break
+            except Exception as e:                       # the loop itself failing: log it and keep serving
+                failures += 1
+                print(f"server loop error ({failures}): {e!r}", file=sys.stderr, flush=True)
+                if failures > 20:
+                    raise                                # something is badly wrong: let the supervisor restart us
+                time.sleep(min(5.0, 0.2 * failures))
     finally:
+        service.notify("STOPPING=1")
         httpd.server_close()
