@@ -4,6 +4,7 @@ import { Inspector } from "./components/Inspector.tsx";
 import { MenuHost } from "./components/Menu.tsx";
 import { ExportPanel } from "./components/ExportPanel.tsx";
 import { EmulatorsPanel, HelpPanel, JobsPanel } from "./components/Panels.tsx";
+import { HistoryPanel } from "./components/HistoryPanel.tsx";
 import { Stage } from "./components/Stage.tsx";
 import { Timeline } from "./components/Timeline.tsx";
 import { track } from "./lib/drag.ts";
@@ -90,7 +91,7 @@ function useShortcuts() {
       }
     };
     addEventListener("keydown", onKey);
-    const beforeUnload = (e: BeforeUnloadEvent) => { if (useStore.getState().saveState === "dirty" || useStore.getState().saveState === "saving") { save(); e.preventDefault(); } };
+    const beforeUnload = (e: BeforeUnloadEvent) => { const st = useStore.getState().saveState; if (st !== "saved") { void save(); e.preventDefault(); } };          // editing, saving, failed or in conflict: the tab asks before it closes
     addEventListener("beforeunload", beforeUnload);
     return () => { removeEventListener("keydown", onKey); removeEventListener("beforeunload", beforeUnload); };
   }, []);
@@ -160,6 +161,7 @@ export function App() {
       {panel === "jobs" && <JobsPanel />}
       {panel === "help" && <HelpPanel />}
       {panel === "export" && <ExportPanel />}
+      {panel === "history" && <HistoryPanel />}
       <MenuHost />
       <Toasts />
     </div>

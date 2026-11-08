@@ -758,8 +758,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"ok": True, "raw": raw, "rev": rev, "status": spec_status(m.group(1))})
         m = re.fullmatch(r"/api/spec/([\w.-]+)/stash", p)
         if m:                                           # keep a version that was not saved (a draft, another tab's edits) in the history only
-            raw = S.migrate(self.body().get("raw") or {})
-            return self.send_json({"ok": True, "id": spec_store.stash(m.group(1), raw)})
+            body = self.body()
+            reason = body.get("reason") if body.get("reason") in ("unsaved", "replaced") else "unsaved"
+            return self.send_json({"ok": True, "id": spec_store.stash(m.group(1), S.migrate(body.get("raw") or {}), reason)})
         m = re.fullmatch(r"/api/copy/([\w.-]+)/([\w.-]+)", p)
         if m:
             spec_path(m.group(1)), spec_path(m.group(2))

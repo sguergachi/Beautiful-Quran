@@ -1,5 +1,6 @@
 // The studio server's API (server.py). Errors carry the server's message.
 import type { Emulator, ExportFile, ExportOptions, Geo, Job, Meta, Plate, RawSpec, SpecStatus, Timeline, VersePlan } from "./types.ts";
+import type { Version } from "./safety.ts";
 
 async function call<T>(path: string, opts: RequestInit = {}): Promise<T> {
   let r: Response;
@@ -12,13 +13,37 @@ async function call<T>(path: string, opts: RequestInit = {}): Promise<T> {
   if (!r.ok || (j && (j as { error?: string }).error)) throw new Error((j as { error?: string }).error || r.statusText);
   return j as T;
 }
+/** A save made against a version that is no longer the current one: the server refused it and says what is there now. */
+export class SaveConflict extends Error {
+  raw: RawSpec;
+  rev: string;
+  constructor(raw: RawSpec, rev: string) { super("This video was changed elsewhere (another tab or window)."); this.raw = raw; this.rev = rev; }
+}
+
+/** PUT a spec. `rev` is the revision the edit was made against (If-Match): a stale one is refused with a SaveConflict, never written. */
+async function putSpec(name: string, body: string, rev: string | null, keepalive = false): Promise<{ ok: true; rev: string; status: SpecStatus }> {
+  let r: Response;
+  try {
+    r = await fetch(`/api/spec/${name}`, { method: "PUT", body, keepalive, headers: { "Content-Type": "application/json", ...(rev ? { "If-Match": rev } : {}) } });
+  } catch {
+    throw new Error("the studio server is not answering; your edits are kept in this browser and saved when it is back");
+  }
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 409 && j.conflict) throw new SaveConflict(j.raw, j.rev);
+  if (!r.ok || j.error) throw new Error(j.error || r.statusText);
+  return j;
+}
 const post = <T,>(path: string, body: unknown = {}) => call<T>(path, { method: "POST", body: JSON.stringify(body) });
 
 export const api = {
   meta: () => call<Meta>("/api/meta"),
   specs: () => call<SpecStatus[]>("/api/specs"),
-  spec: (name: string) => call<{ raw: RawSpec; status: SpecStatus }>(`/api/spec/${name}`),
-  save: (name: string, body: string) => call<{ ok: true; status: SpecStatus }>(`/api/spec/${name}`, { method: "PUT", body }),
+  spec: (name: string) => call<{ raw: RawSpec; rev: string; status: SpecStatus }>(`/api/spec/${name}`),
+  save: putSpec,
+  history: (name: string) => call<{ versions: Version[]; rev: string | null }>(`/api/spec/${name}/history`),
+  restore: (name: string, id: string) => post<{ ok: true; raw: RawSpec; rev: string; status: SpecStatus }>(`/api/spec/${name}/restore`, { id }),
+  stash: (name: string, raw: RawSpec, reason: "unsaved" | "replaced" = "unsaved") => post<{ ok: true; id: string }>(`/api/spec/${name}/stash`, { raw, reason }),
+  trash: () => call<{ deleted: (Pick<Version, "id" | "at" | "title" | "pieces" | "keys" | "size"> & { name: string })[] }>("/api/trash"),
   remove: (name: string) => call<{ ok: true }>(`/api/spec/${name}`, { method: "DELETE" }),
   removeExport: (name: string, file: ExportFile) => call<{ ok: true; exports: ExportFile[] }>(`/api/exports/${encodeURIComponent(name)}/${encodeURIComponent(file.file)}`, { method: "DELETE", body: JSON.stringify({ revision: file.revision }) }),
   create: (name: string, from?: string, title?: string) => post<{ ok: true }>(`/api/new/${name}`, { from, title }),
