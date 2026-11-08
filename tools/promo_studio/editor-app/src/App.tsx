@@ -45,7 +45,10 @@ function useShortcuts() {
       if (s.panel || t.closest('[data-project-form], [role="menu"]')) return;
       const typing = t.closest("textarea, [contenteditable=true], input:not([type=range]):not([type=checkbox]):not([type=radio])");
       const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
-      if (typing || (t.closest("select, input") && !mod)) return;
+      // Space is play / pause wherever the focus is, even on a button or slider
+      // the last click left it on (Space would press it: Fit, a toggle…);
+      // Enter still presses a focused button. Only text and dropdowns keep it.
+      if (typing || (!mod && (t.closest("select") || (e.key !== " " && t.closest("input"))))) return;
       if (mod && key === "s") { e.preventDefault(); save(); return; }
       if (mod && key === "e") { e.preventDefault(); openPanel("export"); return; }
       if (mod && key === "b") { e.preventDefault(); setUI({ hideL: !s.ui.hideL }); return; }
@@ -57,7 +60,6 @@ function useShortcuts() {
       if (mod && key === "c") { if (selKeys().length) { e.preventDefault(); copy(); } return; }
       if (mod && key === "v") { if (s.clipboard) { e.preventDefault(); paste(); } return; }
       if (mod || e.altKey) return;
-      if (e.key === " " && t.closest("button, a, summary")) return;
       const step = (sec: number) => { e.preventDefault(); clock.pause(); clock.seek(clock.t + sec); };
       const fps = s.spec.fps || 60;
       switch (e.key) {
@@ -89,10 +91,18 @@ function useShortcuts() {
         case "?": openPanel("help"); break;
       }
     };
+    // A button presses on Space's key-up; stop that when Space played the video.
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== " " || e.ctrlKey || e.metaKey || e.altKey || !useStore.getState().spec || useStore.getState().panel) return;
+      const t = e.target as HTMLElement;
+      if (t.closest('[data-project-form], [role="menu"], textarea, select, [contenteditable=true], input:not([type=range]):not([type=checkbox]):not([type=radio])')) return;
+      e.preventDefault();
+    };
     addEventListener("keydown", onKey);
+    addEventListener("keyup", onKeyUp);
     const beforeUnload = (e: BeforeUnloadEvent) => { if (useStore.getState().saveState === "dirty" || useStore.getState().saveState === "saving") { save(); e.preventDefault(); } };
     addEventListener("beforeunload", beforeUnload);
-    return () => { removeEventListener("keydown", onKey); removeEventListener("beforeunload", beforeUnload); };
+    return () => { removeEventListener("keydown", onKey); removeEventListener("keyup", onKeyUp); removeEventListener("beforeunload", beforeUnload); };
   }, []);
 }
 
