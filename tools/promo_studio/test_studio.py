@@ -343,6 +343,27 @@ class AccelTests(unittest.TestCase):
             self.assertEqual(compose._pick_accel("auto"), (True, "RTX"))
             self.assertEqual(compose._pick_accel("cpu")[0], False, "CPU stays an explicit choice")
 
+    def test_chunks_have_equal_cost_not_equal_frames(self):
+        # still frames cost 1, a camera move 24: equal frame counts would hand two workers 90% of the work
+        costs = np.array([1.] * 100 + [24.] * 50 + [1.] * 100 + [24.] * 50)
+        for parts in (4, 8):
+            b = compose.balanced_bounds(costs, parts)
+            self.assertEqual((b[0], b[-1]), (0, len(costs)))
+            self.assertTrue(all(x < y for x, y in zip(b, b[1:])), "boundaries strictly increase")
+            share = [costs[b[i]:b[i + 1]].sum() / costs.sum() for i in range(len(b) - 1)]
+            self.assertLess(max(share) * parts, 1.25, f"{parts} parts: {share}")
+        self.assertEqual(compose.balanced_bounds(np.ones(10), 1), [0, 10])
+        self.assertEqual(compose.balanced_bounds(np.ones(3), 5)[0::len(compose.balanced_bounds(np.ones(3), 5)) - 1], [0, 3], "more parts than frames still covers every frame")
+
+    def test_frame_costs_price_motion_blur_samples(self):
+        r = compose.Renderer.__new__(compose.Renderer)
+        r.fps = 60
+        r.subframe_count = lambda t: 24 if 1 <= t < 2 else 1
+        c = compose.frame_costs(r, 240, base=4)
+        self.assertEqual(c[0], 5)
+        self.assertEqual(c[90], 28)
+        self.assertEqual(len(c), 240)
+
     def test_chunk_encoder_is_nvenc_for_h264_and_hevc_only(self):
         o = lambda f, **k: formats.options({"format": f, **k})
         with patch.object(gpu_compose, "nvenc_ok", return_value=True):

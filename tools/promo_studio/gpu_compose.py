@@ -8,7 +8,7 @@ operations), fused into one kernel per shutter sub-frame:
     -> phone over it -> average the sub-frames -> half-LSB dither -> 8 bit
 
 The phone is area-filtered down to its on-screen size first, like
-cv2.INTER_AREA, here as two matrix products with box-overlap weights. The
+cv2.INTER_AREA, by a kernel that averages each output pixel's box of source pixels. The
 result matches the CPU frame to within 1-2 of 255 levels; the dither is a
 per-pixel hash instead of numpy's RNG, so the noise (not the picture) differs.
 
@@ -135,6 +135,38 @@ extern "C" __global__ void phone_canvas(float* P, const float* Fp, const unsigne
   long ci = ((long)(y0 + y) * Wc + (x0 + x)) * 3, si = ((long)y * sw + x) * 3;
   for (int c = 0; c < 3; c++) P[ci + c] = Fp[ci + c] + (scr[si + c] * (1.f / 255.f)) * A3[si + c];
 }
+// cv2.INTER_AREA: each output pixel is the box-overlap-weighted mean of the source pixels it covers
+template<int CH>
+__device__ __forceinline__ void area_px(const float* src, int Wc, int Hc, float* dst, int tw, int th, int x, int y) {
+  // float, not double: consumer GPUs run FP64 at 1/64 rate. Positions stay within ~2e-4 px.
+  float scx = (float)Wc / tw, scy = (float)Hc / th;
+  float ax = x * scx, bx = ax + scx, ay = y * scy, by = ay + scy;
+  int i0 = (int)floorf(ax), i1 = min(Wc, (int)ceilf(bx)), j0 = (int)floorf(ay), j1 = min(Hc, (int)ceilf(by));
+  float acc[CH];
+  #pragma unroll
+  for (int c = 0; c < CH; c++) acc[c] = 0.f;
+  for (int j = j0; j < j1; j++) {
+    float wy = (fminf(by, (float)(j + 1)) - fmaxf(ay, (float)j)) / scy;
+    for (int i = i0; i < i1; i++) {
+      float w = wy * ((fminf(bx, (float)(i + 1)) - fmaxf(ax, (float)i)) / scx);
+      const float* p = src + ((long)j * Wc + i) * CH;
+      #pragma unroll
+      for (int c = 0; c < CH; c++) acc[c] += w * p[c];
+    }
+  }
+  float* o = dst + ((long)y * tw + x) * CH;
+  #pragma unroll
+  for (int c = 0; c < CH; c++) o[c] = acc[c];
+}
+extern "C" __global__ void area_resize3(const float* src, int Wc, int Hc, float* dst, int tw, int th) {
+  int x = blockIdx.x * blockDim.x + threadIdx.x, y = blockIdx.y * blockDim.y + threadIdx.y;
+  if (x < tw && y < th) area_px<3>(src, Wc, Hc, dst, tw, th, x, y);
+}
+extern "C" __global__ void area_resize1(const float* src, int Wc, int Hc, float* dst, int tw, int th) {
+  int x = blockIdx.x * blockDim.x + threadIdx.x, y = blockIdx.y * blockDim.y + threadIdx.y;
+  if (x < tw && y < th) area_px<1>(src, Wc, Hc, dst, tw, th, x, y);
+}
+
 extern "C" __global__ void u8_to_f32(const unsigned char* a, float* b, long n) {
   long i = (long)blockIdx.x * blockDim.x + threadIdx.x; if (i < n) b[i] = a[i] * (1.f / 255.f);
 }
@@ -147,7 +179,7 @@ def _kernels():
     """Compile once per process (CuPy also caches the cubin on disk)."""
     if not _K:
         mod = cp.RawModule(code=SRC, options=("-std=c++17",))
-        for n in ("accum", "finish_rgb", "finish_nv12", "phone_canvas", "u8_to_f32"):
+        for n in ("accum", "finish_rgb", "finish_nv12", "phone_canvas", "u8_to_f32", "area_resize3", "area_resize1"):
             _K[n] = mod.get_function(n)
     return _K
 
@@ -200,18 +232,6 @@ def nvenc_ok(codec):
     return _STATUS[k]
 
 
-def area_weights(src, dst):
-    """cv2.INTER_AREA weights: (dst, src) matrix of box overlaps."""
-    scale = src / dst
-    W = np.zeros((dst, src), np.float32)
-    for i in range(dst):
-        a, b = i * scale, (i + 1) * scale
-        j0, j1 = int(math.floor(a)), min(src, int(math.ceil(b)))
-        for j in range(j0, j1):
-            W[i, j] = max(0.0, min(b, j + 1) - max(a, j)) / scale
-    return W
-
-
 class GpuRenderer(C.Renderer):
     cpu_buffers = False            # the full-frame float buffers live on the GPU instead
 
@@ -223,26 +243,17 @@ class GpuRenderer(C.Renderer):
         self.shadow_g = f32(self.shadow)
         self.P_g = cp.empty_like(self.Fp_g)
         self.acc_g = cp.empty((self.H, self.W, 3), cp.float32)
-        self._wcache = {}
         self._alpha_g = {}
         # the host copies of what now lives on the GPU
         self.Fp = self.A = self.Pa = self._screen_alpha = self._phone_rgb = None
 
-    def _weights(self, src, dst):
-        k = (src, dst)
-        w = self._wcache.get(k)
-        if w is None:
-            if len(self._wcache) > 64: self._wcache.clear()
-            w = self._wcache[k] = cp.asarray(area_weights(src, dst))
-        return w
-
-    def _resize(self, P, tw, th):
-        Hc, Wc = P.shape[:2]
-        wy, wx = self._weights(Hc, th), self._weights(Wc, tw)
-        t1 = (wy @ P.reshape(Hc, Wc * 3)).reshape(th, Wc, 3)                       # (th, Wc, 3)
-        t2 = cp.ascontiguousarray(t1.transpose(1, 0, 2)).reshape(Wc, th * 3)         # (Wc, th*3)
-        t3 = (wx @ t2).reshape(tw, th, 3)                                           # (tw, th, 3)
-        return cp.ascontiguousarray(t3.transpose(1, 0, 2))                          # (th, tw, 3)
+    def _resize(self, img, tw, th):
+        """cv2.INTER_AREA downscale of a (h, w) or (h, w, 3) float image on the GPU."""
+        Hc, Wc = img.shape[:2]
+        ch = img.shape[2] if img.ndim == 3 else 1
+        out = cp.empty((th, tw, 3) if ch == 3 else (th, tw), cp.float32)
+        _kernels()["area_resize3" if ch == 3 else "area_resize1"](grid(tw, th), B, (img, np.int32(Wc), np.int32(Hc), out, np.int32(tw), np.int32(th)))
+        return out
 
     def _phone_params(self, P, M):
         """GPU image + alpha to sample, and the 2x3 inverse (output px -> image px)."""
@@ -257,7 +268,7 @@ class GpuRenderer(C.Renderer):
             a = self._alpha_g.get((tw, th))
             if a is None:
                 if len(self._alpha_g) > 4: self._alpha_g.clear()
-                a = self._alpha_g[(tw, th)] = cp.ascontiguousarray(self._resize(self.Pa_g[..., None].repeat(3, axis=2), tw, th)[..., 0])
+                a = self._alpha_g[(tw, th)] = self._resize(self.Pa_g, tw, th)
             S = np.array([[Wc / tw, 0, 0], [0, Hc / th, 0], [0, 0, 1]])
             Mi = (np.vstack([M, [0, 0, 1]]) @ S)[:2]
             Mi[:, 2] += (M[:, :2] @ np.array([0.5 * (Wc / tw - 1), 0.5 * (Hc / th - 1)]))
