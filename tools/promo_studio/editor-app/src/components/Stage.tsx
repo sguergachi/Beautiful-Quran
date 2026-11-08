@@ -8,8 +8,8 @@ import { phoneMatrix } from "../lib/geometry.ts";
 import { previewContext } from "../lib/inspector.ts";
 import { Preview } from "../lib/render.ts";
 import { clock, media } from "../state/clock.ts";
-import { endGesture, hideExact, inspect, record, select, setProp, setUI, useStore } from "../state/store.ts";
-import { Button, Icon } from "./ui.tsx";
+import { cancelJob, endGesture, hideExact, inspect, record, select, setProp, setUI, useStore } from "../state/store.ts";
+import { Button, Icon, Progress } from "./ui.tsx";
 
 export function Stage() {
   const wrap = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
@@ -17,6 +17,8 @@ export function Stage() {
   const [preview] = useState(() => new Preview());
   const spec = useStore((s) => s.spec), geo = useStore((s) => s.geo), plate = useStore((s) => s.plate);
   const meta = useStore((s) => s.meta), exact = useStore((s) => s.exact);
+  // The recording in flight for this video: the pill below turns into its status.
+  const capture = useStore((s) => s.jobs.find((j) => j.kind === "capture" && j.name === s.name && (j.state === "running" || j.state === "queued")));
   const box = useRef({ w: 0, h: 0 });
 
   // Keep the video in the browser's video compositor. Copying a full 1080 ×
@@ -135,7 +137,21 @@ export function Stage() {
         <img src={exact} alt="exact frame" onClick={hideExact} style={{ width: box.current.w, height: box.current.h }}
           className="absolute cursor-pointer rounded-sm outline outline-2 outline-gold" title="The exporter's own frame (with motion blur) · click to hide" />
       )}
-      {spec && geo && !geo.clip && (
+      {spec && geo && capture && (
+        <div role="status" className="absolute bottom-3 left-1/2 w-[min(420px,calc(100%-24px))] -translate-x-1/2 rounded-lg border border-orange/40 bg-panel/95 px-4 py-2.5 shadow-xl">
+          <div className="flex items-center gap-2">
+            <span className="size-2 shrink-0 rounded-full bg-orange animate-pulse-soft" />
+            <span className="font-semibold">{capture.state === "queued" ? "Waiting for the emulator" : "Recording a take"}</span>
+            {capture.serial && <span className="text-faint">on {capture.serial}</span>}
+            <div className="flex-1" />
+            {capture.state === "running" && <span className="num text-[12px] text-mute">{Math.round(capture.progress * 100)}%</span>}
+            <Button size="sm" variant="ghost" onClick={() => cancelJob(capture.id)}>Cancel</Button>
+          </div>
+          <div className="mt-2"><Progress value={capture.progress} tone="gold" indeterminate={capture.state === "queued"} /></div>
+          <p className="num mt-1.5 break-words text-[12px] text-mute">{capture.msg}</p>
+        </div>
+      )}
+      {spec && geo && !geo.clip && !capture && (
         <div className="absolute bottom-3 left-1/2 flex w-max max-w-[calc(100%-24px)] -translate-x-1/2 flex-wrap items-center justify-center gap-3 rounded-lg border border-line bg-panel/95 px-4 py-2.5 text-center shadow-xl">
           <span className="text-mute">This video has no take yet.</span>
           <Button variant="primary" size="sm" onClick={() => { setUI({ tab: "recording", hideR: false }); void record(null, false); }}>{Icon.rec} Record a take</Button>
