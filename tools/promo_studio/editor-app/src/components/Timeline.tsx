@@ -24,7 +24,7 @@ function PlayheadKeysToggle() {
   return (
     <button onClick={togglePlayheadKeys} aria-pressed={on} aria-label="Select every key at the playhead"
       title={on ? "Deselect the keys at the playhead" : "Select every key at the playhead"}
-      className={`pointer-events-auto sticky bottom-1 -ml-[8px] grid size-[17px] place-items-center rounded-[4px] border border-gold text-[10px] leading-none ${on ? "bg-gold text-bg" : "bg-panel text-gold hover:bg-gold/25"}`}>◆</button>
+      className={`pointer-events-auto sticky bottom-4 -ml-[8px] grid size-[17px] place-items-center rounded-[4px] border border-gold text-[10px] leading-none ${on ? "bg-gold text-bg" : "bg-panel text-gold hover:bg-gold/25"}`}>◆</button>
   );
 }
 
