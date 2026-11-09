@@ -221,17 +221,12 @@ export function HomeScreen({
   )
   const correctedQuery = useMemo(() => spellingCorrection(visibleWordHits), [visibleWordHits])
 
+  // Android's sole place marker: the last verse heard. Reading alone
+  // never creates one, so there is no Continue row before any listening.
   const continueSurah =
     !searching && state.settings.lastSurah > 0
       ? state.surahs.find((s) => s.id === state.settings.lastSurah)
       : null
-
-  const readingSurah = !searching
-    ? state.surahs.find((surah) => surah.id === state.settings.lastReadSurah)
-    : null
-  // One Android-style place marker: last heard, or reading before any listening.
-  const resumeSurah = continueSurah ?? readingSurah
-  const resumeAyah = continueSurah ? state.settings.lastAyah : state.settings.lastReadAyah
   const depth = Math.max(0, stackLayer - COVER_LAYER)
   const isTop = stackLayer === COVER_LAYER
 
@@ -479,14 +474,13 @@ export function HomeScreen({
                 </div>
               </div>
 
-            {resumeSurah ? (
+            {continueSurah ? (
               <ContinueRow
-                label={continueSurah ? 'Continue listening' : 'Continue reading'}
-                surahId={resumeSurah.id}
-                ayah={resumeAyah}
-                transliteration={resumeSurah.nameTransliteration}
-                arabic={resumeSurah.nameArabic}
-                onPrepare={() => prepareChapter(resumeSurah.id)}
+                surahId={continueSurah.id}
+                ayah={state.settings.lastAyah}
+                transliteration={continueSurah.nameTransliteration}
+                arabic={continueSurah.nameArabic}
+                onPrepare={() => prepareChapter(continueSurah.id)}
               />
             ) : null}
 

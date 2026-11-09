@@ -726,15 +726,14 @@ class AppStore {
     this.openSurah(surahId, ayah, undefined, undefined, [], 'reading')
   }
 
-  /** Remember settled paper without moving the listening clock or loading audio. */
+  /** Remember settled paper for this session only (link + return page).
+   * Never persisted: Android has no Continue Reading place — the sole
+   * durable place is the last verse heard ([rememberListened]). */
   rememberReading = (place: AyahRef) => {
     const surah = this.state.surahs.find((item) => item.id === place.surahId)
     if (!surah || !Number.isInteger(place.ayah) || place.ayah < 1 || place.ayah > surah.ayahCount) return
     const previous = this.state.readingPlace
-    const settings = this.state.settings
-    if (previous?.surahId === place.surahId && previous.ayah === place.ayah &&
-      settings.lastReadSurah === place.surahId && settings.lastReadAyah === place.ayah) return
-    this.updateSettings({ lastReadSurah: place.surahId, lastReadAyah: place.ayah })
+    if (previous?.surahId === place.surahId && previous.ayah === place.ayah) return
     this.set({ readingPlace: place })
   }
 
