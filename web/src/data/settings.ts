@@ -61,12 +61,10 @@ export interface Settings {
   showTranslation: boolean
   themeMode: ThemeMode
   ayahSelectorSide: AyahSelectorSide
-  /** Continue Listening — last verse actually recited (not mere open/scroll). */
+  /** Continue Listening — last verse actually recited (not mere open/scroll).
+   * The only persisted place, as on Android: reading never moves it. */
   lastSurah: number
   lastAyah: number
-  /** Last settled reading place, independent of the verse last heard. */
-  lastReadSurah: number
-  lastReadAyah: number
   playbackSpeed: number
   /** Reveals developer tools (e.g. the Ornaments Lab). Off by default. */
   developerMode: boolean
@@ -110,8 +108,6 @@ const DEFAULTS: Settings = {
   ayahSelectorSide: 'left',
   lastSurah: 0,
   lastAyah: 1,
-  lastReadSurah: 0,
-  lastReadAyah: 1,
   playbackSpeed: 1,
   developerMode: false,
   colorSystem: 'ladder',
@@ -144,17 +140,18 @@ function cleanIds(value: unknown, fallback: number[]): number[] {
 }
 
 export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
+  // Drop the retired separate reading place: Android persists only the
+  // last-heard verse, so a stored lastRead* must not survive a load.
+  const clean = { ...partial } as Record<string, unknown>
+  delete clean.lastReadSurah
+  delete clean.lastReadAyah
   return {
     ...DEFAULTS,
-    ...partial,
+    ...(clean as Partial<Settings>),
     favoriteReciterIds: cleanIds(partial.favoriteReciterIds, DEFAULTS.favoriteReciterIds),
     pinnedSurahIds: cleanIds(partial.pinnedSurahIds, DEFAULTS.pinnedSurahIds),
     fontScale: clampFontScale(partial.fontScale ?? DEFAULTS.fontScale),
     pagePresentation: partial.pagePresentation === 'single' ? 'single' : 'facing',
-    lastReadSurah: Number.isInteger(partial.lastReadSurah) && partial.lastReadSurah! >= 1 && partial.lastReadSurah! <= 114
-      ? partial.lastReadSurah! : 0,
-    lastReadAyah: Number.isInteger(partial.lastReadAyah) && partial.lastReadAyah! >= 1
-      ? partial.lastReadAyah! : 1,
     developerMode: Boolean(partial.developerMode ?? DEFAULTS.developerMode),
     colorSystem: partial.colorSystem === 'legacy' ? 'legacy' : 'ladder',
     educationGuidesEnabled: Boolean(

@@ -10,18 +10,22 @@ import {
 import { HOME_BOOKMARK_STYLES, normalizeSettings } from './settings'
 
 describe('favorite reciters', () => {
-  it('keeps page pictures across reading/listening updates and invalidates visual changes', () => {
+  it('keeps page pictures across listening updates and invalidates visual changes', () => {
     const key = readingAppearanceKey(normalizeSettings())
-    expect(readingAppearanceKey(normalizeSettings({ lastSurah: 2, lastAyah: 255, lastReadSurah: 1, lastReadAyah: 5 }))).toBe(key)
+    expect(readingAppearanceKey(normalizeSettings({ lastSurah: 2, lastAyah: 255 }))).toBe(key)
     expect(readingAppearanceKey(normalizeSettings({ themeMode: 'dark' }))).not.toBe(key)
     expect(readingAppearanceKey(normalizeSettings({ mushafGlyphWiden: 8 }))).not.toBe(key)
   })
 
-  it('keeps reading and listening places independent when migrating settings', () => {
-    const settings = normalizeSettings({ lastSurah: 1, lastAyah: 5, lastReadSurah: 2, lastReadAyah: 255, pagePresentation: 'single' })
+  it('persists only the last-heard place, dropping the retired reading place', () => {
+    const settings = normalizeSettings({ lastSurah: 1, lastAyah: 5, pagePresentation: 'single' })
     expect([settings.lastSurah, settings.lastAyah]).toEqual([1, 5])
-    expect([settings.lastReadSurah, settings.lastReadAyah]).toEqual([2, 255])
-    expect(normalizeSettings({ lastSurah: 1 }).lastReadSurah).toBe(0)
+    const legacy = normalizeSettings(
+      { lastSurah: 2, lastAyah: 255, lastReadSurah: 1, lastReadAyah: 7 } as Parameters<typeof normalizeSettings>[0],
+    )
+    expect([legacy.lastSurah, legacy.lastAyah]).toEqual([2, 255])
+    expect(legacy).not.toHaveProperty('lastReadSurah')
+    expect(legacy).not.toHaveProperty('lastReadAyah')
     expect(normalizeSettings({ pagePresentation: 'broken' as never }).pagePresentation).toBe('facing')
   })
 

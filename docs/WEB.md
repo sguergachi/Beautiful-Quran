@@ -186,12 +186,13 @@ playback does not resume the chapter-opening clip left by `openSurah` /
 `loadSurah`. Continue Listening (`settings.lastSurah` / `lastAyah`) only
 updates when a verse is actually recited — not on open, scroll, or rail jump.
 
-**Continue reading** keeps a separate `lastReadSurah` / `lastReadAyah` at the
-settled scroll verse or Mushaf leaf. It never seeks audio. Chapters shows one
-green-ribbon continue pill: the last-heard place, matching Android, with the
-reading place as its fallback before any listening. A Mushaf turn reports
-its settled verse to in-chapter search; the loaded listening
-chapter stays identified on the transport when it differs from the paper.
+There is no separate Continue Reading place, matching Android: the settled
+scroll verse or Mushaf leaf is kept only for the session (the verse link and
+the return page) and never persisted. Chapters shows its one green-ribbon
+Continue pill only for the last-heard place, and shows none before any
+listening. A Mushaf turn reports its settled verse to in-chapter search; the
+loaded listening chapter stays identified on the transport when it differs
+from the paper.
 An explicitly opened verse is kept when it is on either facing leaf, so a link
 to 2:255 remains 2:255 rather than becoming the first verse on that printed page.
 Scroll likewise keeps an explicit opening, search or rail/keyboard target until

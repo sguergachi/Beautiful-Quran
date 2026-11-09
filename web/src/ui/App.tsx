@@ -121,7 +121,7 @@ export function App() {
   const pageLayers = spreadLayers(spread, stack, state.content != null, leaves, underlay)
   const returnPlace = state.readingPlace ?? (state.content
     ? { surahId: state.content.surah.id, ayah: 1 }
-    : { surahId: state.settings.lastReadSurah, ayah: state.settings.lastReadAyah })
+    : { surahId: state.settings.lastSurah, ayah: state.settings.lastAyah })
   const returnChapter = state.surahs.find(surah => surah.id === returnPlace.surahId)
   useSheetFocus(state.ready && entranceDone && !isLab, spread, leaves, stack, hasReader, state.readerOpenRevision, state.wordSheetOpen)
 

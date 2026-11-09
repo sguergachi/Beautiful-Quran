@@ -1,28 +1,27 @@
 import { appStore } from '../../store/appStore'
 import { VerseBookmarkRibbon } from '../../render/VerseBookmarkRibbon'
 
-/** Android ContinuePill's resting shape, in the web's top continue area. */
+/** Android ContinuePill's resting shape, in the web's top continue area.
+ * The one Continue: the last verse heard. There is no reading variant. */
 export function ContinueRow({
   surahId,
   ayah,
   transliteration,
   arabic,
   onPrepare,
-  label = 'Continue listening',
 }: {
   surahId: number
   ayah: number
   transliteration: string
   arabic: string
   onPrepare: () => void
-  label?: string
 }) {
   return (
     <div className="continue-row">
       <button
         type="button"
         className="continue"
-        aria-label={`${label}: ${transliteration}, ayah ${ayah || 1}`}
+        aria-label={`Continue listening: ${transliteration}, ayah ${ayah || 1}`}
         onPointerEnter={onPrepare}
         onPointerDown={onPrepare}
         onFocus={onPrepare}
