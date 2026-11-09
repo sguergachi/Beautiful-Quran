@@ -35,6 +35,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+private const val HINT_MIN_SP = 11f
+private const val HINT_STEP_SP = 0.5f
 
 /**
  * Shared paper search pill used on Home and Bookmarks — same height, radius,
@@ -97,14 +101,33 @@ fun PaperSearchField(
                 Spacer(Modifier.width(12.dp))
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     if (value.isEmpty()) {
+                        // The pill is one line tall: the hint steps its size
+                        // down until it fits (narrow phone, large font scale)
+                        // rather than wrapping. Ellipsis is the last resort
+                        // below the floor.
+                        val base = MaterialTheme.typography.bodyLarge
+                        var hintSize by remember(placeholder, base.fontSize) {
+                            mutableStateOf(base.fontSize)
+                        }
                         Text(
                             placeholder,
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = base.copy(fontSize = hintSize),
                             color = mutedInk.copy(alpha = 0.5f),
-                            // The pill is one line tall: a long hint must
-                            // trim, never wrap onto a second line.
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                            // Ellipsis hides overflow from the layout result, so
+                            // measure with Clip and only ellipsize at the floor.
+                            overflow = if (hintSize.value > HINT_MIN_SP) {
+                                TextOverflow.Clip
+                            } else {
+                                TextOverflow.Ellipsis
+                            },
+                            onTextLayout = { layout ->
+                                if (layout.didOverflowWidth && hintSize.value > HINT_MIN_SP) {
+                                    hintSize = (hintSize.value - HINT_STEP_SP)
+                                        .coerceAtLeast(HINT_MIN_SP).sp
+                                }
+                            },
                         )
                     }
                     field()
