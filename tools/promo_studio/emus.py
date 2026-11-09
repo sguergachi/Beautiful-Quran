@@ -301,7 +301,7 @@ def prepare(serial, apk=DEFAULT_APK, rep=None):
             seen_cover = True
             done, total = int(m.group(1)), int(m.group(2))
             rep and rep.progress(0.6 + 0.38 * done / max(1, total), f"timings {done} of {total}")
-        elif "Search concept" in xml or "Al-Fatihah" in xml:      # home, past the cover
+        elif "exact phrase" in xml or "Al-Fatihah" in xml:      # home, past the cover
             rep and rep.progress(1.0, "app ready" + ("" if seen_cover else " (timings already present)"))
             return serial
     raise RuntimeError("the app did not finish its first launch within 4 minutes")
