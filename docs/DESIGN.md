@@ -1422,7 +1422,10 @@ three moments:
 2. **The isti'adha.** After a brief hold, **أعوذ بالله من الشيطان الرجيم**
    fades in as text — Arabic letter-washed onto the cover, English italic
    beneath — a quiet pause before reading begins. No audio: the du'a is
-   written, not recited.
+   written, not recited. The du'a holds one line: the frame is sized
+   around it, so on Android the cover's type follows a large system text
+   size only until the du'a fills the text measure (`coverFontScale`),
+   and is held there rather than broken over the frieze on a narrow phone.
 3. **The opening.** After the du'a settles, the board swings open on its
    **left** hinge — the free edge comes **toward the reader** (out of the
    screen, facing them — not into the page) and travels right→left — slower

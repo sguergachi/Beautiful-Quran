@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.home
 
+import com.beautifulquran.ui.theme.fitOneLine
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -1572,6 +1573,7 @@ private fun ContinuePill(
                     style = MaterialTheme.typography.titleMedium,
                     color = colors.primary,
                     maxLines = 1,
+                    autoSize = fitOneLine(MaterialTheme.typography.titleMedium.fontSize),
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
@@ -1676,13 +1678,17 @@ private fun SurahRow(
                 ),
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
+                autoSize = fitOneLine(typeScale(17.sp)),
                 overflow = TextOverflow.Ellipsis,
             )
+            // The ayah count is the end of this line, so a narrow phone at a
+            // large text size sets it down rather than cutting it to "7 a…".
             Text(
                 text = "${surah.nameTranslation} · ${surah.ayahCount} ayahs",
                 style = MaterialTheme.typography.labelMedium,
                 color = QuranTheme.ink.quiet,
                 maxLines = 1,
+                autoSize = fitOneLine(MaterialTheme.typography.labelMedium.fontSize),
                 overflow = TextOverflow.Ellipsis,
             )
         }

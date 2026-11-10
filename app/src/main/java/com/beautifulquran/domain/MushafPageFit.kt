@@ -136,8 +136,17 @@ fun mushafGridSlots(slotCount: Int): Int =
 fun mushafDisplayGridSlots(slotCount: Int): Int =
     maxOf(slotCount, MUSHAF_DISPLAY_LINES_PER_PAGE).coerceAtLeast(1)
 
-/** Smallest / largest fitted page size, in px, so a short page never balloons. */
-const val MUSHAF_MIN_FONT_PX = 28f
+/**
+ * Smallest / largest fitted page size, in px: the ceiling keeps a short page
+ * from ballooning, the floor only guards an unmeasured or nonsense viewport.
+ *
+ * These are device pixels, so the floor must sit below every real phone's
+ * fit, as the English leaf's does (`ENGLISH_LEAF_MIN_FONT_PX`). It was 28 px,
+ * which bit on 480–640 px wide screens (hdpi 320 dp phones, mdpi ones): their
+ * well fits about 20 px of type, the floor set 28 on the well's 20 px row
+ * pitch, and every line ran into the next.
+ */
+const val MUSHAF_MIN_FONT_PX = 12f
 const val MUSHAF_MAX_FONT_PX = 128f
 
 /**

@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.settings
 
+import com.beautifulquran.ui.theme.fitOneLine
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -150,6 +151,9 @@ internal fun ReciterChoiceRow(
                 fontWeight = FontWeight.Medium,
                 color = nameInk,
                 maxLines = 1,
+                // One height per row (#897), so a long name at a large text
+                // size is set down to fit instead of losing its surname.
+                autoSize = fitOneLine(MaterialTheme.typography.bodyLarge.fontSize),
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.layoutId(NameSlot),
             )

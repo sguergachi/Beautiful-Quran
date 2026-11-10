@@ -124,6 +124,17 @@ class MushafPageFitTest {
     }
 
     @Test
+    fun `a low resolution phone keeps the size its well fits`() {
+        // 480 x 854 px, 320 dp at hdpi: about 600 px of well under the chrome.
+        // The fitted size, not a floor, must decide, or the type outgrows the
+        // row pitch the same well sets and the lines collide.
+        val font = mushafUniformFontPx(measureWidthPx = 452f, wellHeightPx = 600f, slots = 15)
+        assertEquals(600f / (15f * MUSHAF_LINE_INK_EM), font, 0.01f)
+        val display = mushafDisplayFontPx(font)
+        assertEquals(font * MUSHAF_TYPE_SCALE, display, 0.01f)
+    }
+
+    @Test
     fun `a line inside the measure is never touched`() {
         // Three lines in four fill by gap alone; the letterforms are left be.
         assertEquals(1f, mushafLineCondense(naturalWidthPx = 964f, measureWidthPx = 964f), 0f)
