@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
@@ -52,6 +53,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -508,9 +510,15 @@ internal fun ReadingPreview(
             end = if (showRail && ayahSelectorSide == AyahSelectorSide.RIGHT) railPad else 0.dp,
         )
 
+    // On a short phone at a large system text size the locked height can
+    // outgrow the screen and leave the settings below no room to scroll
+    // into; past this share of the window the leaf clips at its foot like it
+    // already does when the size dial grows the type.
+    val maxPreviewHeight = LocalConfiguration.current.screenHeightDp.dp * PreviewMaxScreenShare
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(max = maxPreviewHeight)
             .clip(PreviewLeaf)
             .background(leaf, PreviewLeaf)
             .border(0.5.dp, gold.copy(alpha = 0.28f), PreviewLeaf)
@@ -520,7 +528,7 @@ internal fun ReadingPreview(
         // keeps one fixed height (measured at the base text size), and the
         // size dial grows the type inside it — clipping at the leaf's foot —
         // instead of resizing the preview and pushing the settings below.
-        PreviewHeightLock(contentPad)
+        PreviewHeightLock(contentPad, mushafDensity = Density(LocalDensity.current.density, fontScale = 1f))
         CompositionLocalProvider(LocalDensity provides previewDensity) {
             Column(Modifier.matchParentSize().clipToBounds().then(contentPad)) {
                 if (readingLayout == ReadingLayout.MUSHAF) {
@@ -611,6 +619,8 @@ internal fun ReadingPreview(
 }
 
 private val PreviewQcfSize = 20.sp
+/** The most of the window the preview leaf may take before it clips. */
+private const val PreviewMaxScreenShare = 0.36f
 /**
  * 21:91–93 occupy four exclusive Madinah lines (page 330, lines 1–4).
  *
@@ -1044,7 +1054,7 @@ private fun PreviewEnglishLyric(
  * notes / folio script never resize it.
  */
 @Composable
-private fun PreviewHeightLock(contentPad: Modifier) {
+private fun PreviewHeightLock(contentPad: Modifier, mushafDensity: Density) {
     Column(Modifier.alpha(0f).then(contentPad)) {
         PreviewBothBody(
             arabicMarks = true,
@@ -1053,6 +1063,11 @@ private fun PreviewHeightLock(contentPad: Modifier) {
             pageNumberScript = PageNumberScript.BOTH,
         )
     }
+    // Both leaves are measured at the density they are drawn at: a Mushaf
+    // preview ignores the system text size (see [ReadingPreview]), so locking
+    // them at that size reserved a far taller box than either leaf fills —
+    // at 2x text on a 360 dp phone, the whole screen.
+    CompositionLocalProvider(LocalDensity provides mushafDensity) {
     Column(Modifier.alpha(0f).then(contentPad)) {
         PreviewMushafLeaf(
             pageNumberScript = PageNumberScript.BOTH,
@@ -1070,6 +1085,7 @@ private fun PreviewHeightLock(contentPad: Modifier) {
             arabicMarks = true,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
     }
 }
 

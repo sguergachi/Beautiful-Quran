@@ -146,3 +146,27 @@ fun coverFrameGeometry(
         starRadiusPx = starRadius,
     )
 }
+
+/**
+ * The font scale the cover's type is set at: the system's, until the
+ * isti'adha would no longer fit on one line across [availableWidthDp].
+ *
+ * The cover is a fixed composition, a tooled board, not a page of reading:
+ * its gilt frame is sized around the isti'adha ([coverFrameMarginsDp]), and
+ * past this scale on a narrow phone the du'a broke onto three lines, pushed
+ * the medallion into the head frieze and ran the English over the foot
+ * border. Every word on it is shown again, at the reader's size, inside the
+ * app. Below the system scale it only shrinks as far as [COVER_MIN_FONT_SCALE].
+ */
+fun coverFontScale(
+    systemFontScale: Float,
+    availableWidthDp: Float,
+    duaWidthAtUnitScaleDp: Float,
+): Float {
+    if (duaWidthAtUnitScaleDp <= 0f || availableWidthDp <= 0f) return systemFontScale
+    val fit = availableWidthDp / duaWidthAtUnitScaleDp
+    return minOf(systemFontScale, fit.coerceAtLeast(COVER_MIN_FONT_SCALE))
+}
+
+/** The cover's type never shrinks past this to fit a very narrow screen. */
+const val COVER_MIN_FONT_SCALE = 0.8f

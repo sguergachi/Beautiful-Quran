@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.fitOneLine
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -4218,16 +4219,20 @@ fun OrnateSurahTitle(
                         }
                     },
             )
+            // Size before forCaps, which sets Junicode's small caps a step up.
+            val capsStyle = MaterialTheme.typography.labelSmall.copy(
+                fontSize = CAPS_LABEL_SIZE,
+                letterSpacing = transliterationSpacing,
+            ).forCaps()
             Text(
                 text = "$chapterNumber · ${nameTransliteration.uppercase()}",
-                // Size before forCaps, which sets Junicode's small caps a step up.
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = CAPS_LABEL_SIZE,
-                    letterSpacing = transliterationSpacing,
-                ).forCaps(),
+                style = capsStyle,
                 color = QuranTheme.ink.quiet,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
+                // Between the back chevron and the search glass a long name at
+                // a large text size is set down, not cut to "AL-FATIH…".
+                autoSize = fitOneLine(capsStyle.fontSize),
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .fillMaxWidth()

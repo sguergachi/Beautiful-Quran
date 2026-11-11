@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +64,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -99,6 +101,8 @@ private const val ISTIADHA_ENGLISH = "I seek refuge in Allah from Shaytan, the a
 /** Isti'adha type size — shared by the rendered line and the width measure
  *  that sizes the cover's fore-edge margin so the du'a stays inside the frame. */
 private const val DUA_ARABIC_SP = 24f
+/** Side margin of the cover's text column; the du'a must fit between them. */
+private const val COVER_TEXT_MARGIN_DP = 40f
 
 /** The title's ink wash across the calligraphy. */
 private const val TITLE_WASH_MS = 1_500
@@ -235,10 +239,32 @@ fun EntranceCover(
     // gap, or the Arabic runs over the border frieze.
     val configuration = LocalConfiguration.current
     val textMeasurer = rememberTextMeasurer()
-    val duaWidthPx = remember(textMeasurer, localDensity.density) {
+    val duaStyle = TextStyle(fontFamily = HafsFontFamily, fontSize = DUA_ARABIC_SP.sp)
+    // Large system text is honoured until the du'a would leave one line
+    // across the text measure (see coverFontScale); past that the cover's
+    // type is held there instead of breaking out of the frame.
+    val duaUnitWidthPx = remember(textMeasurer, localDensity.density) {
         textMeasurer.measure(
             text = ISTIADHA_ARABIC,
-            style = TextStyle(fontFamily = HafsFontFamily, fontSize = DUA_ARABIC_SP.sp),
+            style = duaStyle,
+            density = Density(localDensity.density, fontScale = 1f),
+        ).size.width.toFloat()
+    }
+    val coverScale = coverFontScale(
+        systemFontScale = localDensity.fontScale,
+        availableWidthDp = configuration.screenWidthDp - 2f * COVER_TEXT_MARGIN_DP,
+        duaWidthAtUnitScaleDp = duaUnitWidthPx / localDensity.density,
+    )
+    val coverDensity = if (coverScale < localDensity.fontScale) {
+        Density(localDensity.density, fontScale = coverScale)
+    } else {
+        localDensity
+    }
+    val duaWidthPx = remember(textMeasurer, coverDensity) {
+        textMeasurer.measure(
+            text = ISTIADHA_ARABIC,
+            style = duaStyle,
+            density = coverDensity,
         ).size.width.toFloat()
     }
     val (frameMarginH, frameMarginV) = remember(
@@ -495,12 +521,13 @@ fun EntranceCover(
 
             val medallionSize =
                 (LocalConfiguration.current.screenWidthDp * 0.52f).coerceAtMost(240f).dp
+            CompositionLocalProvider(LocalDensity provides coverDensity) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(bottom = (chrome.safeInsets.bottom / localDensity.density).dp)
-                    .padding(horizontal = 40.dp),
+                    .padding(horizontal = COVER_TEXT_MARGIN_DP.dp),
             ) {
                 Spacer(Modifier.weight(0.9f))
                 GeneratedMedallion(
@@ -594,6 +621,7 @@ fun EntranceCover(
                         }
                     }
                 }
+            }
             }
         }
     }
