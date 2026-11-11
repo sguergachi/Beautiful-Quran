@@ -38,7 +38,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
     await page.locator('.app-shell:not([data-booting])').waitFor()
     await page.keyboard.press('Escape')
     await page
-      .getByRole('dialog', { name: 'The Noble Quran', exact: true })
+      .getByRole('dialog', { name: 'Beautiful Quran', exact: true })
       .waitFor({ state: 'detached' })
     await page.waitForTimeout(700)
     await page.locator('.book-return-page').waitFor()

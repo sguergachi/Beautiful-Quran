@@ -32,7 +32,7 @@ try {
   await page.goto(process.env.READER_URL ?? 'http://127.0.0.1:5173/', { waitUntil: 'networkidle' })
   await page.locator('.app-shell:not([data-booting])').waitFor()
   await page.keyboard.press('Escape')
-  await page.getByRole('dialog', { name: 'The Noble Quran', exact: true }).waitFor({ state: 'detached' })
+  await page.getByRole('dialog', { name: 'Beautiful Quran', exact: true }).waitFor({ state: 'detached' })
   await page.evaluate(async () => {
     const load = async path => import(performance.getEntriesByType('resource')
       .find(entry => new URL(entry.name).pathname === path)?.name ?? path)
