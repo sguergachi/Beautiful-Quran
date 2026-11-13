@@ -283,6 +283,16 @@ internal fun SettingsScreen(
             // visible air as the colophon below Acknowledgements (76 dp ink to
             // ink on screen), so the sheet has one large break, used twice.
             Spacer(Modifier.height(48.dp))
+            ToggleRow(
+                label = "Play on to the next chapter",
+                checked = settings.autoplayNextChapter,
+                onChange = { on -> viewModel.settings.update { it.copy(autoplayNextChapter = on) } },
+                checkParams = checkParams,
+                checkPaintToken = checkPaintToken,
+            )
+            Caption("Pinned chapters first, in the order you pinned them.")
+
+            Spacer(Modifier.height(20.dp))
             NavigateRow(
                 label = "Customize",
                 note = customizeSummary(settings),

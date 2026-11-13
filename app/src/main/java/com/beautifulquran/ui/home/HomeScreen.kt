@@ -17,6 +17,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,6 +65,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -843,12 +847,124 @@ fun HomeScreen(
                 val movedWet = remember { Animatable(0f) }
                 val wetInk = MaterialTheme.colorScheme.primary.copy(alpha = WetInkAlpha)
                 val sheetPaper = MaterialTheme.colorScheme.background
+                // Holding a pinned row lifts it; carried, the band reorders
+                // around it as a draft and the order is kept when it lets go.
+                val pinReorder = remember { PinReorderState() }
+                val carryView = LocalView.current
+                val carryDensity = LocalDensity.current
+                val bandSurahs = pinReorder.draft
+                    ?.takeIf { it.toSet() == pinnedIds }
+                    ?.mapNotNull { id -> uiState.pinned.firstOrNull { it.id == id } }
+                    ?: uiState.pinned
+                val itemOf = { id: Int ->
+                    listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == chapterKey(id) }
+                }
+                fun liftChapter(id: Int) {
+                    val info = itemOf(id)
+                    if (info != null && pinReorder.liftedId == null) {
+                        pinReorder.draft = uiState.pinned.map { it.id }
+                        pinReorder.center = info.offset + info.size / 2f
+                        pinReorder.liftedId = id
+                    }
+                }
+                fun carryChapter(id: Int, dy: Float) {
+                    val draft = pinReorder.draft
+                    if (pinReorder.liftedId == id && draft != null) {
+                        pinReorder.center += dy
+                        // Seats come from the list as laid out, so the seat a
+                        // finger reaches and the row it displaces always agree.
+                        val seats = listState.layoutInfo.visibleItemsInfo.mapNotNull { info ->
+                            (info.index - BandFirstItem).takeIf { it in draft.indices }
+                                ?.let { PinSeat(it, info.offset, info.size) }
+                        }
+                        val seat = seatAt(pinReorder.center, seats)
+                        if (seat != null) {
+                            val moved = movePinned(draft, id, seat)
+                            if (moved != draft) {
+                                pinReorder.draft = moved
+                                carryView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            }
+                        }
+                    }
+                }
+                fun dropChapter(id: Int) {
+                    if (pinReorder.liftedId == id) {
+                        val kept = pinReorder.draft
+                        reflowScope.launch {
+                            itemOf(id)?.let { info ->
+                                animate(
+                                    pinReorder.center,
+                                    info.offset + info.size / 2f,
+                                    animationSpec = tween(DropSettleMs, easing = FastOutSlowInEasing),
+                                ) { v, _ -> pinReorder.center = v }
+                            }
+                            // Set down, the row dries off as a moved row does.
+                            movedChapter = id
+                            pinReorder.liftedId = null
+                            if (kept != null) {
+                                viewModel.setPinnedOrder(kept)
+                                // Keep the carried order until the stored one has
+                                // caught up, so the rows never flick back a frame.
+                                withTimeoutOrNull(800) {
+                                    snapshotFlow { uiState.pinned.map { it.id } }.first { it == kept }
+                                }
+                                pinReorder.draft = null
+                            }
+                            movedWet.snapTo(1f)
+                            movedWet.animateTo(0f, tween(HoldDryMs, easing = LinearOutSlowInEasing))
+                            if (movedChapter == id) movedChapter = null
+                        }
+                    }
+                }
+                // Carried to the top or foot of the list, the list scrolls on.
+                LaunchedEffect(pinReorder.liftedId) {
+                    val id = pinReorder.liftedId ?: return@LaunchedEffect
+                    val zone = with(carryDensity) { LiftScrollZone.toPx() }
+                    val topSpeed = with(carryDensity) { LiftScrollSpeed.toPx() }
+                    while (pinReorder.liftedId == id) {
+                        withFrameNanos { }
+                        val info = listState.layoutInfo
+                        val nearTop = pinReorder.center - info.viewportStartOffset
+                        val nearFoot = info.viewportEndOffset - pinReorder.center
+                        val push = when {
+                            nearTop < zone -> -topSpeed * ((zone - nearTop) / zone).coerceIn(0f, 1f)
+                            nearFoot < zone -> topSpeed * ((zone - nearFoot) / zone).coerceIn(0f, 1f)
+                            else -> 0f
+                        }
+                        if (push != 0f) {
+                            listState.scrollBy(push)
+                            carryChapter(id, 0f)
+                        }
+                    }
+                }
                 val chapterRow: @Composable (Surah, String, Modifier, Dp) -> Unit = { surah, key, modifier, vertical ->
                     val moving = surah.id == movedChapter
+                    val inBand = showPinned && surah.id in pinnedIds
                     SurahRow(
                         vertical = vertical,
                         pinned = surah.id in pinnedIds,
                         holdable = !searching,
+                        reorder = if (inBand) {
+                            RowReorder(
+                                lifted = pinReorder.liftedId == surah.id,
+                                offset = {
+                                    if (pinReorder.liftedId == surah.id) {
+                                        itemOf(surah.id)?.let { pinReorder.center - (it.offset + it.size / 2f) } ?: 0f
+                                    } else {
+                                        0f
+                                    }
+                                },
+                                onLift = { liftChapter(surah.id) },
+                                onDrag = { carryChapter(surah.id, it) },
+                                onDrop = { dropChapter(surah.id) },
+                                onNudge = { by ->
+                                    val order = uiState.pinned.map { it.id }
+                                    viewModel.setPinnedOrder(movePinned(order, surah.id, order.indexOf(surah.id) + by))
+                                },
+                            )
+                        } else {
+                            null
+                        },
                         surah = surah,
                         // One place marker: only the row owning the place
                         // carries the green cloth (the pinned copy, when pinned).
@@ -978,7 +1094,7 @@ fun HomeScreen(
                     // row up into the band (and unpinning back down) and the
                     // rows around it close or open.
                     itemsIndexed(
-                        chapterRows(uiState.pinned, uiState.surahs, showPinned),
+                        chapterRows(bandSurahs, uiState.surahs, showPinned),
                         key = { _, surah -> chapterKey(surah.id) },
                     ) { index, surah ->
                         val pinned = index < bandCount
@@ -986,7 +1102,20 @@ fun HomeScreen(
                             surah,
                             chapterKey(surah.id),
                             Modifier
-                                .animateItem(placementSpec = ChapterReflowSpec)
+                                // The carried row follows the finger, not the list.
+                                .then(
+                                    if (pinReorder.liftedId == surah.id) {
+                                        Modifier.zIndex(1f)
+                                    } else {
+                                        Modifier.animateItem(
+                                            placementSpec = if (pinReorder.liftedId != null) {
+                                                ChapterReorderSpec
+                                            } else {
+                                                ChapterReflowSpec
+                                            },
+                                        )
+                                    },
+                                )
                                 .then(if (pinned) Modifier.pinnedBand() else Modifier)
                                 // The band closes with its own air before the
                                 // full list resumes.
@@ -1462,6 +1591,21 @@ internal fun placeRowKey(continueId: Int?): String? = continueId?.let(::chapterK
  * new seat and the list closes or opens around it. */
 private val ChapterReflowSpec = tween<IntOffset>(420, easing = FastOutSlowInEasing)
 
+/** The rows making room for a carried one: quicker, so they keep up with the hand. */
+private val ChapterReorderSpec = tween<IntOffset>(200, easing = FastOutSlowInEasing)
+
+/** Items ahead of the first chapter row once the band is up: its air and its flag. */
+private const val BandFirstItem = 2
+
+/** A carried row settles into its seat over this on letting go. */
+private const val DropSettleMs = 140
+
+/** How near the list's top or foot a carried row must be to scroll it on. */
+private val LiftScrollZone = 72.dp
+
+/** The list's fastest scroll under a carried row, per frame. */
+private val LiftScrollSpeed = 14.dp
+
 /**
  * The reading place floats only while its chapter row is scrolled out of
  * view. Search owns the sheet while active, and the pill is cover-gated
@@ -1610,12 +1754,16 @@ private fun SurahRow(
     pinned: Boolean,
     /** Off while searching; see [holdToPin]. */
     holdable: Boolean,
+    /** Set on a pinned row of the band: its grip carries it to another seat. */
+    reorder: RowReorder? = null,
     onTogglePinned: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     vertical: Dp = ContinueRowVertical,
 ) {
     val accents = LocalQuranAccents.current
+    val wetInk = MaterialTheme.colorScheme.primary.copy(alpha = WetInkAlpha)
+    val paper = MaterialTheme.colorScheme.background
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
@@ -1627,14 +1775,34 @@ private fun SurahRow(
                 pinned = pinned,
                 holdable = holdable,
                 label = surah.nameTransliteration,
-                wetInk = MaterialTheme.colorScheme.primary.copy(alpha = WetInkAlpha),
+                wetInk = wetInk,
                 onTap = onClick,
                 onHeld = onTogglePinned,
+                moreActions = if (reorder != null) {
+                    listOf(
+                        CustomAccessibilityAction("Move ${surah.nameTransliteration} up") { reorder.onNudge(-1); true },
+                        CustomAccessibilityAction("Move ${surah.nameTransliteration} down") { reorder.onNudge(1); true },
+                    )
+                } else {
+                    emptyList()
+                },
             )
+            // Carried by its grip, the row follows the finger over the band,
+            // a sheet of its own: paper under it so the rows it passes stay
+            // hidden, soaked with the wet ink.
+            .offset { IntOffset(0, reorder?.offset?.invoke()?.roundToInt() ?: 0) }
+            .drawBehind {
+                if (reorder?.lifted == true) {
+                    drawRect(paper)
+                    drawRect(wetInk)
+                }
+            }
             .padding(
                 end = HomeEndInset,
-                top = vertical,
-                bottom = vertical,
+                // The grip is a full touch target tall; the padding gives back
+                // what it adds so a pinned row stands as tall as any other.
+                top = if (reorder != null) (vertical - GripOverhang).coerceAtLeast(0.dp) else vertical,
+                bottom = if (reorder != null) (vertical - GripOverhang).coerceAtLeast(0.dp) else vertical,
             ),
     ) {
         if (currentAyah != null) {
@@ -1699,7 +1867,82 @@ private fun SurahRow(
             color = QuranTheme.accents.greenInk,
             modifier = Modifier.padding(end = HomeArabicOpticalInset),
         )
+        if (reorder != null) {
+            // The grip ends where the names do; a pinned row's name stands that much in.
+            ReorderHandle(reorder, surah.nameTransliteration)
+        }
     }
+}
+
+/**
+ * What a pinned row of the band hands the list: [lifted] says this row is the
+ * one in the hand, [offset] is how far (px) the hand has carried it from its
+ * seat, and the rest report the carrying. [onNudge] is the same move for a
+ * screen reader, one seat at a time.
+ */
+internal class RowReorder(
+    val lifted: Boolean,
+    val offset: () -> Float,
+    val onLift: () -> Unit,
+    val onDrag: (Float) -> Unit,
+    val onDrop: () -> Unit,
+    val onNudge: (Int) -> Unit,
+)
+
+/**
+ * The grip at the end of a pinned row: three rules ending on the content edge. Touching it lifts the row at once, in wet ink, and the finger
+ * carries it up or down the band; the others make room and the order is kept
+ * when it is set down. Everything else about the row, holding included, keeps
+ * its meaning, so the grip is the only place a row is moved.
+ */
+@Composable
+private fun ReorderHandle(reorder: RowReorder, label: String, modifier: Modifier = Modifier) {
+    val view = LocalView.current
+    val hands by rememberUpdatedState(reorder)
+    val ink = QuranTheme.ink.quiet
+    Box(
+        modifier = modifier
+            .width(ReorderGripWidth)
+            .height(48.dp)
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    // The grip owns this touch: not a tap on the row, not the list's scroll.
+                    down.consume()
+                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    hands.onLift()
+                    try {
+                        while (true) {
+                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                            // Read the move before consuming: a consumed change reports none.
+                            val dy = change.positionChange().y
+                            change.consume()
+                            if (!change.pressed) break
+                            hands.onDrag(dy)
+                        }
+                    } finally {
+                        hands.onDrop()
+                    }
+                }
+            }
+            .drawBehind {
+                val width = 14.dp.toPx()
+                val gap = 4.dp.toPx()
+                val stroke = 1.dp.toPx()
+                // The rules end on the content edge, where the names and the
+                // search field end; the rest of the box is touch room.
+                for (i in -1..1) {
+                    val y = size.height / 2f + i * gap
+                    drawLine(
+                        color = ink.copy(alpha = 0.7f),
+                        start = Offset(size.width - width, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = stroke,
+                    )
+                }
+            }
+            .semantics { contentDescription = "Reorder $label" },
+    ) {}
 }
 
 /**
@@ -1726,6 +1969,7 @@ private fun Modifier.holdToPin(
     wetInk: androidx.compose.ui.graphics.Color,
     onTap: () -> Unit,
     onHeld: () -> Unit,
+    moreActions: List<CustomAccessibilityAction> = emptyList(),
 ): Modifier {
     val fill = remember { Animatable(0f) }
     val view = LocalView.current
@@ -1811,7 +2055,7 @@ private fun Modifier.holdToPin(
         if (holdable) {
             customActions = listOf(
                 CustomAccessibilityAction(if (pinned) "Unpin $label" else "Pin $label") { held(); true },
-            )
+            ) + moreActions
         }
     }.drawBehind {
         val alpha = fill.value
@@ -1839,6 +2083,10 @@ internal enum class HoldOutcome { Tap, Cancel }
 internal fun holdOutcome(heldMs: Long, pace: Float = 1f): HoldOutcome =
     if (heldMs < HoldTapMaxMs * pace) HoldOutcome.Tap else HoldOutcome.Cancel
 
+/** The grip's box: its rules and the touch room to their left. */
+private val ReorderGripWidth = 32.dp
+/** How much taller a 48 dp grip stands than the two-line row it sits in, per side. */
+private val GripOverhang = 3.dp
 /** No tint for an ordinary tap: the fill waits this long to begin. */
 private const val HoldStartMs = 150
 /** Then deepens to the full band slice over this, in step with the finger. */
