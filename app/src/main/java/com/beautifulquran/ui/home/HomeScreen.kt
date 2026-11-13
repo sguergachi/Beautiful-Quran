@@ -1798,7 +1798,7 @@ private fun SurahRow(
                 }
             }
             .padding(
-                end = if (reorder != null) 0.dp else HomeEndInset,
+                end = HomeEndInset,
                 // The grip is a full touch target tall; the padding gives back
                 // what it adds so a pinned row stands as tall as any other.
                 top = if (reorder != null) (vertical - GripOverhang).coerceAtLeast(0.dp) else vertical,
@@ -1868,7 +1868,7 @@ private fun SurahRow(
             modifier = Modifier.padding(end = HomeArabicOpticalInset),
         )
         if (reorder != null) {
-            // The end margin the other rows keep as bare paper is the grip's.
+            // The grip ends where the names do; a pinned row's name stands that much in.
             ReorderHandle(reorder, surah.nameTransliteration)
         }
     }
@@ -1890,8 +1890,7 @@ internal class RowReorder(
 )
 
 /**
- * The grip at the end of a pinned row: three rules, in the margin the names
- * leave free. Touching it lifts the row at once, in wet ink, and the finger
+ * The grip at the end of a pinned row: three rules ending on the content edge. Touching it lifts the row at once, in wet ink, and the finger
  * carries it up or down the band; the others make room and the order is kept
  * when it is set down. Everything else about the row, holding included, keeps
  * its meaning, so the grip is the only place a row is moved.
@@ -1902,9 +1901,8 @@ private fun ReorderHandle(reorder: RowReorder, label: String, modifier: Modifier
     val hands by rememberUpdatedState(reorder)
     val ink = QuranTheme.ink.quiet
     Box(
-        contentAlignment = Alignment.Center,
         modifier = modifier
-            .width(HomeEndInset)
+            .width(ReorderGripWidth)
             .height(48.dp)
             .pointerInput(Unit) {
                 awaitEachGesture {
@@ -1928,15 +1926,17 @@ private fun ReorderHandle(reorder: RowReorder, label: String, modifier: Modifier
                 }
             }
             .drawBehind {
-                val half = 7.dp.toPx()
+                val width = 14.dp.toPx()
                 val gap = 4.dp.toPx()
                 val stroke = 1.dp.toPx()
+                // The rules end on the content edge, where the names and the
+                // search field end; the rest of the box is touch room.
                 for (i in -1..1) {
                     val y = size.height / 2f + i * gap
                     drawLine(
                         color = ink.copy(alpha = 0.7f),
-                        start = Offset(size.width / 2f - half, y),
-                        end = Offset(size.width / 2f + half, y),
+                        start = Offset(size.width - width, y),
+                        end = Offset(size.width, y),
                         strokeWidth = stroke,
                     )
                 }
@@ -2083,6 +2083,8 @@ internal enum class HoldOutcome { Tap, Cancel }
 internal fun holdOutcome(heldMs: Long, pace: Float = 1f): HoldOutcome =
     if (heldMs < HoldTapMaxMs * pace) HoldOutcome.Tap else HoldOutcome.Cancel
 
+/** The grip's box: its rules and the touch room to their left. */
+private val ReorderGripWidth = 32.dp
 /** How much taller a 48 dp grip stands than the two-line row it sits in, per side. */
 private val GripOverhang = 3.dp
 /** No tint for an ordinary tap: the fill waits this long to begin. */
