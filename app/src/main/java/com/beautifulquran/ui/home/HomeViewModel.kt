@@ -297,6 +297,11 @@ class HomeViewModel(
         it.copy(pinnedSurahIds = if (surahId in ids) ids - surahId else ids + surahId)
     }
 
+    /** Keeps the band in the order a reader carried it to. */
+    fun setPinnedOrder(ids: List<Int>) = settings.update {
+        it.copy(pinnedSurahIds = acceptPinOrder(it.pinnedSurahIds, ids))
+    }
+
     /** The pinning lesson runs behind the developer guide gate, once. */
     fun shouldShowPinTip(): Boolean {
         val current = settings.settings.value

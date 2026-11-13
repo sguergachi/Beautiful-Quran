@@ -17,6 +17,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,6 +65,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -843,12 +850,124 @@ fun HomeScreen(
                 val movedWet = remember { Animatable(0f) }
                 val wetInk = MaterialTheme.colorScheme.primary.copy(alpha = WetInkAlpha)
                 val sheetPaper = MaterialTheme.colorScheme.background
+                // Holding a pinned row lifts it; carried, the band reorders
+                // around it as a draft and the order is kept when it lets go.
+                val pinReorder = remember { PinReorderState() }
+                val carryView = LocalView.current
+                val carryDensity = LocalDensity.current
+                val bandSurahs = pinReorder.draft
+                    ?.takeIf { it.toSet() == pinnedIds }
+                    ?.mapNotNull { id -> uiState.pinned.firstOrNull { it.id == id } }
+                    ?: uiState.pinned
+                val itemOf = { id: Int ->
+                    listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == chapterKey(id) }
+                }
+                fun liftChapter(id: Int) {
+                    val info = itemOf(id)
+                    if (info != null && pinReorder.liftedId == null) {
+                        pinReorder.draft = uiState.pinned.map { it.id }
+                        pinReorder.center = info.offset + info.size / 2f
+                        pinReorder.liftedId = id
+                    }
+                }
+                fun carryChapter(id: Int, dy: Float) {
+                    val draft = pinReorder.draft
+                    if (pinReorder.liftedId == id && draft != null) {
+                        pinReorder.center += dy
+                        // Seats come from the list as laid out, so the seat a
+                        // finger reaches and the row it displaces always agree.
+                        val seats = listState.layoutInfo.visibleItemsInfo.mapNotNull { info ->
+                            (info.index - BandFirstItem).takeIf { it in draft.indices }
+                                ?.let { PinSeat(it, info.offset, info.size) }
+                        }
+                        val seat = seatAt(pinReorder.center, seats)
+                        if (seat != null) {
+                            val moved = movePinned(draft, id, seat)
+                            if (moved != draft) {
+                                pinReorder.draft = moved
+                                carryView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            }
+                        }
+                    }
+                }
+                fun dropChapter(id: Int) {
+                    if (pinReorder.liftedId == id) {
+                        val kept = pinReorder.draft
+                        reflowScope.launch {
+                            itemOf(id)?.let { info ->
+                                animate(
+                                    pinReorder.center,
+                                    info.offset + info.size / 2f,
+                                    animationSpec = tween(DropSettleMs, easing = FastOutSlowInEasing),
+                                ) { v, _ -> pinReorder.center = v }
+                            }
+                            // Set down, the row dries off as a moved row does.
+                            movedChapter = id
+                            pinReorder.liftedId = null
+                            if (kept != null) {
+                                viewModel.setPinnedOrder(kept)
+                                // Keep the carried order until the stored one has
+                                // caught up, so the rows never flick back a frame.
+                                withTimeoutOrNull(800) {
+                                    snapshotFlow { uiState.pinned.map { it.id } }.first { it == kept }
+                                }
+                                pinReorder.draft = null
+                            }
+                            movedWet.snapTo(1f)
+                            movedWet.animateTo(0f, tween(HoldDryMs, easing = LinearOutSlowInEasing))
+                            if (movedChapter == id) movedChapter = null
+                        }
+                    }
+                }
+                // Carried to the top or foot of the list, the list scrolls on.
+                LaunchedEffect(pinReorder.liftedId) {
+                    val id = pinReorder.liftedId ?: return@LaunchedEffect
+                    val zone = with(carryDensity) { LiftScrollZone.toPx() }
+                    val topSpeed = with(carryDensity) { LiftScrollSpeed.toPx() }
+                    while (pinReorder.liftedId == id) {
+                        withFrameNanos { }
+                        val info = listState.layoutInfo
+                        val nearTop = pinReorder.center - info.viewportStartOffset
+                        val nearFoot = info.viewportEndOffset - pinReorder.center
+                        val push = when {
+                            nearTop < zone -> -topSpeed * ((zone - nearTop) / zone).coerceIn(0f, 1f)
+                            nearFoot < zone -> topSpeed * ((zone - nearFoot) / zone).coerceIn(0f, 1f)
+                            else -> 0f
+                        }
+                        if (push != 0f) {
+                            listState.scrollBy(push)
+                            carryChapter(id, 0f)
+                        }
+                    }
+                }
                 val chapterRow: @Composable (Surah, String, Modifier, Dp) -> Unit = { surah, key, modifier, vertical ->
                     val moving = surah.id == movedChapter
+                    val inBand = showPinned && surah.id in pinnedIds
                     SurahRow(
                         vertical = vertical,
                         pinned = surah.id in pinnedIds,
-                        holdable = !searching,
+                        pinnable = !searching,
+                        reorder = if (inBand) {
+                            RowReorder(
+                                lifted = pinReorder.liftedId == surah.id,
+                                offset = {
+                                    if (pinReorder.liftedId == surah.id) {
+                                        itemOf(surah.id)?.let { pinReorder.center - (it.offset + it.size / 2f) } ?: 0f
+                                    } else {
+                                        0f
+                                    }
+                                },
+                                onLift = { liftChapter(surah.id) },
+                                onDrag = { carryChapter(surah.id, it) },
+                                onDrop = { dropChapter(surah.id) },
+                                onNudge = { by ->
+                                    val order = uiState.pinned.map { it.id }
+                                    viewModel.setPinnedOrder(movePinned(order, surah.id, order.indexOf(surah.id) + by))
+                                },
+                            )
+                        } else {
+                            null
+                        },
                         surah = surah,
                         // One place marker: only the row owning the place
                         // carries the green cloth (the pinned copy, when pinned).
@@ -978,7 +1097,7 @@ fun HomeScreen(
                     // row up into the band (and unpinning back down) and the
                     // rows around it close or open.
                     itemsIndexed(
-                        chapterRows(uiState.pinned, uiState.surahs, showPinned),
+                        chapterRows(bandSurahs, uiState.surahs, showPinned),
                         key = { _, surah -> chapterKey(surah.id) },
                     ) { index, surah ->
                         val pinned = index < bandCount
@@ -986,7 +1105,20 @@ fun HomeScreen(
                             surah,
                             chapterKey(surah.id),
                             Modifier
-                                .animateItem(placementSpec = ChapterReflowSpec)
+                                // The carried row follows the finger, not the list.
+                                .then(
+                                    if (pinReorder.liftedId == surah.id) {
+                                        Modifier.zIndex(1f)
+                                    } else {
+                                        Modifier.animateItem(
+                                            placementSpec = if (pinReorder.liftedId != null) {
+                                                ChapterReorderSpec
+                                            } else {
+                                                ChapterReflowSpec
+                                            },
+                                        )
+                                    },
+                                )
                                 .then(if (pinned) Modifier.pinnedBand() else Modifier)
                                 // The band closes with its own air before the
                                 // full list resumes.
@@ -1462,6 +1594,21 @@ internal fun placeRowKey(continueId: Int?): String? = continueId?.let(::chapterK
  * new seat and the list closes or opens around it. */
 private val ChapterReflowSpec = tween<IntOffset>(420, easing = FastOutSlowInEasing)
 
+/** The rows making room for a carried one: quicker, so they keep up with the hand. */
+private val ChapterReorderSpec = tween<IntOffset>(200, easing = FastOutSlowInEasing)
+
+/** Items ahead of the first chapter row once the band is up: its air and its flag. */
+private const val BandFirstItem = 2
+
+/** A carried row settles into its seat over this on letting go. */
+private const val DropSettleMs = 140
+
+/** How near the list's top or foot a carried row must be to scroll it on. */
+private val LiftScrollZone = 72.dp
+
+/** The list's fastest scroll under a carried row, per frame. */
+private val LiftScrollSpeed = 14.dp
+
 /**
  * The reading place floats only while its chapter row is scrolled out of
  * view. Search owns the sheet while active, and the pill is cover-gated
@@ -1608,8 +1755,10 @@ private fun SurahRow(
     placeUnfurlSignal: Int,
     onPlaceUnfurlConsumed: (Int) -> Unit,
     pinned: Boolean,
-    /** Off while searching; see [holdToPin]. */
-    holdable: Boolean,
+    /** Off while searching; see [chapterRowGestures]. */
+    pinnable: Boolean,
+    /** Set on a pinned row of the band: holding it lifts it to be carried. */
+    reorder: RowReorder? = null,
     onTogglePinned: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1620,16 +1769,18 @@ private fun SurahRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            // A tap opens the chapter; holding fills the row with its
-            // answer — the band's green to pin, paper over the band to unpin —
-            // and holding it full is the confirmation.
-            .holdToPin(
+            // A tap opens the chapter; swiping the row aside pins it (or
+            // unpins it) and holding a pinned row lifts it to be carried.
+            .chapterRowGestures(
                 pinned = pinned,
-                holdable = holdable,
+                pinnable = pinnable,
                 label = surah.nameTransliteration,
                 wetInk = MaterialTheme.colorScheme.primary.copy(alpha = WetInkAlpha),
+                paper = MaterialTheme.colorScheme.background,
+                labelInk = accents.greenInk,
+                reorder = reorder,
                 onTap = onClick,
-                onHeld = onTogglePinned,
+                onTogglePinned = onTogglePinned,
             )
             .padding(
                 end = HomeEndInset,
@@ -1703,126 +1854,222 @@ private fun SurahRow(
 }
 
 /**
- * Hold-to-pin: the hold is the confirmation. A quick tap opens the chapter.
- * Held, the row soaks evenly with [wetInk] — no shape spreading across a
- * strip this thin — a soft tick as the hold takes, deepening in step with
- * the finger; at full a firm tick and [onHeld]. The row then travels to its
- * new seat (see ChapterReflowSpec) and the wet ink dries off it, down to the
- * band's pale wash when pinned or to bare paper when unpinned. Lifting early,
- * or the list taking the drag, drains it and changes nothing.
+ * What a pinned row hands the list when it is held: [lifted] says this row is
+ * the one in the hand, [offset] is how far (px) the hand has carried it from
+ * its seat, and the rest report the carrying. [onNudge] is the same move for
+ * a screen reader, one seat at a time.
+ */
+internal class RowReorder(
+    val lifted: Boolean,
+    val offset: () -> Float,
+    val onLift: () -> Unit,
+    val onDrag: (Float) -> Unit,
+    val onDrop: () -> Unit,
+    val onNudge: (Int) -> Unit,
+)
+
+private enum class RowIntent { Tap, Swipe, Lift, Scroll, Cancel }
+
+/**
+ * A chapter row's hands. A quick tap opens the chapter. Swiping the row to
+ * the right slides it aside like a sheet of paper: beneath it the band's
+ * green (to pin) or bare paper (to unpin) deepens as the finger nears the
+ * choice, a soft tick says it has been made, and letting go there pins or
+ * unpins. Short of it the sheet slides home and nothing changes. Holding a
+ * pinned row of the band instead lifts it, soaked in wet ink, to be carried
+ * to another seat; see [RowReorder]. A drag along the list belongs to the
+ * list, and a long press elsewhere changes nothing.
  *
- * The hold is timed on the frame clock, not by an animation: the system's
- * animator scale must neither make every tap a pin (animations off) nor
- * stretch a hold to seconds. Keyboards and D-pads open with Enter and pin
- * with Shift+Enter; TalkBack gets Pin / Unpin as an action. With [holdable]
- * off (search lists pinned chapters in place, off the band, where a hold
- * could show nothing of what it would do) the row is only a tap.
+ * The first movement past touch slop picks the gesture: across the row is a
+ * swipe, along the list is a scroll. The hold is timed on the system's own
+ * touch & hold delay, and a longer system delay stretches a tap with it.
+ * Keyboards and D-pads open with Enter and pin with Shift+Enter; TalkBack
+ * gets Pin / Unpin and Move up / Move down as actions. With [pinnable] off
+ * (search lists pinned chapters in place, off the band, where a swipe could
+ * show nothing of what it would do) the row is only a tap.
  */
 @Composable
-private fun Modifier.holdToPin(
+private fun Modifier.chapterRowGestures(
     pinned: Boolean,
-    holdable: Boolean,
+    pinnable: Boolean,
     label: String,
     wetInk: androidx.compose.ui.graphics.Color,
+    paper: androidx.compose.ui.graphics.Color,
+    labelInk: androidx.compose.ui.graphics.Color,
+    reorder: RowReorder?,
     onTap: () -> Unit,
-    onHeld: () -> Unit,
+    onTogglePinned: () -> Unit,
 ): Modifier {
-    val fill = remember { Animatable(0f) }
+    var travel by remember { mutableFloatStateOf(0f) }
     val view = LocalView.current
     val tap by rememberUpdatedState(onTap)
-    val held by rememberUpdatedState(onHeld)
-    val canHold by rememberUpdatedState(holdable)
+    val toggle by rememberUpdatedState(onTogglePinned)
+    val canPin by rememberUpdatedState(pinnable)
+    val hands by rememberUpdatedState(reorder)
+    val isPinned by rememberUpdatedState(pinned)
+    val measurer = rememberTextMeasurer()
+    val flagStyle = MaterialTheme.typography.labelSmall.copy(
+        letterSpacing = CAPS_TRACKING,
+        fontSize = 10.sp,
+        color = labelInk,
+    )
+    val flag = remember(pinned, flagStyle) { measurer.measure(if (pinned) "UNPIN" else "PIN", flagStyle) }
+    val lifted = reorder?.lifted == true
     return pointerInput(Unit) {
         coroutineScope {
             awaitEachGesture {
                 val down = awaitFirstDown()
-                // Readers who set a longer system touch & hold delay get a
-                // proportionally slower hold, and a longer tap.
                 val pace = holdPace(viewConfiguration.longPressTimeoutMillis)
-                var full = false
-                val filling = if (!canHold) null else launch {
-                    val start = withFrameMillis { it }
-                    var engaged = false
-                    while (!full) {
-                        val elapsed = withFrameMillis { it } - start
-                        val progress = holdFillProgress(elapsed, pace)
-                        fill.snapTo(progress)
-                        // The hold has taken: a soft tick, so the finger knows
-                        // to stay before any ink is easy to see under it.
-                        if (!engaged && progress > 0f) {
-                            engaged = true
-                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        }
-                        full = elapsed >= (HoldStartMs + HoldFillMs) * pace
-                    }
-                    view.performHapticFeedback(
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                            HapticFeedbackConstants.CONFIRM
-                        } else {
-                            HapticFeedbackConstants.LONG_PRESS
-                        },
-                    )
-                    held()
-                }
+                val slop = viewConfiguration.touchSlop
+                val liftable = hands != null
+                var total = Offset.Zero
                 var up: PointerInputChange? = null
-                while (true) {
-                    val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                    if (full) {
-                        // Pinned: the rest of the gesture is spent, not a tap.
-                        change.consume()
-                        if (!change.pressed) break else continue
+                val decided = withTimeoutOrNull(
+                    if (liftable) viewConfiguration.longPressTimeoutMillis else NoLiftWaitMs,
+                ) {
+                    var intent: RowIntent? = null
+                    while (intent == null) {
+                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                        intent = when {
+                            change == null -> RowIntent.Cancel
+                            !change.pressed -> {
+                                // A cancelled or consumed release (a system back swipe,
+                                // the search dials' dismissing tap) is not a tap.
+                                if (!change.isConsumed) up = change
+                                if (up != null) RowIntent.Tap else RowIntent.Cancel
+                            }
+                            change.isConsumed -> RowIntent.Scroll
+                            else -> {
+                                total += change.positionChange()
+                                when {
+                                    total.getDistance() <= slop -> null
+                                    canPin && kotlin.math.abs(total.x) > kotlin.math.abs(total.y) -> RowIntent.Swipe
+                                    else -> RowIntent.Scroll
+                                }
+                            }
+                        }
                     }
-                    if (!change.pressed) {
-                        // A cancelled or consumed release (a system back swipe, the
-                        // search dials' dismissing tap) is not a tap.
-                        if (!change.isConsumed) up = change
-                        break
-                    }
-                    // A drag belongs to the list: let it scroll, drain the fill.
-                    if (change.isConsumed ||
-                        (change.position - down.position).getDistance() > viewConfiguration.touchSlop
-                    ) {
-                        break
-                    }
+                    intent
                 }
-                if (!full) {
-                    filling?.cancel()
-                    val opens = up != null &&
-                        (!canHold || holdOutcome(up.uptimeMillis - down.uptimeMillis, pace) == HoldOutcome.Tap)
-                    if (opens) {
-                        up!!.consume()
-                        tap()
+                // Out of time with the finger still down and still: a hold.
+                when (decided ?: if (liftable) RowIntent.Lift else RowIntent.Cancel) {
+                    RowIntent.Tap -> {
+                        val released = up
+                        if (released != null &&
+                            holdOutcome(released.uptimeMillis - down.uptimeMillis, pace) == HoldOutcome.Tap
+                        ) {
+                            released.consume()
+                            tap()
+                        }
                     }
+                    RowIntent.Swipe -> {
+                        val width = size.width.toFloat()
+                        var raw = total.x.coerceAtLeast(0f)
+                        var chosen = false
+                        travel = swipeTravel(raw, width)
+                        while (true) {
+                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) {
+                                change.consume()
+                                break
+                            }
+                            raw = (raw + change.positionChange().x).coerceAtLeast(0f)
+                            travel = swipeTravel(raw, width)
+                            val now = swipeCommits(travel, width)
+                            // A soft tick as the choice is made, and again if it is unmade.
+                            if (now != chosen) view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            chosen = now
+                            change.consume()
+                        }
+                        if (chosen && canPin) {
+                            view.performHapticFeedback(
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                    HapticFeedbackConstants.CONFIRM
+                                } else {
+                                    HapticFeedbackConstants.LONG_PRESS
+                                },
+                            )
+                            toggle()
+                        }
+                    }
+                    RowIntent.Lift -> {
+                        val carry = hands
+                        if (carry != null) {
+                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            carry.onLift()
+                            try {
+                                while (true) {
+                                    val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                    // Read the move before consuming: a consumed change reports none.
+                                    val dy = change.positionChange().y
+                                    change.consume()
+                                    if (!change.pressed) break
+                                    carry.onDrag(dy)
+                                }
+                            } finally {
+                                carry.onDrop()
+                            }
+                        }
+                    }
+                    RowIntent.Scroll, RowIntent.Cancel -> Unit
                 }
-                // Done, the sheet carries the wet ink with the moving row and
-                // dries it there; let go early, it drains back quickly.
-                launch { fill.animateTo(0f, tween(if (full) 0 else HoldDrainMs)) }
+                if (travel != 0f) {
+                    val from = travel
+                    launch { animate(from, 0f, animationSpec = tween(SwipeHomeMs, easing = FastOutSlowInEasing)) { v, _ -> travel = v } }
+                }
             }
         }
     }.onKeyEvent { event ->
         val enter = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter
         if (!enter || event.type != KeyEventType.KeyUp) return@onKeyEvent enter
-        if (event.isShiftPressed) { if (canHold) held() } else tap()
+        if (event.isShiftPressed) { if (canPin) toggle() } else tap()
         true
     }.focusable().semantics(mergeDescendants = true) {
         role = Role.Button
         if (pinned) stateDescription = "Pinned"
         onClick(label = "Open $label") { tap(); true }
-        if (holdable) {
-            customActions = listOf(
-                CustomAccessibilityAction(if (pinned) "Unpin $label" else "Pin $label") { held(); true },
-            )
+        if (pinnable) {
+            customActions = buildList {
+                add(CustomAccessibilityAction(if (pinned) "Unpin $label" else "Pin $label") { toggle(); true })
+                if (reorder != null) {
+                    add(CustomAccessibilityAction("Move $label up") { hands?.onNudge?.invoke(-1); true })
+                    add(CustomAccessibilityAction("Move $label down") { hands?.onNudge?.invoke(1); true })
+                }
+            }
         }
     }.drawBehind {
-        val alpha = fill.value
-        if (alpha > 0f) drawRect(wetInk.copy(alpha = wetInk.alpha * alpha))
+        // What the sheet uncovers as it slides: paper to unpin, the band's
+        // green to pin, deepening toward the choice, its word wiped in.
+        val shown = travel
+        if (shown > 0f) {
+            val near = swipeProgress(shown, size.width)
+            clipRect(right = shown) {
+                if (isPinned) {
+                    drawRect(paper)
+                } else {
+                    drawRect(wetInk.copy(alpha = wetInk.alpha * (0.4f + 0.6f * near)))
+                }
+                drawText(
+                    flag,
+                    color = labelInk.copy(alpha = 0.45f + 0.55f * near),
+                    topLeft = Offset(
+                        HomeStartInset.toPx(),
+                        (size.height - flag.size.height) / 2f,
+                    ),
+                )
+            }
+        }
+    }.offset {
+        IntOffset(travel.roundToInt(), reorder?.offset?.invoke()?.roundToInt() ?: 0)
+    }.drawBehind {
+        // The lifted row is a sheet of its own in the hand: paper under it so
+        // the rows it passes stay hidden, soaked with the wet ink.
+        if (lifted) {
+            drawRect(paper)
+            drawRect(wetInk)
+        }
     }
 }
-
-/** How full the row is [elapsedMs] into a hold: nothing for an ordinary
- * tap's worth, then deepening evenly to full. [pace] stretches it. */
-internal fun holdFillProgress(elapsedMs: Long, pace: Float = 1f): Float =
-    ((elapsedMs - HoldStartMs * pace) / (HoldFillMs * pace)).coerceIn(0f, 1f)
 
 /** The hold's timings stretched to the system touch & hold delay; the
  * default (400 ms) and anything quicker keep them as designed. */
@@ -1839,11 +2086,10 @@ internal enum class HoldOutcome { Tap, Cancel }
 internal fun holdOutcome(heldMs: Long, pace: Float = 1f): HoldOutcome =
     if (heldMs < HoldTapMaxMs * pace) HoldOutcome.Tap else HoldOutcome.Cancel
 
-/** No tint for an ordinary tap: the fill waits this long to begin. */
-private const val HoldStartMs = 150
-/** Then deepens to the full band slice over this, in step with the finger. */
-private const val HoldFillMs = 550
-private const val HoldDrainMs = 180
+/** The sheet slides home over this when a swipe stops short, or has chosen. */
+private const val SwipeHomeMs = 220
+/** A row with nothing to lift has no hold to wait for; this only ends the wait. */
+private const val NoLiftWaitMs = 60_000L
 /** The wet ink drying off a row that has moved, over its glide and past it. */
 private const val HoldDryMs = 650
 /** How dark the ink is at full: plainly wetter than the band's pale wash it

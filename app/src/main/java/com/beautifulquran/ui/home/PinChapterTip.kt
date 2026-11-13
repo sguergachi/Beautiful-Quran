@@ -21,7 +21,7 @@ import com.beautifulquran.ui.theme.royalGreenOverlayInk
 /**
  * The pinning lesson, written around the live row of the chapter being read:
  * the one a reader is most likely to want kept at the top. The row stays the
- * real target — holding it until it is full pins it. The lesson occupies the
+ * real target — swiping it aside pins it. The lesson occupies the
  * right side, level with the chapter, and the vellum tapers left toward its
  * number column. [target] is that column's centre in this sheet's own space.
  * The copy follows the chapter; **Got it** stays at the bottom of the guide.
@@ -47,7 +47,7 @@ internal fun PinChapterTip(
             ContextualFeatureTip(
                 visible = visible,
                 title = "Keep it at the top",
-                body = "Press and hold this chapter to pin it.",
+                body = "Swipe this chapter right to pin it.",
                 onDismiss = onDismiss,
                 spotlightCenter = { target },
                 placement = ContextualTipPlacement(bodyAngleDegrees = 0f),

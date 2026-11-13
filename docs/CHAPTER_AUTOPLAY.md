@@ -43,3 +43,22 @@ range or single-ayah loop (those never reach `STATE_ENDED`), a playback error.
   until the new one is ready). It does not yet reuse the NEXT footer's flying
   chapter header; that only fits when the next chapter is n+1.
 - Android only. The web port does not have the setting yet.
+
+## Keeping the pins (swipe and carry)
+
+Because pin order is the queue, pins are managed by two gestures on Home
+(`ui/home/PinReorder.kt` holds the rules, `chapterRowGestures` in
+`HomeScreen.kt` the hands):
+
+- **Swipe a row to the right** to pin it (or unpin it, on the band). The row
+  slides aside like a sheet of paper over the band's green ("PIN") or bare
+  paper ("UNPIN"), deepening toward the choice; a tick marks the moment it
+  is made (34% of the row), and letting go there chooses. Short of it the
+  sheet slides home and nothing changes. This replaces hold-to-pin.
+- **Hold a pinned row** to lift it (wet ink, a tick), then carry it up or down
+  the band; the others make room and the list scrolls on near its ends. The
+  order is stored when it is set down. Holding any other row does nothing.
+
+TalkBack gets Pin / Unpin and Move up / Move down actions; Shift+Enter still
+pins from a keyboard. Search lists chapters in place off the band, so rows are
+tap-only there.
