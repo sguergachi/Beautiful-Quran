@@ -94,6 +94,7 @@ import com.beautifulquran.ui.home.FloatingPlaybackListClearance
 import com.beautifulquran.ui.home.HomeScreen
 import com.beautifulquran.ui.home.HomeViewModel
 import com.beautifulquran.ui.reader.BackToOriginPill
+import com.beautifulquran.playback.chapterAfter
 import com.beautifulquran.ui.reader.PinnedChapterPlayback
 import com.beautifulquran.ui.reader.PinnedPlaybackHost
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
@@ -152,6 +153,7 @@ import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -956,6 +958,28 @@ private fun PaperStackApp(
         val action = pendingAssistantAction ?: return@LaunchedEffect
         fulfillAssistantAction(action)
         onAssistantActionConsumed()
+    }
+
+    // Autoplay: a chapter that has played out hands on to the next one down
+    // the Chapters page (pins in pinned order, then the rest in book order).
+    LaunchedEffect(Unit) {
+        app.player.state.map { it.finishedSurahId }.distinctUntilChanged().filterNotNull()
+            .collect { finished ->
+                val prefs = app.settings.settings.value
+                if (!prefs.autoplayNextChapter) return@collect
+                val next = chapterAfter(
+                    finished, app.repository.surahs().map { it.id }, prefs.pinnedSurahIds,
+                ) ?: return@collect
+                readerViewModel.load(next, startPlaybackAtAyah = 1, keepContent = true)
+                if (selectedSurahId != 0) {
+                    selectedSurahId = next
+                    selectedStartAyah = 0
+                    selectedStartPlayback = false
+                    selectedStartWord = -1
+                    selectedStartWords = emptyList()
+                    selectedSearchText = null
+                }
+            }
     }
 
     fun onWordLongPress(surahId: Int, ayah: Int, wordPosition: Int) {

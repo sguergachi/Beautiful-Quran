@@ -423,6 +423,7 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 | `docs/OUTPUT_LATENCY.md` | Route-based Bluetooth/output lag presets applied before the highlight clock |
 | `docs/DESIGN.md` | Any UI/visual change — the paper metaphor and its hard rules |
 | `docs/KEY_ART.md` | Marketing art and product-page videos — niche and rules, the intro Reel shot list, and the Android capture → Revideo edit pipeline in `tools/key_art/` |
+| `docs/CHAPTER_AUTOPLAY.md` | Play-on-to-the-next-chapter: the queue order, pin order, trigger and limits |
 | `docs/CONTEXTUAL_GUIDES.md` | Adding or changing feature education — live-target contract, wiring, and device verification |
 | `docs/PERFORMANCE.md` | Anything touching the reader, scrolling, or the highlight loop |
 | `docs/REPEAT_HIGHLIGHTING.md` | Repeat-aware timings and the orange second fade |
