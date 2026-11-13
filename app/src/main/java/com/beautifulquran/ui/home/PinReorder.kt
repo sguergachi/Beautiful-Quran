@@ -7,10 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /**
- * Pinned chapters are an ordered list, and two gestures keep it: a swipe
- * across a row pins or unpins it, and holding a pinned row lifts it to be
- * carried to another seat in the band. The rules for both live here, free
- * of the screen, so they can be tested.
+ * Pinned chapters are an ordered list, and a row's grip carries it to another
+ * seat in the band. The rules for that live here, free of the screen, so they
+ * can be tested.
  */
 
 /** [order] with [id] carried to seat [toIndex] (clamped to the band). A chapter
@@ -56,26 +55,6 @@ internal fun acceptPinOrder(current: List<Int>, proposed: List<Int>): List<Int> 
     } else {
         current
     }
-
-/** How far a swipe must travel, as a share of the row, to count as a choice. */
-internal const val SwipeCommitFraction = 0.34f
-
-/** The row's travel for a finger that has moved [raw] px across it: it
- * follows the finger, then draws tighter once the choice is made, so
- * there is no doubt that more distance adds nothing. */
-internal fun swipeTravel(raw: Float, width: Float): Float {
-    val threshold = width * SwipeCommitFraction
-    val dragged = raw.coerceAtLeast(0f)
-    return if (dragged <= threshold) dragged else threshold + (dragged - threshold) * 0.25f
-}
-
-/** Whether a swipe let go with the row [travel] px across has chosen. */
-internal fun swipeCommits(travel: Float, width: Float): Boolean =
-    width > 0f && travel >= width * SwipeCommitFraction
-
-/** 0..1: how near a swipe at [travel] px is to choosing. */
-internal fun swipeProgress(travel: Float, width: Float): Float =
-    if (width <= 0f) 0f else (travel / (width * SwipeCommitFraction)).coerceIn(0f, 1f)
 
 /**
  * The one lifted row. [center] is where its middle is held, in the list's
