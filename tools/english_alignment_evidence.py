@@ -26,9 +26,9 @@ def retry_delay(message, retry_after=None):
     if re.search(r'resets? at midnight UTC', message, re.I):
         utc = datetime.fromtimestamp(now, timezone.utc)
         return (utc + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0).timestamp() - now + 1
-    match = re.search(r'retry\s+in\s+(\d+(?:\.\d+)?)\s*(seconds?|minutes?|hours?)', message, re.I)
+    match = re.search(r'retry\s+(?:in|after)\s+(\d+(?:\.\d+)?)\s*([smh])', message, re.I)
     if match:
-        return max(1, float(match[1]) * {'s': 1, 'm': 60, 'h': 3600}[match[2][0].lower()])
+        return max(1, float(match[1]) * {'s': 1, 'm': 60, 'h': 3600}[match[2].lower()])
     return 3600 if re.search(r'daily|quota', message, re.I) else 60
 
 

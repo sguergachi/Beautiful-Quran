@@ -138,6 +138,10 @@ class QuranRetryTest(unittest.TestCase):
             self.assertEqual(120, evidence.retry_delay('', 'Thu, 01 Jan 1970 00:02:00 GMT'))
         self.assertEqual(60, evidence.retry_delay('unknown retry message'))
         self.assertEqual(3600, evidence.retry_delay('daily limit reached'))
+        # The server's own one-request-per-second guidance must not become a minute.
+        self.assertEqual(1, evidence.retry_delay(
+            '[rate_limited] Unverified clients may make one MCP tool request per second. Retry after 1 seconds.'))
+        self.assertEqual(90, evidence.retry_delay('Retry after 1.5 minutes'))
 
 
 if __name__ == '__main__':
