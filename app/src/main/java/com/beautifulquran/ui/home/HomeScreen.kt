@@ -46,6 +46,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Reorder
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -850,6 +851,14 @@ fun HomeScreen(
                 // Holding a pinned row lifts it; carried, the band reorders
                 // around it as a draft and the order is kept when it lets go.
                 val pinReorder = remember { PinReorderState() }
+                // The grips stick out of the band, so they stay put away
+                // until the band's own Reorder leaf asks for them; Done —
+                // or a band too small to reorder — puts them away again.
+                var reorderMode by remember { mutableStateOf(false) }
+                LaunchedEffect(bandCount) {
+                    if (bandCount < 2) reorderMode = false
+                }
+                val gripsShown = reorderMode && showReorderControl(bandCount)
                 val carryView = LocalView.current
                 val carryDensity = LocalDensity.current
                 val bandSurahs = pinReorder.draft
@@ -944,7 +953,7 @@ fun HomeScreen(
                         vertical = vertical,
                         pinned = surah.id in pinnedIds,
                         holdable = !searching,
-                        reorder = if (inBand) {
+                        reorder = if (inBand && gripsShown) {
                             RowReorder(
                                 lifted = pinReorder.liftedId == surah.id,
                                 offset = {
@@ -1072,21 +1081,36 @@ fun HomeScreen(
                         }
                         // Over the band, on the paper: a small-caps flag on the
                         // names' rail, the Continue pill's CONTINUE flag in kind.
+                        // At its right end, in line with the names below, the
+                        // leaf that brings out the rows' grips — Done puts
+                        // them away again.
                         item(key = "pinned-flag") {
-                            Text(
-                                text = "PINNED",
-                                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
-                                fontSize = 10.sp,
-                                color = QuranTheme.accents.greenQuiet,
-                                maxLines = 1,
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .animateItem()
                                     .fillMaxWidth()
                                     .padding(
                                         start = HomeStartInset + HomeNumberColumn + HomeColumnGap,
+                                        end = HomeEndInset,
                                         bottom = PinnedFlagGap,
                                     ),
-                            )
+                            ) {
+                                Text(
+                                    text = "PINNED",
+                                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = CAPS_TRACKING),
+                                    fontSize = 10.sp,
+                                    color = QuranTheme.accents.greenQuiet,
+                                    maxLines = 1,
+                                )
+                                Spacer(Modifier.weight(1f))
+                                if (showReorderControl(bandCount)) {
+                                    PinnedReorderControl(
+                                        reordering = reorderMode,
+                                        onToggle = { reorderMode = !reorderMode },
+                                    )
+                                }
+                            }
                         }
                     }
                     // One key per chapter wherever it sits: the pinned head and
@@ -1890,7 +1914,51 @@ internal class RowReorder(
 )
 
 /**
- * The grip at the end of a pinned row: three rules ending on the content edge. Touching it lifts the row at once, in wet ink, and the finger
+ * The leaf at the right of the PINNED flag: three rules in miniature, the
+ * grips' own mark. Tapping it brings every pinned row's grip out; the leaf
+ * then reads Done, and tapping it puts the grips away. At rest the band is
+ * plain paper — nothing sticks out of the rows.
+ */
+@Composable
+private fun PinnedReorderControl(reordering: Boolean, onToggle: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier
+            .quietClickable(role = Role.Button, onClick = onToggle)
+            .semantics {
+                contentDescription = if (reordering) {
+                    "Done reordering pinned chapters"
+                } else {
+                    "Reorder pinned chapters"
+                }
+            }
+            .padding(vertical = 6.dp),
+    ) {
+        if (!reordering) {
+            Icon(
+                imageVector = Icons.Rounded.Reorder,
+                contentDescription = null,
+                tint = QuranTheme.ink.secondary,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        Text(
+            text = if (reordering) "Done" else "Reorder",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (reordering) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (reordering) {
+                QuranTheme.accents.greenQuiet
+            } else {
+                QuranTheme.ink.secondary
+            },
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * The grip at the end of a pinned row: three rules ending on the content edge, shown only while the band is reordering. Touching it lifts the row at once, in wet ink, and the finger
  * carries it up or down the band; the others make room and the order is kept
  * when it is set down. Everything else about the row, holding included, keeps
  * its meaning, so the grip is the only place a row is moved.

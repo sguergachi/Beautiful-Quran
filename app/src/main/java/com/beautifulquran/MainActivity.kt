@@ -126,6 +126,7 @@ import com.beautifulquran.ui.settings.AcknowledgementsPage
 import com.beautifulquran.ui.settings.CustomizeScreen
 import com.beautifulquran.ui.settings.DownloadManagerPage
 import com.beautifulquran.ui.settings.ComponentKitScreen
+import com.beautifulquran.ui.settings.PlaybackPage
 import com.beautifulquran.ui.settings.RecitersPage
 import com.beautifulquran.ui.settings.SettingsDetail
 import com.beautifulquran.ui.settings.SettingsInkPreviewState
@@ -611,6 +612,9 @@ private fun PaperStackApp(
             restore = SettingsDetail::valueOf,
         ),
     ) { mutableStateOf<SettingsDetail?>(null) }
+    /** The full reciter list was opened from Playback, so its back leaf
+     * returns there rather than to Settings. */
+    var recitersReturnToPlayback by rememberSaveable { mutableStateOf(false) }
     var downloadsRefreshKey by remember { mutableIntStateOf(0) }
     /**
      * Remount key for the reader. Bumped on home/bookmarks/concordance/voice
@@ -1067,8 +1071,14 @@ private fun PaperStackApp(
         // Back from a detail page lands on Settings, but the page itself
         // stays where it is — the leaf you turned back from is still the
         // one under your thumb, so swiping forward from Settings re-opens
-        // exactly that sheet.
-        animateTo(settingsLayer)
+        // exactly that sheet. The reciter list opened from Playback is the
+        // one exception: its leaf turns back to Playback.
+        if (settingsDetail == SettingsDetail.RECITERS && recitersReturnToPlayback) {
+            recitersReturnToPlayback = false
+            settingsDetail = SettingsDetail.PLAYBACK
+        } else {
+            animateTo(settingsLayer)
+        }
     }
     // Composed after the stack handler so overlay backs dismiss the bleed
     // instead of turning the page beneath it.
@@ -1182,8 +1192,8 @@ private fun PaperStackApp(
                     onBack = {
                         animateTo(if (selectedSurahId == 0) COVER_LAYER else AYAH_LAYER)
                     },
-                    onOpenReciters = {
-                        settingsDetail = SettingsDetail.RECITERS
+                    onOpenPlayback = {
+                        settingsDetail = SettingsDetail.PLAYBACK
                         animateTo(settingsLayer + 1)
                     },
                     onOpenCustomize = {
@@ -1222,9 +1232,25 @@ private fun PaperStackApp(
             ) {
                 SettingsPaper {
                     when (settingsDetail) {
+                        SettingsDetail.PLAYBACK -> PlaybackSheet(
+                            viewModel = settingsViewModel,
+                            inkPreview = settingsInkPreview,
+                            onBack = { animateTo(settingsLayer) },
+                            onOpenReciters = {
+                                recitersReturnToPlayback = true
+                                settingsDetail = SettingsDetail.RECITERS
+                            },
+                        )
                         SettingsDetail.RECITERS -> RecitersSheet(
                             viewModel = settingsViewModel,
-                            onBack = { animateTo(settingsLayer) },
+                            onBack = {
+                                if (recitersReturnToPlayback) {
+                                    recitersReturnToPlayback = false
+                                    settingsDetail = SettingsDetail.PLAYBACK
+                                } else {
+                                    animateTo(settingsLayer)
+                                }
+                            },
                         )
                         SettingsDetail.CUSTOMIZE -> CustomizeSheet(
                             viewModel = settingsViewModel,
@@ -1687,6 +1713,29 @@ private fun PaperStackApp(
         }
     }
 
+}
+
+@Composable
+private fun PlaybackSheet(
+    viewModel: com.beautifulquran.ui.settings.SettingsViewModel,
+    inkPreview: SettingsInkPreviewState,
+    onBack: () -> Unit,
+    onOpenReciters: () -> Unit,
+) {
+    val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
+    val reciters by viewModel.reciters.collectAsStateWithLifecycle()
+    PlaybackPage(
+        settings = settings,
+        reciters = reciters,
+        onSelectReciter = viewModel::selectReciter,
+        onOpenReciters = onOpenReciters,
+        onToggleAutoplay = { on ->
+            viewModel.settings.update { it.copy(autoplayNextChapter = on) }
+        },
+        checkParams = inkPreview.checkParams,
+        checkPaintToken = inkPreview.checkPaintToken,
+        onBack = onBack,
+    )
 }
 
 @Composable

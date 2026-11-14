@@ -1,7 +1,9 @@
 package com.beautifulquran.ui.home
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PinReorderTest {
@@ -55,6 +57,14 @@ class PinReorderTest {
         val visible = listOf(PinSeat(3, 60, 50), PinSeat(2, 10, 50))
         assertEquals(2, seatAt(0f, visible))
         assertEquals(3, seatAt(400f, visible))
+    }
+
+    @Test
+    fun reorderingIsOfferedOnlyWhenThereIsAnOrderToChange() {
+        assertFalse(showReorderControl(0))
+        assertFalse(showReorderControl(1))
+        assertTrue(showReorderControl(2))
+        assertTrue(showReorderControl(9))
     }
 
     @Test

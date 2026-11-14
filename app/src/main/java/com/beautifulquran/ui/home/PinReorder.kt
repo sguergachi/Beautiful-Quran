@@ -43,6 +43,12 @@ internal fun seatAt(center: Float, seats: List<PinSeat>): Int? {
 }
 
 /**
+ * Whether the band's head offers reordering: the grips stay out of sight
+ * until they are asked for, and one pinned chapter has no order to change.
+ */
+internal fun showReorderControl(pinnedCount: Int): Boolean = pinnedCount >= 2
+
+/**
  * A pin order the list may adopt: only a rearrangement of the pins already
  * kept. Anything else (a drop landing after the chapter was unpinned from
  * elsewhere) keeps the order that is stored.

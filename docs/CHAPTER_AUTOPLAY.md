@@ -1,6 +1,7 @@
 # Play on to the next chapter (#916)
 
-Settings → **Play on to the next chapter** (off by default). When a chapter's
+Settings → Playback → **Play on to the next chapter** (off by default). The
+Playback page also holds the reciter choice. When a chapter's
 recitation plays out, the next chapter starts by itself, with its basmalah, in
 the same reciter.
 
@@ -53,12 +54,16 @@ moving between screens.
 
 - **Hold a row** to pin it (or unpin it, on the band), as ever: the row fills
   with wet ink and holding it full is the confirmation.
-- **Drag a pinned row's grip** (three rules in the end margin) to reorder. The
-  row lifts at once in wet ink and follows the finger; the others make room
-  and the list scrolls on near its ends. The order is stored when it is set
-  down. Only the grip moves a row, so the row's own tap and hold keep their
-  meanings.
+- **Reorder from the band's head.** The grips stick out, so they stay put
+  away: the PINNED flag carries a small Reorder leaf (three rules, the
+  grips' own mark) at its right end, shown once two chapters are pinned.
+  Tapping it brings every pinned row's grip out (three rules ending on the
+  content edge) and the leaf reads Done; tapping Done puts them away.
+  **Drag a grip** to reorder: the row lifts at once in wet ink and follows
+  the finger; the others make room and the list scrolls on near its ends.
+  The order is stored when it is set down. Only the grip moves a row, so
+  the row's own tap and hold keep their meanings.
 
-TalkBack gets Pin / Unpin and Move up / Move down actions; Shift+Enter still
-pins from a keyboard. Search lists chapters in place off the band, so rows
-there have no grip and are tap-only.
+TalkBack gets Pin / Unpin and — while the grips are out — Move up / Move
+down actions; Shift+Enter still pins from a keyboard. Search lists chapters
+in place off the band, so rows there have no grip and are tap-only.
