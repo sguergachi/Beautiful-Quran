@@ -610,7 +610,8 @@ def main():
                            for p in (work / 'evidence').glob('*.json')),
                        'Legacy source copies found; preserve decisions and run purge-source-cache before resuming')
         usage_wait = UsageWait(work / "usage-wait.json", cancelled)
-        usage_wait.wait()
+        # No startup wait: the loop and cached_model_call already gate every paid
+        # call, and the evidence thread must keep fetching while a quota is out.
         export = work / "export"
         if not (export / "manifest.json").exists():
             ledger.export_corpus(export, args.corpus)
