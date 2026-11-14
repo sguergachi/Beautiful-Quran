@@ -217,6 +217,13 @@ def stored_evidence(work, row):
     return receipt if bound else None
 
 
+def evidence_plan(queue, states, limit=None):
+    """Verses that still need a canonical fetch: not seeds, not reviewed, within the run's budget."""
+    pending = [key for key in queue if states.get(key, {}).get("origin") != "prior_ai_review"
+               and states.get(key, {}).get("status") != "model_reviewed"]
+    return pending[:limit] if limit else pending
+
+
 def fetch_evidence(client, row, directory, tafsir):
     """Retrieve and validate online; persist only citations and hashes, never source text."""
     path = directory / (row["verse"].replace(":", "-") + ".json")
@@ -559,7 +566,8 @@ def main():
                         help="Share of baseline-covered verses still reviewed to bound their error rate")
     parser.add_argument("--batch", type=int, default=6,
                         help="Verses per paid draft/critique pair; 1 keeps the per-verse stage cache")
-    parser.add_argument("--workers", type=int, default=2, help="1–4 concurrent verse reviews; canonical fetches remain serial")
+    parser.add_argument("--workers", type=int, default=2,
+                        help="1–4 concurrent verse reviews; canonical fetches stay serial, on their own thread")
     args = parser.parse_args()
     work = args.work_dir.resolve()
     if args.command == "report":
@@ -660,6 +668,21 @@ def main():
                 for key, state in future.result().items():
                     checkpoint(key, state)
 
+        # Quran.ai throttles each call to ~1/s and sometimes for a full minute. Fetch
+        # one verse ahead on its own thread so those waits never idle a paid review
+        # worker, and so a quota blackout is spent filling the evidence cache.
+        evidence_pool = ThreadPoolExecutor(max_workers=1)
+        evidence_jobs = {}
+
+        def evidence_for(key):
+            if key not in evidence_jobs:
+                row = rows[key]
+                evidence_jobs[key] = evidence_pool.submit(
+                    lambda: stored_evidence(work, row) or fetch_evidence(client, row, work / "evidence", args.tafsir))
+            return evidence_jobs[key]
+
+        for key in evidence_plan(queue, states, args.max_verses):
+            evidence_for(key)
         call = lambda payload, output, dest: cached_model_call(payload, output, dest, args.model, args.timeout, cancelled, usage_wait, args.reasoning)
         groups = [queue[index:index + args.batch] for index in range(0, len(queue), args.batch)]
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
@@ -678,9 +701,7 @@ def main():
                         continue
                     try:
                         usage_wait.wait()
-                        old_state = states.get(key, {})
-                        evidence = (stored_evidence(work, row) if old_state.get("status") == "model_reviewed" else None) \
-                            or fetch_evidence(client, row, work / "evidence", args.tafsir)
+                        evidence = evidence_for(key).result()
                         items.append({"row": row, "binding": manifest["verses"][key], "evidence": evidence,
                                       "directory": work / "jobs" / key.replace(":", "-")})
                     except (ValueError, OSError, KeyError) as error:
@@ -708,6 +729,7 @@ def main():
                     collect()
             while pending_jobs:
                 collect()
+        evidence_pool.shutdown(wait=True, cancel_futures=True)
         # Only currently bound model-reviewed rows enter the candidate artifact.
         accepted = []
         for key, state in states.items():

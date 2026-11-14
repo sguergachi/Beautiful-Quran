@@ -152,6 +152,14 @@ class ChapterReviewTest(unittest.TestCase):
             (work / "evidence" / "1-1.json").write_text('{"interrupted":')
             self.assertIsNone(runner.stored_evidence(work, self.row))
 
+    def test_evidence_is_fetched_once_per_pending_verse_and_never_for_banked_work(self):
+        states = {"1:1": {"origin": "prior_ai_review", "status": "model_reviewed"},
+                  "1:2": {"status": "model_reviewed"},
+                  "1:4": {"status": "held"}}
+        self.assertEqual(["1:3", "1:4"], runner.evidence_plan(["1:1", "1:2", "1:3", "1:4"], states))
+        self.assertEqual(["1:3"], runner.evidence_plan(["1:1", "1:2", "1:3", "1:4"], states, 1))
+        self.assertEqual([], runner.evidence_plan([], states))
+
     def test_completed_stage_resumes_but_changed_or_interrupted_input_does_not(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
