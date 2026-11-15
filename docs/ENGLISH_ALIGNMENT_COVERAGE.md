@@ -181,16 +181,16 @@ stage cache. `report.json` and `selection.json` record
 chapter, and `python3 tools/test_review_english_selection.py` pins the filter,
 the draw and the chapter bound. A verse already reviewed re-binds to its
 recorded evidence receipt instead of paying for the same four Quran.ai fetches
-again; the hashes, citations and decisions are unchanged. Held verses reuse
-their receipt too, so a hold costs no second fetch. Canonical fetches run on
-their own thread, one verse ahead of the review queue: Quran.ai throttles each
-call to about one per second and sometimes for a full minute, and those waits
-must not idle a paid review worker. The same thread keeps filling the evidence
-cache while the model side waits out an exhausted quota, which is why a blackout
-leaves the review queue with nothing left to fetch when it lifts. Retry windows
-come from the server's own `Retry after N seconds`; treating an unrecognised
-rate-limit message as a full minute once made every verse cost four minutes of
-pure waiting.
+again; the hashes, citations and decisions are unchanged. A *new* review always
+fetches live evidence: the receipt is hashes and citations only, so handing it
+to the model would ask it to judge a meaning it cannot read. Canonical fetches
+run on their own thread, one verse ahead of the review queue: Quran.ai throttles
+each call to about one per second, and those waits must not idle a paid review
+worker. The same thread keeps filling the evidence cache while the model side
+waits out an exhausted quota, which is why a blackout leaves the review queue
+with nothing left to fetch when it lifts. Retry windows come from the server's
+own `Retry after N seconds`; treating an unrecognised rate-limit message as a
+full minute once made every verse cost four minutes of pure waiting.
 
 Staying at baseline is still not certification. The audit sample bounds how
 often a covered verse would have moved; it does not make its owners reviewed,

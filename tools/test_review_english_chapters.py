@@ -152,6 +152,14 @@ class ChapterReviewTest(unittest.TestCase):
             (work / "evidence" / "1-1.json").write_text('{"interrupted":')
             self.assertIsNone(runner.stored_evidence(work, self.row))
 
+    def test_a_stored_receipt_is_hashes_only_and_cannot_feed_a_new_review(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            runner.fetch_evidence(self.evidence_client(), self.row, work / "evidence", "ar-jalalayn")
+            receipt = runner.stored_evidence(work, self.row)
+            self.assertNotIn("entry", receipt["sources"]["fetch_quran"])
+            self.assertNotIn("morphology", receipt)
+
     def test_evidence_is_fetched_once_per_pending_verse_and_never_for_banked_work(self):
         states = {"1:1": {"origin": "prior_ai_review", "status": "model_reviewed"},
                   "1:2": {"status": "model_reviewed"},

@@ -679,7 +679,7 @@ def main():
             if key not in evidence_jobs:
                 row = rows[key]
                 evidence_jobs[key] = evidence_pool.submit(
-                    lambda: stored_evidence(work, row) or fetch_evidence(client, row, work / "evidence", args.tafsir))
+                    fetch_evidence, client, row, work / "evidence", args.tafsir)
             return evidence_jobs[key]
 
         for key in evidence_plan(queue, states, args.max_verses):
