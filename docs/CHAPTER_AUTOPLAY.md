@@ -7,17 +7,18 @@ the same reciter.
 
 ## Which chapter is next
 
-The queue is the Chapters page read top to bottom: **pinned chapters in the
-order they were pinned, then every other chapter in book order**. What plays
-next is always what the reader can see below the current row. Pins are stored in
-pin order (`Settings.pinnedSurahIds` is a list) and the green band shows them in
-that order, so the order is never hidden. A new pin lands at the foot of the
+The pinned chapters are a playlist first: **a pinned chapter hands to the
+next pin in pin order**. Pins are stored in pin order
+(`Settings.pinnedSurahIds` is a list) and the green band shows them in that
+order, so the order is never hidden. A new pin lands at the foot of the
 band. Installs from before pins had an order keep book order.
 
-- The last pinned chapter hands on to the first unpinned one (Al-Fatihah unless
-  pinned), then down the page. A pinned chapter is never replayed from the list.
-- The foot of the page (114, or the last unpinned chapter) is the end: playback
-  stops as it always did.
+- The last pinned chapter hands on to **the book where it sits**: the next
+  chapter in book order after it, skipping anything pinned (the band plays
+  those in its own turn). A pinned chapter is never replayed from the list.
+- The book's own end is the end: playback stops as it always did — unless
+  the final chapter (114) is pinned, in which case it wraps to the top of
+  the book.
 - Search does not change the queue; it follows the full page, not a filter.
 
 Pure rule: `chapterAfter` in `playback/ChapterOrder.kt` (tested in
@@ -55,10 +56,11 @@ moving between screens.
 - **Hold a row** to pin it (or unpin it, on the band), as ever: the row fills
   with wet ink and holding it full is the confirmation.
 - **Reorder from the band's head.** The grips stick out, so they stay put
-  away: the PINNED flag carries a small Reorder leaf (three rules, the
-  grips' own mark) at its right end, shown once two chapters are pinned.
-  Tapping it brings every pinned row's grip out (three rules ending on the
-  content edge) and the leaf reads Done; tapping Done puts them away.
+  away: the PINNED flag carries an icon-only button (up and down arrows,
+  on the quiet ink rung secondary buttons use) at its right end, shown
+  once two chapters are pinned. Tapping it brings every pinned row's grip
+  out (three rules ending on the content edge) and the button shows a
+  check; tapping it puts the grips away.
   **Drag a grip** to reorder: the row lifts at once in wet ink and follows
   the finger; the others make room and the list scrolls on near its ends.
   The order is stored when it is set down. Only the grip moves a row, so

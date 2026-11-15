@@ -964,8 +964,8 @@ private fun PaperStackApp(
         onAssistantActionConsumed()
     }
 
-    // Autoplay: a chapter that has played out hands on to the next one down
-    // the Chapters page (pins in pinned order, then the rest in book order).
+    // Autoplay: a chapter that has played out hands on to the next pin in
+    // pin order, then to the book where the finished chapter sits.
     LaunchedEffect(Unit) {
         app.player.state.map { it.finishedSurahId }.distinctUntilChanged().filterNotNull()
             .collect { finished ->

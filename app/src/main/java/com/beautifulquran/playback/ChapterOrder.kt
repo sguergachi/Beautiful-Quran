@@ -1,17 +1,23 @@
 package com.beautifulquran.playback
 
 /**
- * The order Chapters reads top to bottom: pinned chapters as they were pinned,
- * then every other chapter in book order. Autoplay walks this same page, so
- * what plays next is always what the reader can see below the current row.
+ * What plays after a chapter ends (Play on to the next chapter). The pinned
+ * chapters are a playlist first: a pinned chapter hands to the next pin in
+ * pin order. When the pins run out — or the chapter was never pinned — the
+ * book resumes where the finished chapter sits: the next chapter in book
+ * order, skipping anything pinned (the band plays those in its own turn).
+ * A pinned book-final chapter wraps to the top of the book; an unpinned
+ * one ends it.
  */
-internal fun chapterListOrder(allIds: List<Int>, pinned: List<Int>): List<Int> {
-    val onBand = pinned.filter { it in allIds }.distinct()
-    return onBand + allIds.filterNot { it in onBand }
+internal fun chapterAfter(finished: Int, allIds: List<Int>, pinned: List<Int>): Int? {
+    val finishedIndex = allIds.indexOf(finished)
+    if (finishedIndex < 0) return null
+    val band = pinned.filter { it in allIds }.distinct()
+    val pinIndex = band.indexOf(finished)
+    if (pinIndex >= 0 && pinIndex < band.lastIndex) return band[pinIndex + 1]
+    val rest = allIds.filterNot { it in band }
+    val after = allIds.drop(finishedIndex + 1).firstOrNull { it in rest }
+    // Only a pinned chapter wraps: the book's last chapter, pinned, still
+    // hands on to the top of the book as the band promised.
+    return after ?: if (pinIndex >= 0) rest.firstOrNull() else null
 }
-
-/** The chapter after [finished] down the page, or null at the foot of it. */
-internal fun chapterAfter(finished: Int, allIds: List<Int>, pinned: List<Int>): Int? =
-    chapterListOrder(allIds, pinned).let { order ->
-        order.getOrNull(order.indexOf(finished) + 1).takeIf { finished in order }
-    }

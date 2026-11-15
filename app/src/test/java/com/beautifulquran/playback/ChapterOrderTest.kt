@@ -18,14 +18,20 @@ class ChapterOrderTest {
         assertEquals(36, chapterAfter(2, all, pinned))
     }
 
-    @Test fun theLastPinHandsOnToTheTopOfTheRest() {
-        assertEquals(1, chapterAfter(36, all, listOf(67, 2, 36)))
+    @Test fun theLastPinHandsOnToTheBookWhereItSits() {
+        assertEquals(37, chapterAfter(36, all, listOf(67, 2, 36)))
     }
 
     @Test fun theRestSkipsWhatThePinsAlreadyMoved() {
         val pinned = listOf(3, 2)
-        assertEquals(1, chapterAfter(2, all, pinned))
+        assertEquals(4, chapterAfter(2, all, pinned))
         assertEquals(4, chapterAfter(1, all, pinned))
+    }
+
+    @Test fun theBookResumedAfterThePinsSkipsPinsAlreadyPlayed() {
+        val pinned = listOf(67, 2, 36)
+        assertEquals(68, chapterAfter(66, all, pinned))
+        assertEquals(37, chapterAfter(35, all, pinned))
     }
 
     @Test fun theFootOfThePageIsTheEnd() {

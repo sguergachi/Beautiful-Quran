@@ -46,7 +46,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Reorder
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -852,7 +853,7 @@ fun HomeScreen(
                 // around it as a draft and the order is kept when it lets go.
                 val pinReorder = remember { PinReorderState() }
                 // The grips stick out of the band, so they stay put away
-                // until the band's own Reorder leaf asks for them; Done —
+                // until the band's own reorder button asks for them; the check —
                 // or a band too small to reorder — puts them away again.
                 var reorderMode by remember { mutableStateOf(false) }
                 LaunchedEffect(bandCount) {
@@ -1082,8 +1083,8 @@ fun HomeScreen(
                         // Over the band, on the paper: a small-caps flag on the
                         // names' rail, the Continue pill's CONTINUE flag in kind.
                         // At its right end, in line with the names below, the
-                        // leaf that brings out the rows' grips — Done puts
-                        // them away again.
+                        // button that brings out the rows' grips — its check
+                        // puts them away again.
                         item(key = "pinned-flag") {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1914,17 +1915,19 @@ internal class RowReorder(
 )
 
 /**
- * The leaf at the right of the PINNED flag: three rules in miniature, the
- * grips' own mark. Tapping it brings every pinned row's grip out; the leaf
- * then reads Done, and tapping it puts the grips away. At rest the band is
- * plain paper — nothing sticks out of the rows.
+ * The button at the right of the PINNED flag, icon alone: up and down
+ * arrows, so it reads as reordering without a word. Tapping it brings
+ * every pinned row's grip out; the button then shows a check, and tapping
+ * it puts the grips away. At rest the band is plain paper — nothing
+ * sticks out of the rows. Its ink is [QuranTheme.ink.quiet], the rung
+ * secondary buttons on this sheet carry (the settings gear is the other).
  */
 @Composable
 private fun PinnedReorderControl(reordering: Boolean, onToggle: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
+            .size(40.dp)
             .quietClickable(role = Role.Button, onClick = onToggle)
             .semantics {
                 contentDescription = if (reordering) {
@@ -1932,27 +1935,13 @@ private fun PinnedReorderControl(reordering: Boolean, onToggle: () -> Unit) {
                 } else {
                     "Reorder pinned chapters"
                 }
-            }
-            .padding(vertical = 6.dp),
-    ) {
-        if (!reordering) {
-            Icon(
-                imageVector = Icons.Rounded.Reorder,
-                contentDescription = null,
-                tint = QuranTheme.ink.secondary,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-        Text(
-            text = if (reordering) "Done" else "Reorder",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (reordering) FontWeight.SemiBold else FontWeight.Medium,
-            color = if (reordering) {
-                QuranTheme.accents.greenQuiet
-            } else {
-                QuranTheme.ink.secondary
             },
-            maxLines = 1,
+    ) {
+        Icon(
+            imageVector = if (reordering) Icons.Rounded.Check else Icons.Rounded.SwapVert,
+            contentDescription = null,
+            tint = QuranTheme.ink.quiet,
+            modifier = Modifier.size(20.dp),
         )
     }
 }
