@@ -79,6 +79,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -1925,8 +1927,15 @@ internal class RowReorder(
 @Composable
 private fun PinnedReorderControl(reordering: Boolean, onToggle: () -> Unit) {
     Box(
-        contentAlignment = Alignment.Center,
+        // The arrows end on the content edge, over the grips they bring out.
+        contentAlignment = Alignment.CenterEnd,
         modifier = Modifier
+            // A full touch target that takes no height from the flag's line:
+            // the band must not drop when a second chapter is pinned.
+            .layout { measurable, constraints ->
+                val box = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                layout(box.width, 0) { box.place(0, -box.height / 2) }
+            }
             .size(40.dp)
             .quietClickable(role = Role.Button, onClick = onToggle)
             .semantics {

@@ -21,3 +21,16 @@ internal fun chapterAfter(finished: Int, allIds: List<Int>, pinned: List<Int>): 
     // hands on to the top of the book as the band promised.
     return after ?: if (pinIndex >= 0) rest.firstOrNull() else null
 }
+
+/**
+ * The reader's NEXT chapter for the chapter on screen. A pinned chapter
+ * leads where the Play-on queue leads ([chapterAfter]: the next pin, then
+ * the book where it sits); any other chapter keeps the book's next,
+ * pinned or not.
+ */
+internal fun readerNextChapter(currentId: Int, allIds: List<Int>, pinned: List<Int>): Int? {
+    val band = pinned.filter { it in allIds }.distinct()
+    if (currentId in band) return chapterAfter(currentId, allIds, pinned)
+    val index = allIds.indexOf(currentId)
+    return if (index >= 0) allIds.getOrNull(index + 1) else null
+}

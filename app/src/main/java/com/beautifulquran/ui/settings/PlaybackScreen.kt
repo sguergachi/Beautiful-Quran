@@ -105,7 +105,7 @@ internal fun PlaybackPage(
                 checkParams = checkParams,
                 checkPaintToken = checkPaintToken,
             )
-            Caption("Pinned chapters first, in the order you pinned them.")
+            Caption("Pins play in your order, then the book carries on.")
 
             Spacer(Modifier.height(48.dp))
         }

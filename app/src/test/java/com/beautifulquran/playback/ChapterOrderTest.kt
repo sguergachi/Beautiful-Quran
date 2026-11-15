@@ -48,6 +48,22 @@ class ChapterOrderTest {
         assertNull(chapterAfter(0, all, emptyList()))
     }
 
+    @Test fun theReaderNextForAPinnedChapterIsTheNextPin() {
+        // Chapter 107 pinned with 109 after it: NEXT is the pin, not 108.
+        assertEquals(109, readerNextChapter(107, all, listOf(107, 109)))
+        assertEquals(1, readerNextChapter(2, all, listOf(2, 1)))
+    }
+
+    @Test fun theReaderNextForTheLastPinResumesTheBook() {
+        assertEquals(3, readerNextChapter(1, all, listOf(2, 1)))
+    }
+
+    @Test fun theReaderNextForAnUnpinnedChapterStaysTheBooksNext() {
+        // Even when the book's next chapter is itself pinned.
+        assertEquals(36, readerNextChapter(35, all, listOf(36)))
+        assertNull(readerNextChapter(114, all, emptyList()))
+    }
+
     @Test fun legacyUnorderedPinsKeepTheBookOrderTheBandShowed() {
         assertEquals(listOf(2, 36, 67), readPinnedSurahIds(null, setOf("67", "2", "36")))
         assertEquals(listOf(67, 2), readPinnedSurahIds("67,2,x,67", setOf("1")))

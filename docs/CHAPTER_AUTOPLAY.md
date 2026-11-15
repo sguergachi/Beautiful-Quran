@@ -24,6 +24,13 @@ band. Installs from before pins had an order keep book order.
 Pure rule: `chapterAfter` in `playback/ChapterOrder.kt` (tested in
 `ChapterOrderTest`).
 
+The reader's NEXT footer (and the page turn past a chapter's end) follows
+the same queue for a pinned chapter: its NEXT is the next pin, then the book
+where the last pin sits (`readerNextChapter`). An unpinned chapter's NEXT
+stays the book's next chapter, so reading straight through the book never
+skips a chapter. Play-on from an unpinned chapter skips pinned ones instead;
+the two differ only there.
+
 ## How it fires
 
 `PlayerUiState.finishedSurahId` is set when Media3 reaches `STATE_ENDED` and
@@ -43,7 +50,7 @@ range or single-ayah loop (those never reach `STATE_ENDED`), a playback error.
   finishes and playback stops there.
 - The hand-off swaps the chapter in place (outgoing text stays on the glass
   until the new one is ready). It does not yet reuse the NEXT footer's flying
-  chapter header; that only fits when the next chapter is n+1.
+  chapter header.
 - Android only. The web port does not have the setting yet.
 
 ## Keeping the pins (hold to pin, grip to carry)
