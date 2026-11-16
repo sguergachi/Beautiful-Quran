@@ -193,8 +193,6 @@ private val HomeRibbonWidth = 13.dp
 private val HomeRibbonGutter = (HomeRibbonLane - HomeRibbonWidth) / 2f
 private val HomeStartInset = HomeRibbonLane
 private val HomeEndInset = 28.dp
-/** The end column's controls (settings, reorder, grips): one box width, one centre line. */
-private val HomeEndControl = 48.dp
 private val HomeNumberColumn = 26.dp
 private val HomeRowRibbonGutter = (HomeNumberColumn - HomeRibbonWidth) / 2f
 private val HomeColumnGap = 4.dp
@@ -1464,7 +1462,7 @@ private fun HomeHeader(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(HomeEndControl)
+                .size(48.dp)
                 // The title sits 7 dp below the masthead's overall center.
                 .offset(y = 7.dp)
                 .quietClickable(role = Role.Button, onClick = onOpenSettings)
@@ -1929,9 +1927,8 @@ internal class RowReorder(
 @Composable
 private fun PinnedReorderControl(reordering: Boolean, onToggle: () -> Unit) {
     Box(
-        // The settings button's own box, at the same end inset: the arrows,
-        // the check and the grips below share its centre line.
-        contentAlignment = Alignment.Center,
+        // The arrows end on the content edge, over the grips they bring out.
+        contentAlignment = Alignment.CenterEnd,
         modifier = Modifier
             // A full touch target that takes no height from the flag's line:
             // the band must not drop when a second chapter is pinned.
@@ -1939,7 +1936,7 @@ private fun PinnedReorderControl(reordering: Boolean, onToggle: () -> Unit) {
                 val box = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
                 layout(box.width, 0) { box.place(0, -box.height / 2) }
             }
-            .size(HomeEndControl)
+            .size(40.dp)
             .quietClickable(role = Role.Button, onClick = onToggle)
             .semantics {
                 contentDescription = if (reordering) {
@@ -1959,8 +1956,7 @@ private fun PinnedReorderControl(reordering: Boolean, onToggle: () -> Unit) {
 }
 
 /**
- * The grip at the end of a pinned row: three rules on the settings button's centre line, shown only while the band
- * is reordering. Touching it lifts the row at once, in wet ink, and the finger
+ * The grip at the end of a pinned row: three rules ending on the content edge, shown only while the band is reordering. Touching it lifts the row at once, in wet ink, and the finger
  * carries it up or down the band; the others make room and the order is kept
  * when it is set down. Everything else about the row, holding included, keeps
  * its meaning, so the grip is the only place a row is moved.
@@ -1996,17 +1992,17 @@ private fun ReorderHandle(reorder: RowReorder, label: String, modifier: Modifier
                 }
             }
             .drawBehind {
-                val half = 7.dp.toPx()
+                val width = 14.dp.toPx()
                 val gap = 4.dp.toPx()
                 val stroke = 1.dp.toPx()
-                // Centred in the box, so the rules stand under the reorder
-                // check and the settings button on one vertical line.
+                // The rules end on the content edge, where the names and the
+                // search field end; the rest of the box is touch room.
                 for (i in -1..1) {
                     val y = size.height / 2f + i * gap
                     drawLine(
                         color = ink.copy(alpha = 0.7f),
-                        start = Offset(size.width / 2f - half, y),
-                        end = Offset(size.width / 2f + half, y),
+                        start = Offset(size.width - width, y),
+                        end = Offset(size.width, y),
                         strokeWidth = stroke,
                     )
                 }
@@ -2153,8 +2149,8 @@ internal enum class HoldOutcome { Tap, Cancel }
 internal fun holdOutcome(heldMs: Long, pace: Float = 1f): HoldOutcome =
     if (heldMs < HoldTapMaxMs * pace) HoldOutcome.Tap else HoldOutcome.Cancel
 
-/** The grip's box: as wide as the settings button's, so they share a centre. */
-private val ReorderGripWidth = HomeEndControl
+/** The grip's box: its rules and the touch room to their left. */
+private val ReorderGripWidth = 32.dp
 /** How much taller a 48 dp grip stands than the two-line row it sits in, per side. */
 private val GripOverhang = 3.dp
 /** No tint for an ordinary tap: the fill waits this long to begin. */
