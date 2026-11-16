@@ -160,6 +160,7 @@ internal fun SettingsScreen(
     viewModel: SettingsViewModel,
     inkPreview: SettingsInkPreviewState,
     onBack: () -> Unit,
+    onOpenReciters: () -> Unit = {},
     onOpenPlayback: () -> Unit = {},
     onOpenCustomize: () -> Unit = {},
     onOpenDownloads: () -> Unit = {},
@@ -174,6 +175,7 @@ internal fun SettingsScreen(
 ) {
     val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
     val reciters by viewModel.reciters.collectAsStateWithLifecycle()
+    val favoriteReciters = reciters.filter { it.id in settings.favoriteReciterIds }
     val context = LocalContext.current
     var usage by remember { mutableStateOf<RecitationUsage?>(null) }
     LaunchedEffect(downloadsRefreshKey) {
@@ -264,12 +266,27 @@ internal fun SettingsScreen(
 
             Spacer(Modifier.height(36.dp))
 
+            SectionLabel("Reciter")
+            Spacer(Modifier.height(10.dp))
+            favoriteReciters.forEach { reciter ->
+                ReciterChoiceRow(
+                    reciter = reciter,
+                    selected = reciter.id == settings.reciterId,
+                    onSelect = { viewModel.selectReciter(reciter) },
+                )
+            }
+            if (favoriteReciters.isEmpty()) {
+                Caption("No favorites yet — keep them from the full list.")
+            }
+            ShowAllRecitersLink(total = reciters.size, onClick = onOpenReciters)
+
+            // The reciter section stands apart from the page rows by the same
+            // visible air as the colophon below Acknowledgements (76 dp ink to
+            // ink on screen), so the sheet has one large break, used twice.
+            Spacer(Modifier.height(48.dp))
             NavigateRow(
                 label = "Playback",
-                note = playbackSummary(
-                    reciterName = reciters.firstOrNull { it.id == settings.reciterId }?.name,
-                    autoplayNextChapter = settings.autoplayNextChapter,
-                ),
+                note = playbackSummary(autoplayNextChapter = settings.autoplayNextChapter),
                 onClick = { onOpenPlayback() },
             )
 

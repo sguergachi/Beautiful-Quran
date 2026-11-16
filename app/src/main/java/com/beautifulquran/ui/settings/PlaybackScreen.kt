@@ -22,35 +22,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.data.Settings
-import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.ui.theme.BrushCheckParams
 import com.beautifulquran.ui.theme.verticalFadingEdges
 
-/** The Settings row's one-line account of this page: the voice, and whether
- * a finished chapter hands on to the next. */
-internal fun playbackSummary(reciterName: String?, autoplayNextChapter: Boolean): String =
-    when {
-        reciterName == null -> "Reciter and chapter flow"
-        autoplayNextChapter -> "$reciterName · plays on to the next chapter"
-        else -> "$reciterName · stops at the chapter's end"
-    }
+/** The Settings row's one-line account of this page: whether a finished
+ * chapter hands on to the next. */
+internal fun playbackSummary(autoplayNextChapter: Boolean): String =
+    if (autoplayNextChapter) "Plays on to the next chapter" else "Stops at the chapter's end"
 
 /**
- * Playback as its own sheet of paper: the voice, and what happens when a
- * chapter ends. Settings keeps only the row that opens this page.
+ * How recitation carries on, as its own sheet of paper. The voice itself is
+ * chosen on Settings, under Reciter; this page holds what happens around it.
  */
 @Composable
 internal fun PlaybackPage(
     settings: Settings,
-    reciters: List<Reciter>,
-    onSelectReciter: (Reciter) -> Unit,
-    onOpenReciters: () -> Unit,
     onToggleAutoplay: (Boolean) -> Unit,
     checkParams: BrushCheckParams,
     checkPaintToken: Int,
     onBack: () -> Unit,
 ) {
-    val favoriteReciters = reciters.filter { it.id in settings.favoriteReciterIds }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -80,24 +71,9 @@ internal fun PlaybackPage(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(Modifier.height(2.dp))
-            LeafIntro("The voice, and what happens when a chapter ends.")
+            LeafIntro("What happens when a chapter ends.")
 
             Spacer(Modifier.height(36.dp))
-            SectionLabel("Reciter")
-            Spacer(Modifier.height(10.dp))
-            favoriteReciters.forEach { reciter ->
-                ReciterChoiceRow(
-                    reciter = reciter,
-                    selected = reciter.id == settings.reciterId,
-                    onSelect = { onSelectReciter(reciter) },
-                )
-            }
-            if (favoriteReciters.isEmpty()) {
-                Caption("No favorites yet — keep them from the full list.")
-            }
-            ShowAllRecitersLink(total = reciters.size, onClick = onOpenReciters)
-
-            Spacer(Modifier.height(48.dp))
             ToggleRow(
                 label = "Play on to the next chapter",
                 checked = settings.autoplayNextChapter,

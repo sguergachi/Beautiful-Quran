@@ -1,7 +1,7 @@
 # Play on to the next chapter (#916)
 
 Settings → Playback → **Play on to the next chapter** (off by default). The
-Playback page also holds the reciter choice. When a chapter's
+reciter stays on Settings itself, under Reciter. When a chapter's
 recitation plays out, the next chapter starts by itself, with its basmalah, in
 the same reciter.
 
