@@ -357,7 +357,8 @@ function AyahBlockInner({
       onClick={(event) => {
         const target = event.target as HTMLElement
         if (gathering) {
-          if (target.closest('button')) return
+          // Words toggle through their own handler; never toggle twice.
+          if (target.closest('button, [data-reader-word]')) return
           paperToggleHaptic(gatherOrdinal == null)
           onVerseBodyTap?.()
           return

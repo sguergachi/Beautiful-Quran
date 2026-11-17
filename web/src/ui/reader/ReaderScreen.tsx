@@ -276,7 +276,9 @@ export function ReaderScreen({
   }, [])
   /** Tap a verse off its words: play from that ayah with follow on. */
   const onAyahTap = useCallback((ayah: number) => {
-    if (editingAtPointerDown.current || appStore.getSnapshot().gathering) return
+    // A held ribbon that just opened a note goes inert under the lifting
+    // finger, so that lift lands on the verse: it must not also play.
+    if (editingAtPointerDown.current || editingNoteRef.current != null || appStore.getSnapshot().gathering) return
     followWasEnabled.current = false
     void appStore.playAyah(ayah)
   }, [])
@@ -1788,7 +1790,7 @@ export function ReaderScreen({
                           appStore.onVerseTap(content.surah.id, ayahNumber)
                           return
                         }
-                        if (editingAtPointerDown.current) return
+                        if (editingAtPointerDown.current || editingNoteRef.current != null) return
                         onPlayWord(ayahNumber, position)
                       }}
                       onToggleBookmark={onToggleBookmark}
