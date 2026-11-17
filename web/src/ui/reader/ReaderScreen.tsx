@@ -1953,7 +1953,6 @@ export function ReaderScreen({
                 data-active={repeatMode !== 'off'}
                 aria-pressed={repeatMode !== 'off'}
                 aria-label="Repeat"
-                aria-haspopup="dialog"
                 aria-expanded={repeatOpen}
                 onClick={() => setRepeatOpen(true)}
               >
@@ -2073,6 +2072,10 @@ export function ReaderScreen({
         currentAyah={state.player.nowPlaying?.surahId === content.surah.id
           ? Math.max(1, state.player.nowPlaying.ayah) : focusedAyah || state.openAyah || 1}
         mode={repeatMode} range={state.player.repeatRange} retainedChoice={retainedRepeat.current}
+        liveAyah={() => {
+          const np = appStore.getSnapshot().player.nowPlaying
+          return np?.surahId === content.surah.id && np.ayah >= 1 ? np.ayah : null
+        }}
         onDismiss={() => setRepeatOpen(false)}
         onApply={(mode, range, choice) => {
           retainedRepeat.current = choice
