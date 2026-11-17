@@ -12,8 +12,6 @@ export type AyahSelectorSide = 'left' | 'right'
 /** Android `EnglishLeafText`: what the English Mushaf leaf prints. */
 export type EnglishLeafText = 'translation' | 'gloss'
 export type HomeBookmarkStyle = 'top_bound' | 'saved_passages'
-/** Android `ColorSystem`. Ladder ships; legacy is the pre-ladder palette. */
-export type ColorSystem = 'ladder' | 'legacy'
 
 /** Percent. The print elongates letters to fill a line; this is the web's stand-in. */
 export type MushafGlyphWiden = 0 | 4 | 6 | 8
@@ -77,11 +75,10 @@ export interface Settings {
   playbackSpeed: number
   /** Reveals developer tools (e.g. the Ornaments Lab). Off by default. */
   developerMode: boolean
-  /** Developer A/B: the ink ladder, or the palette that preceded it. */
-  colorSystem: ColorSystem
   /**
-   * One-shot reader lessons. Existing explicit preferences are preserved;
-   * new readers start with hints enabled. Enabling rearms every lesson.
+   * Android `educationGuidesEnabled`: developer-only gate for the contextual
+   * feature lessons, off until their visual language is approved for readers.
+   * Enabling rearms every lesson.
    */
   educationGuidesEnabled: boolean
   /**
@@ -104,7 +101,7 @@ const DEFAULTS: Settings = {
   reciterId: 1,
   favoriteReciterIds: [1, 2, 3, 4, 5, 6, 7],
   pinnedSurahIds: [],
-  fontScale: 0.95,
+  fontScale: 1,
   readingMode: 'arabic_english',
   readingLayout: 'scroll',
   pagePresentation: 'facing',
@@ -121,8 +118,7 @@ const DEFAULTS: Settings = {
   lastAyah: 1,
   playbackSpeed: 1,
   developerMode: false,
-  colorSystem: 'ladder',
-  educationGuidesEnabled: true,
+  educationGuidesEnabled: false,
   gapless5Playback: true,
   mushafGlyphWiden: 6,
   homeBookmarkStyle: 'top_bound',
@@ -138,8 +134,14 @@ function clampBrushStyle(value: unknown): BrushCircleStyle {
 
 const KEY = 'beautiful-quran-settings'
 
+/** The web's retired default; not one of Android's stops. */
+const RETIRED_DEFAULT_FONT_SCALE = 0.95
+
 function clampFontScale(value: unknown): number {
-  const n = typeof value === 'number' && Number.isFinite(value) ? value : DEFAULTS.fontScale
+  const raw = typeof value === 'number' && Number.isFinite(value) ? value : DEFAULTS.fontScale
+  // Every reader was saved at the old 0.95 default whether or not they touched
+  // the dial; it is not a stop, so it lands on Android's 1.0 default.
+  const n = Math.abs(raw - RETIRED_DEFAULT_FONT_SCALE) < 1e-6 ? DEFAULTS.fontScale : raw
   return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, n))
 }
 
@@ -156,6 +158,9 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
   const clean = { ...partial } as Record<string, unknown>
   delete clean.lastReadSurah
   delete clean.lastReadAyah
+  // Retired developer A/B (Android removed `colorSystem` too).
+  delete clean.colorSystem
+  const developerMode = Boolean(partial.developerMode ?? DEFAULTS.developerMode)
   return {
     ...DEFAULTS,
     ...(clean as Partial<Settings>),
@@ -163,13 +168,14 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
     pinnedSurahIds: cleanIds(partial.pinnedSurahIds, DEFAULTS.pinnedSurahIds),
     fontScale: clampFontScale(partial.fontScale ?? DEFAULTS.fontScale),
     pagePresentation: partial.pagePresentation === 'single' ? 'single' : 'facing',
-    developerMode: Boolean(partial.developerMode ?? DEFAULTS.developerMode),
+    developerMode,
     englishLeafText: partial.englishLeafText === 'gloss' ? 'gloss' : 'translation',
     annotationsEnabled: Boolean(partial.annotationsEnabled ?? DEFAULTS.annotationsEnabled),
-    colorSystem: partial.colorSystem === 'legacy' ? 'legacy' : 'ladder',
-    educationGuidesEnabled: Boolean(
-      partial.educationGuidesEnabled ?? DEFAULTS.educationGuidesEnabled,
-    ),
+    // A developer toggle. The web used to default it on and saved that for
+    // every reader, so a stored `true` only counts while developer mode is on.
+    educationGuidesEnabled:
+      developerMode &&
+      Boolean(partial.educationGuidesEnabled ?? DEFAULTS.educationGuidesEnabled),
     gapless5Playback: Boolean(
       partial.gapless5Playback ?? DEFAULTS.gapless5Playback,
     ),

@@ -7,7 +7,7 @@ import {
   showsWordGlossChrome,
   wordSearchSources,
 } from './customizePolicy'
-import { HOME_BOOKMARK_STYLES, normalizeSettings } from './settings'
+import { HOME_BOOKMARK_STYLES, normalizeSettings, type Settings } from './settings'
 
 describe('favorite reciters', () => {
   it('keeps page pictures across listening updates and invalidates visual changes', () => {
@@ -88,25 +88,38 @@ describe('gapless5Playback setting', () => {
   })
 })
 
-describe('colorSystem setting', () => {
-  it('ships the ink ladder and only accepts the legacy palette by name', () => {
-    expect(normalizeSettings().colorSystem).toBe('ladder')
-    expect(normalizeSettings({ colorSystem: 'legacy' }).colorSystem).toBe('legacy')
-    expect(normalizeSettings({ colorSystem: 'nope' as never }).colorSystem).toBe('ladder')
+describe('retired colorSystem setting', () => {
+  it('is stripped from stored settings', () => {
+    const stored = { colorSystem: 'legacy' } as unknown as Partial<Settings>
+    expect('colorSystem' in normalizeSettings(stored)).toBe(false)
   })
 })
 
 describe('educationGuidesEnabled setting', () => {
-  it('defaults on and preserves explicit opt-outs', () => {
-    expect(normalizeSettings().educationGuidesEnabled).toBe(true)
-    expect(normalizeSettings({ educationGuidesEnabled: false }).educationGuidesEnabled).toBe(false)
+  it('is off by default, as on Android', () => {
+    expect(normalizeSettings().educationGuidesEnabled).toBe(false)
+  })
+
+  it('is a developer toggle: a stored true only counts in developer mode', () => {
+    expect(normalizeSettings({ educationGuidesEnabled: true }).educationGuidesEnabled).toBe(false)
     expect(
-      normalizeSettings({ educationGuidesEnabled: true }).educationGuidesEnabled,
+      normalizeSettings({ developerMode: true, educationGuidesEnabled: true }).educationGuidesEnabled,
     ).toBe(true)
     expect(
-      normalizeSettings({ educationGuidesEnabled: 1 as unknown as boolean })
+      normalizeSettings({ developerMode: true, educationGuidesEnabled: false }).educationGuidesEnabled,
+    ).toBe(false)
+    expect(
+      normalizeSettings({ developerMode: true, educationGuidesEnabled: 1 as unknown as boolean })
         .educationGuidesEnabled,
     ).toBe(true)
+  })
+})
+
+describe('fontScale setting', () => {
+  it('defaults to the 1.0 stop and lifts the retired 0.95 default onto it', () => {
+    expect(normalizeSettings().fontScale).toBe(1)
+    expect(normalizeSettings({ fontScale: 0.95 }).fontScale).toBe(1)
+    expect(normalizeSettings({ fontScale: 0.9 }).fontScale).toBe(0.9)
   })
 })
 
