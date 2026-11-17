@@ -81,6 +81,8 @@ import {
   type PageMap,
 } from './mushafFollow'
 import './mushaf.css'
+import { SearchHitFlash, searchHitFlashTotalMs } from './SearchHitFlash'
+import { mushafFlashPositions, mushafFlashRole, type MushafSearchFlash } from './mushafSearchFlash'
 
 /** The share of the block between two pages: the pile a turn between them carries. */
 function pileBetween(from: number, to: number): number {
@@ -508,6 +510,44 @@ export function MushafReader({
     const reading = pageReadingPlace(verses, searchTarget ?? { surahId: activeSurahId, ayah: targetAyah })
     if (reading) onReadingPlace(reading)
   }, [ready, turning, covered, atChapters, facing, settled, activeSurahId, targetAyah, searchTarget, onReadingPlace])
+  // Home search hit: once the leaf carrying it has settled, the found words
+  // breathe orange on the scroll reader's clock while the page recedes.
+  const pendingFlash = useAppSelector((state) => state.pendingSearchFlash)
+  const [flash, setFlash] = useState<MushafSearchFlash | null>(null)
+  const flashPage = pendingFlash && ready
+    ? runtimeMushafCache?.pageOfAyah(activeSurahId, pendingFlash.ayah) ?? null : null
+  const flashShown = flashPage != null && !turning && !covered && !atChapters &&
+    (facing ? [mushafFacingPages(settled).right, mushafFacingPages(settled).left].includes(flashPage) : settled === flashPage)
+  useEffect(() => {
+    if (!pendingFlash || !flashShown) {
+      setFlash(null)
+      return
+    }
+    const verse = QuranRepository.surahContent(activeSurahId).ayahs.find((item) => item.number === pendingFlash.ayah)
+    if (!verse) {
+      appStore.clearSearchFlash()
+      return
+    }
+    const positions = new Set(mushafFlashPositions(pendingFlash, verse.words.map((word) => word.position)))
+    let fadeTimer = 0
+    let clearTimer = 0
+    const startTimer = window.setTimeout(() => {
+      setFlash({ surahId: activeSurahId, ayah: pendingFlash.ayah, positions, focusActive: true })
+      clearTimer = window.setTimeout(() => {
+        setFlash((current) => current ? { ...current, focusActive: false } : null)
+        fadeTimer = window.setTimeout(() => {
+          setFlash(null)
+          appStore.clearSearchFlash()
+        }, SearchHitFlash.FOCUS_FADE_MS)
+      }, searchHitFlashTotalMs())
+    }, SearchHitFlash.START_DELAY_MS)
+    return () => {
+      window.clearTimeout(startTimer)
+      window.clearTimeout(clearTimer)
+      window.clearTimeout(fadeTimer)
+    }
+  }, [pendingFlash, flashShown, activeSurahId])
+
   const landing = turning ? motion.flight.to : settled
   const forward = landing > settled
   const fit = turning ? motion.fit : (mushafFit(settled, facing, fits) ?? 1)
@@ -837,7 +877,7 @@ export function MushafReader({
         }}
       >
         <MushafLeaf page={under} fit={turning && !forward ? motion.fromFit : fit} leafRef={rectoRef} {...leafProps}
-          live={leafLive(under)} onFit={turning ? noFit : reportFit} />
+          live={leafLive(under)} onFit={turning ? noFit : reportFit} flash={turning ? null : flash} />
         <span className="mushaf-feather mushaf-feather--left" aria-hidden="true" />
         <span className="mushaf-feather mushaf-feather--right" aria-hidden="true" />
         {probes}
@@ -870,7 +910,7 @@ export function MushafReader({
   return (
     <WordMotionProvider>
       <MushafLeaf page={rectoPage} side="recto" fit={turning && forward ? motion.fromFit : fit} leafRef={rectoRef} {...leafProps}
-        live={live} onFit={turning ? noFit : reportFit} />
+        live={live} onFit={turning ? noFit : reportFit} flash={turning ? null : flash} />
       {probes}
       <button
         type="button"
@@ -885,7 +925,7 @@ export function MushafReader({
         ? createPortal(
             <>
               <MushafLeaf page={versoPage} side="verso" fit={turning && !forward ? motion.fromFit : fit} style={versoBox} {...leafProps}
-                live={live} onFit={turning ? noFit : reportFit} />
+                live={live} onFit={turning ? noFit : reportFit} flash={turning ? null : flash} />
               <button
                 type="button"
                 className="mushaf-turn mushaf-turn--forward"
@@ -1032,7 +1072,10 @@ function MushafLeaf({
   onTurn,
   fit,
   onFit,
+  flash = null,
 }: {
+  /** The search hit breathing on this settled leaf, if any. */
+  flash?: MushafSearchFlash | null
   page: number
   fitRevision: number
   /** Extra chapter furniture sets the same row pitch on both leaves. */
@@ -1293,8 +1336,12 @@ function MushafLeaf({
         <div
           className="mushaf-lines"
           data-opening={opening || undefined}
+          data-search-flash={flash != null && !still ? true : undefined}
+          data-search-focus-active={flash?.focusActive && !still ? true : undefined}
           ref={linesRef}
           style={{
+            ['--search-background-alpha' as string]: String(SearchHitFlash.BACKGROUND_ALPHA),
+            ['--search-focus-fade-ms' as string]: `${SearchHitFlash.FOCUS_FADE_MS}ms`,
             ['--mushaf-fit' as string]: String(fit),
             ['--mushaf-slots' as string]: String(Math.max(MUSHAF_LINES_PER_PAGE, leaf.lines.length, peerSlots)),
             ['--recess-ms' as string]: `${tuning.recessMs}ms`,
@@ -1359,6 +1406,7 @@ function MushafLeaf({
                         activation={owner ? (ink.activeWord?.activation ?? 0) : 0}
                         onPlay={() => playRef.current(surahId, ayah, position)}
                         onHold={() => holdRef.current(surahId, ayah, position, side)}
+                        flashRole={mushafFlashRole(flash, surahId, ayah, position)}
                       />
                     )}
                     {endsAyah ? (
@@ -1403,7 +1451,9 @@ const MushafWord = memo(function MushafWord({
   onPlay,
   onHold,
   tabIndex,
+  flashRole = null,
 }: {
+  flashRole?: 'hit' | 'recessed' | null
   token: MushafToken
   motion: WordMotion
   ink: InkWord
@@ -1425,6 +1475,8 @@ const MushafWord = memo(function MushafWord({
       motion={motion}
       activation={activation}
       tabIndex={tabIndex}
+      searchFlash={flashRole === 'hit'}
+      searchRecessed={flashRole === 'recessed'}
       onPlay={onPlay}
       onHold={onHold}
       onContextMenu={(event) => {
@@ -1436,6 +1488,7 @@ const MushafWord = memo(function MushafWord({
 }, (prev, next) =>
   prev.token === next.token &&
   prev.tabIndex === next.tabIndex &&
+  prev.flashRole === next.flashRole &&
   prev.ink.state === next.ink.state &&
   prev.ink.repeat === next.ink.repeat &&
   prev.sweepMs === next.sweepMs &&

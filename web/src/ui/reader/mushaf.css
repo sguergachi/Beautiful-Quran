@@ -271,13 +271,24 @@
   to { -webkit-mask-position: 100% 0; mask-position: 100% 0; }
 }
 
-/* Search hit: the found verse's words breathe on the settled leaf. */
-.mushaf-lines [data-search-hit] .hafs-glyph,
-.mushaf-lines .hafs-word[data-search-hit] {
-  animation: mushaf-search-breath calc(var(--search-breath-ms, 790ms)) cubic-bezier(0.45, 0, 0.55, 1) 140ms 3 both;
+/* Search hit on the settled leaf (Android MushafPager flashAyah): the found
+   words breathe orange (HafsWord searchFlash, the scroll reader's clock)
+   while the rest of the page recedes behind 60% paper. Arabic is covered
+   rather than alpha-dimmed, so glyphs and overlapping marks stay opaque. */
+.mushaf-lines[data-search-flash='true'] .hafs-word[data-search-recessed='true'] .ink-paper-cover {
+  transition: opacity var(--search-focus-fade-ms, 280ms) var(--recede-ease, ease) !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
 }
 
-@keyframes mushaf-search-breath {
-  0%, 100% { color: inherit; }
-  45% { color: var(--gold); }
+.mushaf-lines[data-search-focus-active='true'] .hafs-word[data-search-recessed='true'] .ink-paper-cover {
+  opacity: calc(1 - var(--search-background-alpha, 0.4)) !important;
+}
+
+.mushaf-lines[data-search-flash='true'] :is(.mushaf-mark, .mushaf-basmalah, .mushaf-chapter-slot) {
+  transition: opacity var(--search-focus-fade-ms, 280ms) var(--recede-ease, ease);
+}
+
+.mushaf-lines[data-search-focus-active='true'] :is(.mushaf-mark, .mushaf-basmalah, .mushaf-chapter-slot) {
+  opacity: var(--search-background-alpha, 0.4);
 }
