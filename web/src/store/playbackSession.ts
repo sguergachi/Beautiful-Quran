@@ -7,8 +7,8 @@ import type { PlayerState } from '../playback/player'
  * Android loads a playlist only when the reader asks to listen, so opening
  * a chapter never raises the transport. The web parks a quiet, paused
  * playlist on every chapter open so the first Play is instant; that parked
- * clip must not count. A session begins when playback starts (play intent:
- * playing or buffering toward play) and follows the recitation as it
+ * clip must not count. A session begins when playback starts and follows
+ * the recitation as it
  * advances through the chapter. A quiet open of another chapter changes
  * `nowPlaying` without starting anything, so the old session no longer
  * matches it and the transport stays down. Stop clears it.
@@ -20,10 +20,10 @@ export function nextPlaybackSession(
 ): number | null {
   const np = next.nowPlaying
   if (np == null) return null
-  const active = next.isPlaying || next.isBuffering
-  if (!active) return session
-  const wasActive = prev.isPlaying || prev.isBuffering
-  if (!wasActive) return np.surahId
+  // isPlaying is published with play intent, before the clip is ready.
+  // Buffering alone is no intent: a parked clip's preload fires `stalled`.
+  if (!next.isPlaying) return session
+  if (!prev.isPlaying) return np.surahId
   // Already listening: a new ayah of the same chapter is the recitation
   // moving on (including into a chapter auto-advanced to). A chapter swap
   // with no ayah step is a quiet open landing while the old clip pauses.

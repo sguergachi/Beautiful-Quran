@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type 
 import type { Surah } from '../../data/models'
 import { exceedsWordHoldSlop } from '../../render/useWordInteraction'
 import { HOLD_FILL_MS, HOLD_START_MS, HOLD_TAP_MAX_MS, holdOutcome } from './pinnedChapters'
+import { VerseBookmarkRibbon } from '../../render/VerseBookmarkRibbon'
+import { holdHaptic } from './holdHaptics'
 
 /**
  * One chapter row, in order or pinned on the band (Android `SurahRow`).
@@ -20,6 +22,8 @@ export function ChapterRow({
   onBand,
   drying,
   holdable,
+  placeAyah = null,
+  placeUnfurlSignal = 0,
   onPrepare,
   onOpen,
   onToggle,
@@ -33,12 +37,18 @@ export function ChapterRow({
   /** Just pinned or unpinned: travels above the rest, its wet ink drying. */
   drying: boolean
   holdable: boolean
+  /** The last-heard ayah when this row owns the reading place: it carries
+   * the green place ribbon in its lane (Android `SurahRow.currentAyah`). */
+  placeAyah?: number | null
+  /** Replays the place ribbon's unfurl (returning from the reader). */
+  placeUnfurlSignal?: number
   onPrepare: () => void
   onOpen: () => void
   onToggle: () => void
 }) {
   const [holding, setHolding] = useState(false)
   const fullTimer = useRef<number | null>(null)
+  const tickTimer = useRef<number | null>(null)
   const start = useRef<{ x: number; y: number; at: number } | null>(null)
   // A press that was a hold (full, let go early, or dragged off) is not a
   // click. Stamped, so a click that never comes cannot swallow a later one.
@@ -49,12 +59,15 @@ export function ChapterRow({
 
   const endHold = () => {
     if (fullTimer.current != null) window.clearTimeout(fullTimer.current)
+    if (tickTimer.current != null) window.clearTimeout(tickTimer.current)
     fullTimer.current = null
+    tickTimer.current = null
     start.current = null
     setHolding(false)
   }
   useEffect(() => () => {
     if (fullTimer.current != null) window.clearTimeout(fullTimer.current)
+    if (tickTimer.current != null) window.clearTimeout(tickTimer.current)
   }, [])
 
   const onPointerDown = (event: PointerEvent) => {
@@ -66,11 +79,18 @@ export function ChapterRow({
     if (event.pointerType === 'mouse' && (event.button !== 0 || event.ctrlKey)) return
     start.current = { x: event.clientX, y: event.clientY, at: event.timeStamp }
     setHolding(true)
+    // The hold has taken: a soft tick as the fill begins (Android CLOCK_TICK).
+    tickTimer.current = window.setTimeout(() => {
+      tickTimer.current = null
+      holdHaptic('engaged')
+    }, HOLD_START_MS)
     fullTimer.current = window.setTimeout(() => {
       fullTimer.current = null
       swallowNextClick()
       start.current = null
       setHolding(false)
+      // Full is the confirmation: a firm tick (Android CONFIRM).
+      holdHaptic('confirmed')
       onToggle()
     }, HOLD_START_MS + HOLD_FILL_MS)
   }
@@ -126,6 +146,24 @@ export function ChapterRow({
       data-drying={drying || undefined}
     >
       <span className="pin-fill" aria-hidden="true" />
+      {placeAyah != null ? (
+        <span className="surah-place-ribbon" aria-hidden="true">
+          <VerseBookmarkRibbon
+            bookmarked={false}
+            placeMarked
+            focused={false}
+            side="left"
+            interactive={false}
+            animateOnTap={false}
+            topInset={0}
+            bottomGap={0}
+            edgeInset={7.5}
+            unfurlSignal={placeUnfurlSignal}
+            onToggle={() => false}
+            decorative
+          />
+        </span>
+      ) : null}
       <button
         type="button"
         className="surah-row"
@@ -145,6 +183,10 @@ export function ChapterRow({
         onKeyDown={onKeyDown}
         onClick={onClick}
       >
+        {placeAyah != null ? (
+          <span className="visually-hidden">Current place, ayah {placeAyah}. </span>
+        ) : null}
+        {pinned ? <span className="visually-hidden">Pinned. </span> : null}
         <span className="surah-num">{surah.id}</span>
         <span className="surah-names">
           <span className="en">{surah.nameTransliteration}</span>

@@ -5,12 +5,13 @@
  * rearm lessons without rewriting every Settings field.
  */
 
-export type EducationMoment = 'bookmark_saved' | 'ayah_rail' | 'word_hold'
+export type EducationMoment = 'bookmark_saved' | 'ayah_rail' | 'word_hold' | 'pin_chapter'
 
 const DISMISS_KEYS: Record<EducationMoment, string> = {
   word_hold: 'beautiful-quran-education-word-hold-v1',
   bookmark_saved: 'beautiful-quran-education-bookmark-saved-v2',
   ayah_rail: 'beautiful-quran-education-ayah-rail-v1',
+  pin_chapter: 'beautiful-quran-education-pin-chapter-v1',
 }
 
 /** Fallback when localStorage is missing (Vitest node) or blocked. */

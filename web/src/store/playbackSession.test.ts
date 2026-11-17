@@ -36,6 +36,11 @@ describe('playback session', () => {
     expect(hasPlaybackSession(run(states), states.at(-1)!)).toBe(false)
   })
 
+  it('a parked clip stalling in preload is not a session', () => {
+    const states = [at(1, 1), at(1, 1, { isBuffering: true }), at(1, 1)]
+    expect(hasPlaybackSession(run(states), states.at(-1)!)).toBe(false)
+  })
+
   it('pressing play starts the session, and pausing keeps it', () => {
     const states = [at(2, 1), at(2, 1, { isBuffering: true }), at(2, 1, { isPlaying: true }), at(2, 2, { isPlaying: true }), at(2, 2)]
     expect(hasPlaybackSession(run(states), states.at(-1)!)).toBe(true)

@@ -40,9 +40,13 @@ export function showsPreviewWordGloss(
   return showsWordGlossChrome(mode) && showWordGloss
 }
 
-/** Web is the Scroll reader, so its search always uses the timed English gloss. */
-export function wordSearchSources(): WordSearchSources {
-  return { arabic: false, wordGloss: true, transliteration: false, verseTranslation: false }
+/** Search uses the selected layout's English (Android `wordSearchSources`):
+ * the timed word gloss on the Scroll, the flowing verse translation on the
+ * Mushaf leaf. */
+export function wordSearchSources(layout: ReadingLayout = 'scroll'): WordSearchSources {
+  return layout === 'mushaf'
+    ? { arabic: false, wordGloss: false, transliteration: false, verseTranslation: true }
+    : { arabic: false, wordGloss: true, transliteration: false, verseTranslation: false }
 }
 
 export function themeLabel(mode: Settings['themeMode']): string {

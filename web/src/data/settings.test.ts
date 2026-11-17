@@ -7,7 +7,7 @@ import {
   showsWordGlossChrome,
   wordSearchSources,
 } from './customizePolicy'
-import { HOME_BOOKMARK_STYLES, normalizeSettings } from './settings'
+import { normalizeSettings } from './settings'
 
 describe('favorite reciters', () => {
   it('keeps page pictures across listening updates and invalidates visual changes', () => {
@@ -59,21 +59,9 @@ describe('favorite reciters', () => {
 })
 
 describe('home bookmark settings', () => {
-  it('defaults removed or absent values to the top-bound ribbon', () => {
-    expect(normalizeSettings().homeBookmarkStyle).toBe('top_bound')
-    expect(
-      normalizeSettings({ homeBookmarkStyle: 'removed_style' as never })
-        .homeBookmarkStyle,
-    ).toBe('top_bound')
-  })
-
-  it('preserves every experiment and keeps it independent of developer mode', () => {
-    for (const homeBookmarkStyle of HOME_BOOKMARK_STYLES) {
-      expect(
-        normalizeSettings({ homeBookmarkStyle, developerMode: false })
-          .homeBookmarkStyle,
-      ).toBe(homeBookmarkStyle)
-    }
+  it('drops the retired Chapters bookmark experiment on load', () => {
+    const legacy = normalizeSettings({ homeBookmarkStyle: 'saved_passages' } as Parameters<typeof normalizeSettings>[0])
+    expect(legacy).not.toHaveProperty('homeBookmarkStyle')
   })
 })
 
@@ -140,6 +128,12 @@ describe('customize reading settings', () => {
       wordGloss: true,
       transliteration: false,
       verseTranslation: false,
+    })
+    expect(wordSearchSources('mushaf')).toEqual({
+      arabic: false,
+      wordGloss: false,
+      transliteration: false,
+      verseTranslation: true,
     })
   })
 

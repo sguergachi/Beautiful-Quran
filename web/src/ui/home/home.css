@@ -1,0 +1,554 @@
+/* Chapters (Android HomeScreen) — loaded before styles.css, so every override
+   here is scoped under the sheet to outrank the shared rules. */
+
+/* Junicode is drawn unhinted; whole-pixel advances at 12–13px open gaps
+   inside words ("T he Cow"). Android sets its book text on linear metrics
+   for the same reason (Type.kt, TextMotion.Animated). */
+.sheet[data-name='home'],
+.sheet[data-name='bookmarks'] {
+  text-rendering: geometricPrecision;
+}
+
+/* —— Masthead —— */
+.sheet[data-name='home'] .home-title {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  padding: 0;
+  text-align: start;
+  cursor: pointer;
+}
+
+.sheet[data-name='home'] .home-title:focus-visible {
+  outline: none;
+  text-decoration: underline;
+  text-decoration-color: var(--green-quiet);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 6px;
+}
+
+/* Android tints the tune glyph with the quiet ink rung, read against the
+   masthead: it sits nearer the title than the furniture grey. */
+.sheet[data-name='home'] .home-settings {
+  color: var(--ink-rung-secondary);
+}
+
+/* —— Chapter rows (Android SurahRow) —— */
+.sheet[data-name='home'] .surah-row {
+  /* Number, names and Arabic share the row's vertical centre. */
+  align-items: center;
+}
+
+.sheet[data-name='home'] .surah-num {
+  /* labelMedium: lining figures, set solid, Junicode at 0.969. */
+  font-size: 12.6px;
+  letter-spacing: 0;
+  font-variant-numeric: lining-nums;
+}
+
+.sheet[data-name='home'] .surah-names .en {
+  font-size: 16.5px;
+}
+
+.sheet[data-name='home'] .surah-names .meta {
+  font-size: 12.6px;
+  font-variant-numeric: lining-nums;
+}
+
+/* No hover band, no pressed tint: Android rows answer only the hold. */
+@media (hover: hover) {
+  .sheet[data-name='home'] .surah-row:hover {
+    background: transparent;
+  }
+}
+
+.sheet[data-name='home'] .surah-row:active {
+  background: transparent;
+}
+
+/* Keyboard focus as a wash inside the row, never a box past its edge. */
+.sheet[data-name='home'] .surah-row:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--green-wash) 70%, transparent);
+}
+
+.sheet[data-name='home'] .surah-row:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* The place ribbon hangs in the 28px lane at the row's left, 44px tall. */
+.surah-place-ribbon {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 28px;
+  height: 44px;
+  transform: translateY(-50%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.surah-place-ribbon .verse-ribbon {
+  width: 28px;
+}
+
+/* —— Continue pill (Android ContinuePill) —— */
+.continue-float {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  width: min(100%, var(--home-max));
+  margin-inline: auto;
+  padding-inline: 16px;
+  z-index: 7;
+  pointer-events: none;
+}
+
+.continue-float .continue,
+.continue-ghost .continue {
+  pointer-events: auto;
+}
+
+.continue-float .continue {
+  opacity: 0;
+  transform: translateY(50%);
+  transition:
+    opacity 220ms ease,
+    transform 260ms ease;
+}
+
+.continue-float[data-shown] .continue {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 280ms ease,
+    transform 320ms var(--ease-sheet, ease);
+}
+
+.continue-float:not([data-shown]) .continue {
+  pointer-events: none;
+}
+
+.continue-float[data-instant] .continue {
+  transition: none;
+}
+
+.continue-ghost {
+  position: absolute;
+  z-index: 7;
+  overflow: hidden;
+  border-radius: 28px;
+  pointer-events: none;
+}
+
+.continue-ghost .continue {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background: var(--green-wash);
+}
+
+/* The pill's name is the primary green; its place and Arabic the green ink. */
+.continue .continue-name {
+  color: var(--accent);
+  font-size: 16.5px;
+}
+
+.continue .continue-number {
+  font-size: 12.6px;
+  font-variant-numeric: lining-nums;
+}
+
+.scroll-with-continue {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+}
+
+/* —— Floating transport (Android FloatingPlaybackControl) —— */
+.floating-play.home-float {
+  padding: 1.1rem var(--sheet-pad) calc(0.25rem + env(safe-area-inset-bottom, 0px));
+  gap: 0;
+  color: var(--ink-muted);
+  animation: home-float-in 320ms ease;
+}
+
+.floating-play.home-float[data-leaving] {
+  animation: home-float-out 260ms ease forwards;
+}
+
+@keyframes home-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+@keyframes home-float-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+.home-float .home-float-reciter {
+  min-height: 32px;
+  align-items: center;
+}
+
+.home-float-reciter-btn {
+  color: var(--ink-rung-quiet);
+  font-size: 12.6px;
+  font-weight: 500;
+  padding: 0.2rem 1rem;
+  min-height: 32px;
+  max-width: min(100% - 6rem, 22rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-float-reciter-btn::after {
+  content: '›';
+  display: inline-block;
+  width: 16px;
+  margin-inline-start: 2px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--ink-muted);
+}
+
+.home-float-reciter-btn::before {
+  content: '';
+  display: inline-block;
+  width: 18px;
+}
+
+/* A notice takes the reciter's band; its dismiss sits at the start, clear
+   of Close at the end (Android noticeDismissAtStart). */
+.home-float .home-float-error {
+  width: 100%;
+  margin-inline: 0;
+  padding-inline: 44px;
+}
+
+.home-float .home-float-error .player-error-dismiss {
+  left: -8px;
+  right: auto;
+}
+
+.home-float .player-return {
+  margin-block: 2px 6px;
+}
+
+.player-return-sep {
+  white-space: pre;
+}
+
+.home-float .home-float-transport {
+  padding: 0 12px 4px;
+}
+
+.home-float-ctrl,
+.home-float-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--ink-muted);
+}
+
+.home-float-ctrl {
+  width: 48px;
+  height: 48px;
+}
+
+.home-float-play {
+  width: 56px;
+  height: 56px;
+}
+
+.home-float-ctrl svg {
+  width: 24px;
+  height: 24px;
+}
+
+.home-float-play svg {
+  width: 34px;
+  height: 34px;
+}
+
+.home-float-repeat,
+.home-float-speed {
+  color: var(--ink-rung-furniture);
+}
+
+.home-float-repeat[data-active],
+.home-float-speed[data-active] {
+  color: var(--accent);
+}
+
+.home-float-speed {
+  font-size: 12.6px;
+  font-weight: 500;
+  font-variant-numeric: lining-nums;
+}
+
+.home-float-close {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-rung-furniture);
+}
+
+.home-float-close svg {
+  width: 20px;
+  height: 20px;
+}
+
+@media (hover: hover) {
+  .home-float-ctrl:hover,
+  .home-float-play:hover,
+  .home-float-reciter-btn:hover {
+    color: var(--accent);
+  }
+}
+
+/* —— Search dials (Android SearchDialsPane) —— */
+.search-dials {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 18px;
+  border-radius: 24px;
+  background: var(--paper-surface);
+  border: 1px solid var(--ink-rung-hairline);
+  opacity: 0;
+  transition-property: opacity;
+  transition-timing-function: ease;
+  touch-action: pan-y;
+}
+
+.search-dials[data-visible] {
+  opacity: 1;
+}
+
+.search-dials-header {
+  display: flex;
+  margin-bottom: 4px;
+}
+
+.search-dials-label {
+  color: var(--ink-rung-muted);
+  font-size: 12.6px;
+  font-weight: 500;
+}
+
+.search-dials-label-surah {
+  flex: 1.7;
+  padding-inline-start: calc(8px + 22px + 8px);
+}
+
+.search-dials-label-ayah {
+  flex: 1;
+  margin-inline-start: 12px;
+  text-align: center;
+}
+
+.search-dials-wheels {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+}
+
+.search-dials-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 42px;
+  transform: translateY(-50%);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  pointer-events: none;
+}
+
+.search-dial {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+  /* Rows dissolve into the pane's paper at both ends. */
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 22%,
+    #000 78%,
+    transparent
+  );
+}
+
+.search-dial::-webkit-scrollbar {
+  display: none;
+}
+
+.search-dial-surah {
+  flex: 1.7;
+}
+
+.search-dial-ayah {
+  flex: 1;
+}
+
+.search-dial-item {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  scroll-snap-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.search-dial-surah-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding-inline: 8px;
+  min-width: 0;
+}
+
+.search-dial-surah-num {
+  flex: 0 0 22px;
+  font-size: 12.6px;
+  font-weight: 500;
+  font-variant-numeric: lining-nums;
+  color: var(--ink-rung-quiet);
+}
+
+.search-dial-surah-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15.5px;
+  color: var(--ink-rung-muted);
+}
+
+.search-dial-surah-ar {
+  font-family: var(--font-arabic);
+  font-size: 18px;
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.search-dial-surah-item[data-selected] .search-dial-surah-num {
+  color: var(--gold-ink);
+}
+
+.search-dial-surah-item[data-selected] .search-dial-surah-name {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.search-dial-surah-item[data-selected] .search-dial-surah-ar {
+  color: color-mix(in srgb, var(--accent) 90%, transparent);
+}
+
+.search-dial-ayah-item {
+  width: 100%;
+  text-align: center;
+  font-size: 16.5px;
+  font-variant-numeric: lining-nums;
+  color: var(--ink-rung-muted);
+}
+
+.search-dial-ayah-item[data-selected] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.search-dials-go {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.search-dials-target {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14.5px;
+  font-variant-numeric: lining-nums;
+  color: var(--ink-rung-secondary);
+}
+
+.search-dials-open {
+  padding: 9px 22px;
+  border-radius: 999px;
+  background: var(--gold);
+  /* Android OnGold: dark ink readable on light and dark gold. */
+  color: #241b00;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* —— Search results (Android WordSearchHitRow / SurahHeader) —— */
+.sheet[data-name='home'] .word-search-mark {
+  color: var(--gold);
+  font-weight: 500;
+}
+
+.sheet[data-name='home'] .word-search-surah-header {
+  align-items: center;
+}
+
+.sheet[data-name='home'] .word-search-surah-count {
+  color: var(--gold-ink);
+  font-size: 12.6px;
+  font-weight: 500;
+  font-variant-numeric: lining-nums;
+}
+
+.sheet[data-name='home'] .word-search-surah-ar {
+  font-size: 20px;
+  line-height: 1.2;
+  color: var(--green-ink);
+}
+
+.sheet[data-name='home'] .search-empty {
+  color: var(--ink-rung-quiet);
+  font-size: 16.5px;
+  line-height: 26px;
+}
+
+@media (hover: hover) {
+  .sheet[data-name='home'] .word-search-hit:hover {
+    background: transparent;
+  }
+}
+
+.sheet[data-name='home'] .word-search-hit:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--green-wash) 70%, transparent);
+}
+
+/* —— Pin lesson —— */
+.pin-chapter-tip {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  pointer-events: none;
+}
