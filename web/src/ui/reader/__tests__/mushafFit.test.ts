@@ -6,9 +6,33 @@ import {
   mushafLeafFit,
   mushafLineGaps,
   mushafMeasure,
+  mushafMedallionChords,
+  mushafMedallionScale,
+  mushafMedallionSlot,
   naturalLineWidth,
   solveLine,
 } from '../mushafFit'
+
+describe('medallion', () => {
+  it('sets rows to the chords of a circle', () => {
+    const chords = mushafMedallionChords(4)
+    expect(chords).toHaveLength(4)
+    expect(chords[0]).toBeCloseTo(Math.sqrt(1 - 0.75 * 0.75))
+    expect(chords[1]).toBeCloseTo(Math.sqrt(1 - 0.25 * 0.25))
+    expect(chords[0]).toBeCloseTo(chords[3]!)
+    expect(mushafMedallionChords(0)).toEqual([])
+  })
+  it('sets the medallion down by its tightest row, never under half', () => {
+    expect(mushafMedallionScale([50, 80], [0.5, 1], 100)).toBe(1)
+    expect(mushafMedallionScale([100, 80], [0.5, 1], 100)).toBeCloseTo(0.5)
+    expect(mushafMedallionScale([200], [0.5], 100)).toBe(0.5)
+  })
+  it('makes the block as tall as it is wide within the well', () => {
+    expect(mushafMedallionSlot(300, 6, 600, 30)).toBe(50)
+    expect(mushafMedallionSlot(300, 6, 240, 30)).toBe(40)
+    expect(mushafMedallionSlot(100, 6, 600, 30)).toBe(30)
+  })
+})
 
 describe('incoming page fit', () => {
   it('waits for both incoming leaves, including the hidden recto', () => {

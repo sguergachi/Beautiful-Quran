@@ -21,7 +21,7 @@ import { BookSpread } from './paper/BookSpread'
 import { PAGE_TURN_SCHEDULE, playFlip, unlockPageTurnSounds } from './paper/pageTurnSounds'
 import { useSheetFocus } from './paper/sheetFocus'
 import { useVerseRoute } from './useVerseRoute'
-import { stackSwipeDestination } from './paper/stackSwipe'
+import { STACK_SWIPE_AXIS_BIAS, stackDragPosition, stackDragRange, stackSwipeDestination } from './paper/stackSwipe'
 
 /** True while the URL hash routes to the Ornaments Lab (`#lab`). */
 function useLabRoute(): boolean {
@@ -93,7 +93,8 @@ export function App() {
   }, [])
   const isLab = useLabRoute()
   useVerseRoute(state.ready, state.readingPlace, state.readerOpenRevision, () => setEntranceDone(true))
-  const swipeStart = useRef<{ x: number; y: number; pointerId: number; layer: StackLayer; field: boolean; at: number } | null>(null)
+  const swipeStart = useRef<{ x: number; y: number; pointerId: number; layer: StackLayer; field: boolean; at: number; axis?: 'x' | 'y'; range?: { start: number; lo: number; hi: number } | null } | null>(null)
+  const shellRef = useRef<HTMLDivElement>(null)
   const stack = state.stackLayer
   // The layer the deck last settled from, so Chapters ↔ Settings can skip
   // the reader sheet between them instead of sweeping it across the page.
@@ -213,6 +214,46 @@ export function App() {
     swipeStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId, layer, field, at: event.timeStamp }
   }
 
+  // Phone: the held sheets follow the finger (Android paperStackDrag), one
+  // layer either way. The position is written straight to the shell so a
+  // stroke never re-renders the paper stack.
+  const releaseStackDrag = () => {
+    const shell = shellRef.current
+    if (!shell || shell.dataset.dragging !== 'true') return false
+    delete shell.dataset.dragging
+    shell.style.removeProperty('--stack-pos')
+    // The stroke ends in a pointerup; the click that follows is not a tap.
+    const swallow = (click: MouseEvent) => { click.preventDefault(); click.stopPropagation() }
+    window.addEventListener('click', swallow, { capture: true, once: true })
+    window.setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 0)
+    return true
+  }
+
+  const holdStackSheet = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = swipeStart.current
+    if (spread || !start || start.pointerId !== event.pointerId || start.axis === 'y') return
+    const dx = event.clientX - start.x
+    const dy = event.clientY - start.y
+    const shell = shellRef.current
+    if (!shell) return
+    if (start.axis == null) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 10) return
+      if (Math.abs(dx) <= Math.abs(dy) * STACK_SWIPE_AXIS_BIAS || !window.matchMedia('(max-width: 899px)').matches) {
+        start.axis = 'y'
+        return
+      }
+      start.axis = 'x'
+      start.range = stackDragRange({
+        layer: start.layer, hasReader, hasBookmarks: state.bookmarks.length > 0,
+        settingsOrigin: state.settingsOrigin, mushafReaderOnTop: state.settings.readingLayout === 'mushaf',
+      })
+      if (!start.range) return
+      shell.dataset.dragging = 'true'
+    }
+    if (!start.range) return
+    shell.style.setProperty('--stack-pos', String(stackDragPosition(start.range, dx, window.innerWidth)))
+  }
+
   const finishBookmarkSwipe = (event: ReactPointerEvent<HTMLDivElement>) => {
     const start = swipeStart.current
     swipeStart.current = null
@@ -220,6 +261,7 @@ export function App() {
     const dx = event.clientX - start.x
     const dy = event.clientY - start.y
     if (!spread) {
+      releaseStackDrag()
       // One sheet per stroke; Chapters never closes the book on a phone.
       const to = stackSwipeDestination({
         layer: start.layer, dx, dy, ms: event.timeStamp - start.at, width: window.innerWidth,
@@ -241,6 +283,7 @@ export function App() {
 
   return (
     <div
+      ref={shellRef}
       className="app-shell"
       data-stack={stack}
       data-underlay={underlay}
@@ -251,8 +294,9 @@ export function App() {
       data-leaves={leaves ? 'true' : undefined}
       data-booting={showStack ? undefined : 'true'}
       onPointerDown={beginBookmarkSwipe}
+      onPointerMove={holdStackSheet}
       onPointerUp={finishBookmarkSwipe}
-      onPointerCancel={() => { swipeStart.current = null }}
+      onPointerCancel={() => { swipeStart.current = null; releaseStackDrag() }}
     >
       {showStack && (
         <>

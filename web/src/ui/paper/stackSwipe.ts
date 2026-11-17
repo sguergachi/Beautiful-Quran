@@ -26,6 +26,41 @@ export interface StackSwipe {
   mushafReaderOnTop: boolean
 }
 
+export interface StackDrag {
+  /** The layer the stack rests on when the stroke begins. */
+  layer: StackLayer
+  hasReader: boolean
+  hasBookmarks: boolean
+  /** The layer Settings was opened over (it returns there). */
+  settingsOrigin: StackLayer
+  mushafReaderOnTop: boolean
+}
+
+/**
+ * The span a held stroke may move the stack through — one layer either
+ * way (Android `paperStackDrag` onDrag), or null when the stroke cannot
+ * hold a sheet (the Mushaf turns its own leaves). Settings opened straight
+ * over Chapters starts one layer above Chapters, so its stroke turns
+ * Chapters back in rather than the hidden reader between them.
+ */
+export function stackDragRange(drag: StackDrag): { start: number; lo: number; hi: number } | null {
+  if (drag.mushafReaderOnTop && drag.layer === READER_LAYER) return null
+  const top = settingsLayerFor(drag.hasReader)
+  const start = drag.layer === top && drag.layer > COVER_LAYER
+    ? Math.min(drag.layer, Math.max(drag.settingsOrigin, COVER_LAYER) + 1)
+    : drag.layer
+  const min = drag.hasBookmarks ? BOOKMARKS_LAYER : COVER_LAYER
+  const lo = Math.max(start - 1, min)
+  const hi = Math.min(start + 1, top)
+  return lo < hi ? { start, lo, hi } : null
+}
+
+/** Where the held sheets stand for a finger `dx` pixels along the stroke. */
+export function stackDragPosition(range: { start: number; lo: number; hi: number }, dx: number, width: number): number {
+  if (width <= 0) return range.start
+  return Math.min(range.hi, Math.max(range.lo, range.start - dx / width))
+}
+
 /** Where a released stroke turns the stack, or null when it turns nothing. */
 export function stackSwipeDestination(swipe: StackSwipe): StackLayer | 'back' | null {
   const { layer, dx, dy, ms, width } = swipe
