@@ -5,12 +5,13 @@
  * rearm lessons without rewriting every Settings field.
  */
 
-export type EducationMoment = 'bookmark_saved' | 'ayah_rail' | 'word_hold'
+export type EducationMoment = 'bookmark_note' | 'ayah_rail' | 'word_hold' | 'pin_chapter'
 
 const DISMISS_KEYS: Record<EducationMoment, string> = {
   word_hold: 'beautiful-quran-education-word-hold-v1',
-  bookmark_saved: 'beautiful-quran-education-bookmark-saved-v2',
+  bookmark_note: 'beautiful-quran-education-bookmark-note-v1',
   ayah_rail: 'beautiful-quran-education-ayah-rail-v1',
+  pin_chapter: 'beautiful-quran-education-pin-chapter-v1',
 }
 
 /** Fallback when localStorage is missing (Vitest node) or blocked. */
@@ -58,26 +59,36 @@ export function rearmEducation(): void {
   }
 }
 
-/** Whether a settled chapter opening should teach its live ayah rail. */
+/**
+ * Whether a settled chapter opening should teach its live ayah rail.
+ * Lessons are developer-gated, as Android `ReaderViewModel.shouldShowAyahRailTip`.
+ */
 export function shouldShowAyahRailTip(opts: {
   educationGuidesEnabled: boolean
+  developerMode: boolean
 }): boolean {
   return (
+    opts.developerMode &&
     opts.educationGuidesEnabled &&
     !isEducationDismissed('ayah_rail')
   )
 }
 
 /**
- * Confirm the first saved bookmark and explain where its saved passages live.
+ * On a fresh bookmark, teach that holding the saved ribbon writes a note —
+ * Android `toggleBookmark().showNoteTip`.
  */
 export function shouldShowBookmarkTip(opts: {
   educationGuidesEnabled: boolean
+  developerMode: boolean
+  annotationsEnabled: boolean
   nowBookmarked: boolean
 }): boolean {
   return (
     opts.nowBookmarked &&
+    opts.developerMode &&
     opts.educationGuidesEnabled &&
-    !isEducationDismissed('bookmark_saved')
+    opts.annotationsEnabled &&
+    !isEducationDismissed('bookmark_note')
   )
 }

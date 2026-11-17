@@ -1,4 +1,5 @@
 import type {
+  EnglishLeafText,
   ReadingLayout,
   ReadingMode,
   Settings,
@@ -28,6 +29,33 @@ export function applyReadingMode(mode: ReadingMode): Partial<Settings> {
   return { readingMode: mode }
 }
 
+/** Which English the English Mushaf leaf may be set from (Android ENGLISH_LEAF_TEXTS). */
+export const ENGLISH_LEAF_TEXTS: EnglishLeafText[] = ['translation', 'gloss']
+
+/** Printed mushaf has no annotation margin, no ayah rail and no size dial. */
+export function showsScrollChrome(layout: ReadingLayout): boolean {
+  return layout === 'scroll'
+}
+
+/** The faded leaf only shows a sample ḥāshiya on a scroll page with notes on. */
+export function showsPreviewAnnotation(layout: ReadingLayout, annotationsEnabled: boolean): boolean {
+  return showsScrollChrome(layout) && annotationsEnabled
+}
+
+/**
+ * Verse-mark script is offered wherever Western digits are a real option:
+ * every scroll view, and the English leaf. The Arabic leaf's marks are drawn
+ * by the page face and cannot be restyled.
+ */
+export function showsVerseNumberChrome(layout: ReadingLayout, mode: ReadingMode): boolean {
+  return showsScrollChrome(layout) || mode === 'english_only'
+}
+
+/** Only the English leaf asks which English to set (Android CustomizeScreen). */
+export function showsEnglishLeafChrome(layout: ReadingLayout, mode: ReadingMode): boolean {
+  return layout === 'mushaf' && mode === 'english_only'
+}
+
 /** Word gloss lives under Arabic tiles — only the bilingual scroll view. */
 export function showsWordGlossChrome(mode: ReadingMode): boolean {
   return mode === 'arabic_english'
@@ -40,9 +68,13 @@ export function showsPreviewWordGloss(
   return showsWordGlossChrome(mode) && showWordGloss
 }
 
-/** Web is the Scroll reader, so its search always uses the timed English gloss. */
-export function wordSearchSources(): WordSearchSources {
-  return { arabic: false, wordGloss: true, transliteration: false, verseTranslation: false }
+/** Search uses the selected layout's English (Android `wordSearchSources`):
+ * the timed word gloss on the Scroll, the flowing verse translation on the
+ * Mushaf leaf. */
+export function wordSearchSources(layout: ReadingLayout = 'scroll'): WordSearchSources {
+  return layout === 'mushaf'
+    ? { arabic: false, wordGloss: false, transliteration: false, verseTranslation: true }
+    : { arabic: false, wordGloss: true, transliteration: false, verseTranslation: false }
 }
 
 export function themeLabel(mode: Settings['themeMode']): string {

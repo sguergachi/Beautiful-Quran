@@ -1,0 +1,80 @@
+/* Android IslamicBackToOriginCapsule: 44 high, paper body, gilt rim. */
+.back-to-place {
+  position: absolute;
+  left: 50%;
+  bottom: calc(6.55rem + env(safe-area-inset-bottom, 0px));
+  z-index: 6;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  max-width: min(320px, calc(100% - 56px));
+  margin: 0 0 10px;
+  padding: 0 18px 0 10px;
+  border: 0;
+  border-radius: 22px;
+  /* Opaque paper with a faint gold wash, rimmed in leafed gold. */
+  background:
+    linear-gradient(
+      rgb(from var(--gold) r g b / 0.1),
+      transparent 55%,
+      rgb(from var(--gold) r g b / 0.08)
+    ) padding-box,
+    linear-gradient(var(--paper), var(--paper)) padding-box,
+    linear-gradient(var(--gold-bright), var(--gold), var(--gold-deep)) border-box;
+  border: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  animation: float-in 280ms var(--ease-sheet, ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.back-to-place-arrow {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-inline-end: 8px;
+}
+.back-to-place-stroke {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  animation: back-to-place-ink 1100ms linear 80ms forwards;
+}
+.back-to-place-stroke.s2 {
+  stroke-width: 2.2;
+  animation-delay: 450ms;
+  animation-duration: 380ms;
+}
+.back-to-place-stroke.s3 {
+  stroke-width: 2.2;
+  animation-delay: 790ms;
+  animation-duration: 390ms;
+}
+@keyframes back-to-place-ink {
+  to { stroke-dashoffset: 0; }
+}
+.back-to-place-stroke.s1 {
+  animation-duration: 380ms;
+}
+.back-to-place-chapter {
+  min-width: 0;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink-rung-strong, var(--ink));
+}
+.back-to-place-sep {
+  white-space: pre;
+  color: var(--ink-rung-quiet);
+}
+.back-to-place-ayah {
+  color: var(--ink-rung-secondary);
+  font-variant-numeric: lining-nums;
+}

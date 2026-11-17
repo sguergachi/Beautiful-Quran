@@ -12,6 +12,13 @@ import type { ActiveWord, Reciter, Surah, SurahContent, Segment, Word } from '..
 import { dictionaryEntry, type DictionaryEntry } from '../data/dictionary'
 import { lexiconEntry, type LexiconEntry } from '../data/lexicon'
 import { QuranRepository } from '../data/repository'
+import {
+  annotationKey,
+  loadAnnotations,
+  saveAnnotations,
+  withAnnotation,
+  type AnnotationMap,
+} from '../data/annotations'
 import { runtimeMushafCache } from '../data/runtimeMushaf'
 import { QF_TIMING_RECITERS, runtimeTimingsCache } from '../data/runtimeTimings'
 import {
@@ -41,6 +48,7 @@ import {
 } from '../domain/FastForwardPolicy'
 import { getHighlightLeadMs } from '../ui/reader/InkEngine'
 import { player, type PlayerState } from '../playback/player'
+import { hasPlaybackSession, nextPlaybackSession } from './playbackSession'
 import {
   readerHighlightKey,
   readerHighlightState,
@@ -135,8 +143,13 @@ export interface AppState {
   reciters: Reciter[]
   settings: Settings
   bookmarks: Bookmark[]
+  /** Reader-written verse notes by `annotationKey` (Android `AnnotationRepository`). */
+  annotations: AnnotationMap
   content: SurahContent | null
   player: PlayerState
+  /** A verse is loaded *for listening* (not just parked by a chapter open):
+   * drives the cover's transport (see [nextPlaybackSession]). */
+  playbackSession: boolean
   activeWord: ActiveWord | null
   /**
    * True from a word tap until its sought word is heard: the tap's own
@@ -177,6 +190,8 @@ export interface AppState {
   gathering: boolean
   gatherSelection: { surahId: number; ayah: number }[]
   shareError: string | null
+  /** Which export is being prepared (Android ShareUiState.preparingText/Image). */
+  sharePreparing: 'text' | 'image' | null
 }
 
 type Listener = () => void
@@ -246,6 +261,8 @@ class AppStore {
    * before position catches up must not re-seek midpoint (#560).
    */
   private longAyahMidpointConsumed = 0
+  /** Chapter holding the listening session; see [nextPlaybackSession]. */
+  private playbackSessionSurah: number | null = null
 
   state: AppState = {
     ready: false,
@@ -259,8 +276,10 @@ class AppStore {
     reciters: [],
     settings: loadSettings(),
     bookmarks: loadBookmarks(),
+    annotations: loadAnnotations(),
     content: null,
     player: player.getState(),
+    playbackSession: false,
     activeWord: null,
     wordTapAwaitingVoice: false,
     inkActivation: 0,
@@ -278,6 +297,7 @@ class AppStore {
     gathering: false,
     gatherSelection: [],
     shareError: null,
+    sharePreparing: null,
   }
 
   constructor() {
@@ -335,7 +355,8 @@ class AppStore {
     })
     player.subscribe((ps) => {
       const prev = this.state.player
-      this.state = { ...this.state, player: ps }
+      this.playbackSessionSurah = nextPlaybackSession(this.playbackSessionSurah, prev, ps)
+      this.state = { ...this.state, player: ps, playbackSession: hasPlaybackSession(this.playbackSessionSurah, ps) }
       this.recomputeActive(ps)
       // A word tap's wait ends the first time its landed seek is audible.
       if (this.state.wordTapAwaitingVoice && this.wordTapLanded && ps.isPlaying && !ps.isBuffering) {
@@ -455,7 +476,9 @@ class AppStore {
     }
     if (this.state.stackLayer === BOOKMARKS_LAYER) {
       this.setStackLayer(COVER_LAYER)
-    } else {
+    } else if (this.state.stackLayer > COVER_LAYER) {
+      // Chapters is the bottom of Back (Android MainActivity BackHandler):
+      // Bookmarks is reached by its own gesture, never by going back.
       this.setStackLayer(this.state.stackLayer - 1)
     }
   }
@@ -532,7 +555,7 @@ class AppStore {
     else this.setStackLayer(settingsLayerFor(this.hasReader()))
   }
 
-  /** Tap ﴿N﴾. The first tap gathers that verse and pauses. Later taps toggle. */
+  /** Hold ﴿N﴾ to enter gather with that verse (pauses); once inside, taps toggle. */
   onMarkTap(surahId: number, ayah: number) {
     if (surahId < 1 || ayah < 1) return
     const action = onMarkTap(this.state.gathering, { surahId, ayah })
@@ -583,7 +606,8 @@ class AppStore {
 
   /** Image: the paper card, via the system share sheet or a downloaded PNG. */
   async shareGatheredImage(): Promise<void> {
-    if (!this.state.gathering || this.state.gatherSelection.length === 0) return
+    if (!this.state.gathering || this.state.gatherSelection.length === 0 || this.state.sharePreparing) return
+    this.set({ sharePreparing: 'image', shareError: null })
     try {
       const blob = await renderShareCard(this.shareVerses())
       const file = new File([blob], 'beautiful-quran.png', { type: 'image/png' })
@@ -599,33 +623,43 @@ class AppStore {
         link.remove()
         window.setTimeout(() => URL.revokeObjectURL(url), 1000)
       }
-      this.set({ shareError: null })
+      // Sent: the gather is done (Android ShareHost exits after the chooser).
+      this.set({ sharePreparing: null })
+      this.exitGather()
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        this.set({ sharePreparing: null })
+        return
+      }
       console.warn('[share] image share failed', error)
-      this.set({ shareError: "Couldn't share the image. Please try again." })
+      this.set({ sharePreparing: null, shareError: "Couldn't create the image. Please try again." })
     }
   }
 
   /** Quote: the system share sheet, or the clipboard when share is unavailable. */
   async shareGatheredText(): Promise<void> {
-    if (!this.state.gathering || this.state.gatherSelection.length === 0) return
+    if (!this.state.gathering || this.state.gatherSelection.length === 0 || this.state.sharePreparing) return
     const text = composeShareText(this.shareVerses())
     if (!text) {
-      this.set({ shareError: 'Those verses have no text yet' })
+      this.set({ shareError: "Couldn't load those verses. Please try again." })
       return
     }
+    this.set({ sharePreparing: 'text', shareError: null })
     try {
       if (navigator.share) {
         await navigator.share({ text })
       } else {
         await navigator.clipboard.writeText(text)
       }
-      this.set({ shareError: null })
+      this.set({ sharePreparing: null })
+      this.exitGather()
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        this.set({ sharePreparing: null })
+        return
+      }
       console.warn('[share] text share failed', error)
-      this.set({ shareError: "Couldn't share the text. Please try again." })
+      this.set({ sharePreparing: null, shareError: "Couldn't prepare the share. Please try again." })
     }
   }
 
@@ -1014,6 +1048,29 @@ class AppStore {
   }
 
   /**
+   * Open [surahId] and recite from [ayah] — from word [position] when given —
+   * once its audio and timings are in. Android `load(startPlaybackAtAyah,
+   * startPlaybackAtWord, keepContent = true)`: a Mushaf word, mark or Play on
+   * another chapter's leaf loads that chapter and plays, rather than only
+   * opening it.
+   */
+  async openSurahAndPlay(surahId: number, ayah: number, position?: number) {
+    this.openSurah(surahId, ayah, undefined, undefined, [], 'reading')
+    if (this.state.content?.surah.id !== surahId) return
+    const token = this.openToken
+    const reciter = this.state.reciters.find((r) => r.id === this.state.settings.reciterId)
+    // Timings load in an idle task after the first reader frame; a reciter
+    // without them only needs the audio queued.
+    const deadline = performance.now() + (reciter?.hasTimings ? 4_000 : 400)
+    while (token === this.openToken && !this.state.hasTimings && performance.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 40))
+    }
+    if (token !== this.openToken || this.state.content?.surah.id !== surahId) return
+    if (position != null && position > 1) await this.playFromWord(ayah, position)
+    else await this.playAyah(ayah)
+  }
+
+  /**
    * Word timings of the basmalah lead-in clip (Al-Fatihah 1:1) for the open
    * chapter's reciter, so the calligraphy wash can ride the same word clock the
    * clip does — Android `ReaderViewModel.timingsWithBasmalahLeadIn` parity.
@@ -1136,6 +1193,19 @@ class AppStore {
         : {}),
     })
     return bookmarks.some((b) => b.surahId === surahId && b.ayah === ayah)
+  }
+
+  /**
+   * Writes (or, when blank, deletes) the reader's note on one verse. Notes
+   * survive un-bookmarking and the Settings toggle; only an explicit clear
+   * removes them (docs/ANNOTATIONS.md).
+   */
+  setAnnotation(surahId: number, ayah: number, text: string) {
+    const key = annotationKey(surahId, ayah)
+    if ((this.state.annotations[key] ?? '') === (text.trim() ? text : '')) return
+    const annotations = withAnnotation(this.state.annotations, surahId, ayah, text)
+    saveAnnotations(annotations)
+    this.set({ annotations })
   }
 
   isBookmarked(ayah: number): boolean {

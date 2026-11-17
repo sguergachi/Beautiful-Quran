@@ -1,0 +1,119 @@
+/* Scroll-reader chrome ported from Android (PlayerBar, ShareRibbon, top bar). */
+
+/* —— Gather bar (Android ShareRibbon) —— */
+.sheet .share-ribbon {
+  flex-wrap: nowrap;
+}
+.share-ribbon-cancel {
+  /* Android: the cross at 0.55 of the bar's ink. */
+  color: rgb(from var(--on-accent) r g b / 0.55);
+}
+.share-ribbon-middle {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  animation: share-ribbon-fade 180ms ease both;
+}
+@keyframes share-ribbon-fade {
+  from { opacity: 0; }
+}
+.share-ribbon-spacer {
+  flex: 1;
+}
+.share-ribbon-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.share-ribbon-hint {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 8px;
+}
+.share-ribbon-hairline {
+  flex: 1;
+  height: 1px;
+  background: rgb(from var(--on-accent) r g b / 0.28);
+}
+.share-ribbon-hint-label {
+  padding-inline: 12px;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-feature-settings: 'kern' 1, 'c2sc' 1, 'smcp' 1;
+  color: rgb(from var(--on-accent) r g b / 0.6);
+}
+.sheet .share-ribbon-error {
+  flex: 1;
+  min-width: 0;
+  padding-inline: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-size: 11px;
+  opacity: 1;
+  color: rgb(from var(--on-accent) r g b / 0.7);
+}
+.share-ribbon-icon-spacer {
+  width: 48px;
+  height: 48px;
+  flex: none;
+}
+.share-ribbon-spinner {
+  width: 22px;
+  height: 22px;
+}
+
+/* —— Top bar —— */
+.reader-top .back svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+.reader-top .back.back--arrow {
+  /* Android ArrowBack at 0.55 of the page ink. */
+  color: rgb(from var(--ink) r g b / 0.55);
+}
+/* The bar's name follows the header leaving: fades, rises 6 px, 0.9 → 1. */
+.reader-top-title[data-follows='true'] {
+  --title-t: 0;
+  opacity: var(--title-t);
+  transform: translate(-50%, calc(-50% + (1 - var(--title-t)) * 6px)) scale(calc(0.9 + 0.1 * var(--title-t)));
+  transition: none;
+}
+.reader-top-title[data-follows='true'][data-advancing='true'] {
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.reader-top-title-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.reader-top-title[data-visible='true'] .reader-top-title-button {
+  pointer-events: auto;
+}
+
+/* —— Transport (Android PlayerBar) —— */
+.player-bar .ctrl:disabled {
+  opacity: 0.38;
+  pointer-events: none;
+}
+
+/* Pinch-to-zoom belongs to the reader's text size, not the browser. */
+.sheet[data-name='reader'] .scroll {
+  touch-action: pan-y;
+}

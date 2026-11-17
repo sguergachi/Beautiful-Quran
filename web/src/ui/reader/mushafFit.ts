@@ -129,3 +129,40 @@ export function mushafLineGaps(
   const markGap = Math.min(markShare, knee) + Math.max(0, markShare - knee) * slope
   return { wordGap, markGap }
 }
+
+/**
+ * The two opening leaves are set in a circle (Android `mushafMedallionChords`):
+ * row k of [rows] is drawn to the chord of a unit circle at its middle, as a
+ * fraction of the diameter.
+ */
+export function mushafMedallionChords(rows: number): number[] {
+  if (rows <= 0) return []
+  return Array.from({ length: rows }, (_, k) => {
+    const y = (k + 0.5) / rows * 2 - 1
+    return Math.sqrt(Math.max(0, 1 - y * y))
+  })
+}
+
+/**
+ * The medallion is set down as one, by what its tightest row needs, so every
+ * row still meets its chord: [needs] are the rows' widths at minimum word
+ * spaces, [measure] the circle's diameter. Never under half size.
+ */
+export function mushafMedallionScale(needs: readonly number[], chords: readonly number[], measure: number): number {
+  let scale = 1
+  needs.forEach((need, index) => {
+    const chord = chords[index]
+    if (chord == null || need <= 0) return
+    scale = Math.min(scale, chord * measure / need)
+  })
+  return Math.max(0.5, scale)
+}
+
+/**
+ * A medallion row's height: the block as tall as it is wide, never shorter
+ * than the book's leading ([pitch]) nor taller than the well's [room] holds.
+ */
+export function mushafMedallionSlot(measure: number, rows: number, room: number, pitch: number): number {
+  if (rows <= 0) return pitch
+  return Math.max(pitch, Math.min(measure / rows, room / rows))
+}

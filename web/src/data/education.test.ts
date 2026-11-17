@@ -24,31 +24,58 @@ describe('education guides', () => {
     expect(
       shouldShowAyahRailTip({
         educationGuidesEnabled: true,
+        developerMode: true,
       }),
     ).toBe(true)
     expect(
       shouldShowAyahRailTip({
         educationGuidesEnabled: false,
+        developerMode: true,
       }),
     ).toBe(false)
     dismissEducation('ayah_rail')
     expect(
       shouldShowAyahRailTip({
         educationGuidesEnabled: true,
+        developerMode: true,
       }),
     ).toBe(false)
   })
 
-  it('gates the saved-bookmark lesson on a fresh mark', () => {
+  it('keeps lessons to developer mode, as Android', () => {
+    expect(shouldShowAyahRailTip({ educationGuidesEnabled: true, developerMode: false })).toBe(false)
     expect(
       shouldShowBookmarkTip({
         educationGuidesEnabled: true,
+        developerMode: false,
+        annotationsEnabled: true,
+        nowBookmarked: true,
+      }),
+    ).toBe(false)
+    expect(
+      shouldShowBookmarkTip({
+        educationGuidesEnabled: true,
+        developerMode: true,
+        annotationsEnabled: false,
+        nowBookmarked: true,
+      }),
+    ).toBe(false)
+  })
+
+  it('gates the bookmark-note lesson on a fresh mark', () => {
+    expect(
+      shouldShowBookmarkTip({
+        educationGuidesEnabled: true,
+        developerMode: true,
+        annotationsEnabled: true,
         nowBookmarked: true,
       }),
     ).toBe(true)
     expect(
       shouldShowBookmarkTip({
         educationGuidesEnabled: true,
+        developerMode: true,
+        annotationsEnabled: true,
         nowBookmarked: false,
       }),
     ).toBe(false)

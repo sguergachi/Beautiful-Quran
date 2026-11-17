@@ -1,8 +1,9 @@
 /**
  * Entrance ceremony — the closed mushaf over the paper stack.
  * Also the cold-start loading screen: the cover is up while quran.db loads,
- * with progress inked onto the leather; arrive → du'a text fade → open once
- * the book is ready.
+ * with progress inked onto the leather. Arrive → title wash → du'a, with the
+ * load label beneath it, whatever the loading is doing → open once the book
+ * is ready. Android `EntranceCover`.
  */
 import {
   useCallback,
@@ -27,6 +28,8 @@ import { animate, type AnimationPlaybackControls } from 'motion'
 import { createWheelTurn, isSidewaysWheel } from '../reader/wheelTurn'
 import { washMaskImage } from '../theme/Fade'
 import { coverLayout, coverLayoutCssVars, sealBox } from './coverLayout'
+import { coverSweep, glintPoint, loadSweepLeft } from './coverSweep'
+import './entrance.css'
 import { generateCoverOrnament, type CoverOrnament, type RosetteSpec } from '../theme/ornamentGenerator'
 import {
   fieldWeaveBackground,
@@ -39,7 +42,6 @@ import {
 const ISTIADHA_ARABIC = 'أَعُوذُ بِٱللَّهِ مِنَ ٱلشَّيْطَٰنِ ٱلرَّجِيمِ'
 const ISTIADHA_ENGLISH = 'I seek refuge in Allah from Shaytan, the accursed'
 
-const SHEET_FADE_MS = 550
 const TITLE_WASH_MS = 1_500
 const ARRIVAL_HOLD_MS = 300
 const DUA_WASH_MS = 2_400
@@ -214,9 +216,10 @@ export function EntranceCover({
   returning = false,
 }: EntranceCoverProps) {
   const [phase, setPhase] = useState<Phase>(returning ? 'closing' : 'loading')
-  const [sheetAlpha, setSheetAlpha] = useState(returning ? 1 : 0)
   const [opening, setOpening] = useState(false)
   const [skipped, setSkipped] = useState(false)
+  // Arrival and du'a are done; the board opens as soon as the book is ready.
+  const [ceremonyDone, setCeremonyDone] = useState(false)
   // Closing swings on the same hinge as opening, so it takes the same mode.
   const [openingMode, setOpeningMode] = useState<'phone' | 'spread' | null>(() =>
     returning ? (bookSpreadEnabled(window.matchMedia(BOOK_SPREAD_QUERY).matches, loadSettings().pagePresentation) ? 'spread' : 'phone') : null)
@@ -225,7 +228,6 @@ export function EntranceCover({
   const arrivalAcRef = useRef<AbortController | null>(null)
   const openingAtRef = useRef(0)
   const [captionOn, setCaptionOn] = useState(returning)
-  const [arrivalDone, setArrivalDone] = useState(false)
   const [board, setBoard] = useState(() => ({ w: 390, h: 844, layout: coverLayout(390, 844) }))
   const layoutVars = useMemo(() => coverLayoutCssVars(board.layout), [board.layout])
   // A fresh ornament every visit — the generating machine's whole point.
@@ -241,43 +243,34 @@ export function EntranceCover({
   const boardRef = useRef<HTMLDivElement>(null)
   const insidePageRef = useRef<HTMLDivElement>(null)
   const glintRef = useRef<HTMLDivElement>(null)
-  // Android turns the gilding's sheen with the phone's tilt. A desk has a
-  // pointer instead: the light falls where the mouse is. Written straight
-  // to the element, so moving the mouse never re-renders the cover.
-  // One write per frame however many moves arrive in it, a transform and
-  // nothing else, against a box measured once as the pointer comes in.
-  const glintState = useRef({ left: 0, top: 0, x: 0, y: 0, frame: 0 })
+  const loadFillRef = useRef<HTMLDivElement>(null)
+  // Android turns the gilding's sheen with the phone's tilt, and without a
+  // tilt sensor keeps a slow 6.5 s idle sweep; the indeterminate load bar
+  // rides that same sweep. A desk has a pointer instead: the light falls
+  // where the mouse is, and goes back to the sweep when it leaves. Written
+  // straight to the elements every frame — a transform and nothing else —
+  // so the light never re-renders the cover.
+  const glintState = useRef({ left: 0, top: 0, mouseX: 0, mouseY: 0, mouse: false, x: -1, y: -1, last: 0 })
   const measureGlint = (event: ReactPointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect()
     glintState.current.left = box.left
     glintState.current.top = box.top
   }
   const moveGlint = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const glint = glintRef.current
-    if (!glint || event.pointerType !== 'mouse') return
+    if (event.pointerType !== 'mouse') return
     const state = glintState.current
-    state.x = event.clientX - state.left
-    state.y = event.clientY - state.top
-    if (state.frame) return
-    state.frame = requestAnimationFrame(() => {
-      state.frame = 0
-      const move = `translate3d(${state.x.toFixed(1)}px, ${state.y.toFixed(1)}px, 0)`
-      for (const layer of Array.from(glint.children) as HTMLElement[]) layer.style.transform = move
-      glint.dataset.on = 'true'
-    })
+    state.mouseX = event.clientX - state.left
+    state.mouseY = event.clientY - state.top
+    state.mouse = true
   }
   const dropGlint = () => {
-    cancelAnimationFrame(glintState.current.frame)
-    glintState.current.frame = 0
-    if (glintRef.current) delete glintRef.current.dataset.on
+    glintState.current.mouse = false
   }
-  useEffect(() => () => cancelAnimationFrame(glintState.current.frame), [])
   const titleArRef = useRef<HTMLParagraphElement>(null)
   const titleEnRef = useRef<HTMLParagraphElement>(null)
   const duaRef = useRef<HTMLParagraphElement>(null)
   const momentAcRef = useRef<AbortController | null>(null)
   const finishedRef = useRef(false)
-  const ceremonyStartedRef = useRef(false)
   const onFinishedRef = useRef(onFinished)
   onFinishedRef.current = onFinished
 
@@ -327,7 +320,6 @@ export function EntranceCover({
     applyWash(titleArRef.current, 1, 0)
     applyWash(titleEnRef.current, 1, 0)
     applyWash(duaRef.current, 1, 0.12)
-    setSheetAlpha(1)
     setCaptionOn(true)
     setPhase('opening')
     setOpening(true)
@@ -340,6 +332,10 @@ export function EntranceCover({
     setCaptionOn(true)
     arrivalAcRef.current?.abort()
     momentAcRef.current?.abort()
+    // Settled face at once, even while the book is still loading.
+    applyWash(titleArRef.current, 1, 0)
+    applyWash(titleEnRef.current, 1, 0)
+    applyWash(duaRef.current, 1, 0.12)
     if (canOpen) open()
   }, [canOpen, open, closing])
 
@@ -452,17 +448,21 @@ export function EntranceCover({
     return () => window.removeEventListener('keydown', onKey, true)
   }, [skipToOpening])
 
-  // Arrival — fade + title wash once, while the book may still be loading.
+  // The ceremony runs once, whatever the loading is doing: title wash, a
+  // breath, then the du'a with the load label beneath it. Only the opening
+  // waits for the book. (It used to hold the du'a back until the database
+  // was open, so a slow load sat on a bare title.)
   useEffect(() => {
     if (returning) return
     const ac = new AbortController()
     arrivalAcRef.current = ac
+    momentAcRef.current = ac
     const { signal } = ac
     ;(async () => {
       try {
-        setSheetAlpha(1)
         setPhase('arriving')
-        await wait(SHEET_FADE_MS, signal)
+        // Paint the board first; the wash starts on the frame after.
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
         await runWash(
           TITLE_WASH_MS,
           (p) => {
@@ -472,45 +472,62 @@ export function EntranceCover({
           signal,
         )
         await wait(ARRIVAL_HOLD_MS, signal)
-        if (!signal.aborted) setArrivalDone(true)
+        setPhase((current) => (current === 'opening' ? current : 'dua'))
+        setCaptionOn(true)
+        await runWash(DUA_WASH_MS, (p) => applyWash(duaRef.current, p, 0.12), signal)
+        await wait(DUA_HOLD_MS, signal)
+        if (!signal.aborted) setCeremonyDone(true)
       } catch {
-        /* unmount */
+        /* skip / unmount owns the next moment */
       }
     })()
     return () => ac.abort()
   }, [returning])
 
-  // Skip can end arrival as well as the du'a; opening runs exactly once.
+  // Opening runs exactly once: after the ceremony or a skip, once the book
+  // is ready. A book closed by hand stays closed until it is opened by hand.
   useEffect(() => {
     if (!canOpen || finishedRef.current) return
-    if (skipped) {
-      open()
-      return
-    }
-    // A book closed by hand stays closed until it is opened by hand.
-    if (returning || !arrivalDone || ceremonyStartedRef.current) return
-    ceremonyStartedRef.current = true
-    const ac = new AbortController()
-    momentAcRef.current = ac
-    let disposed = false
-    ;(async () => {
-      try {
-        setPhase('dua')
-        setCaptionOn(true)
-        await runWash(DUA_WASH_MS, (p) => applyWash(duaRef.current, p, 0.12), ac.signal)
-        await wait(DUA_HOLD_MS, ac.signal)
-        if (!disposed) open()
-      } catch {
-        /* skip / unmount owns the next moment */
+    if (skipped || (ceremonyDone && !returning)) open()
+  }, [canOpen, ceremonyDone, skipped, open, returning])
+
+  // The light on the gilding and the indeterminate load bar: one sweep.
+  const lightStill = opening || closing
+  useEffect(() => {
+    if (lightStill) return
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const started = performance.now()
+    let frame = 0
+    const tick = (now: number) => {
+      frame = requestAnimationFrame(tick)
+      const sweep = reduced ? 0.5 : coverSweep(now - started)
+      const state = glintState.current
+      const glint = glintRef.current
+      const board = boardRef.current
+      if (glint && board) {
+        const target = state.mouse
+          ? { x: state.mouseX, y: state.mouseY }
+          : glintPoint(sweep, board.clientWidth, board.clientHeight)
+        // Chase rather than jump, so the light hands over smoothly between
+        // the pointer and the sweep.
+        const dt = state.last ? Math.min(100, now - state.last) : 1000
+        state.last = now
+        const k = state.x < 0 ? 1 : 1 - Math.exp(-dt / 60)
+        state.x += (target.x - state.x) * k
+        state.y += (target.y - state.y) * k
+        const move = `translate3d(${state.x.toFixed(1)}px, ${state.y.toFixed(1)}px, 0)`
+        for (const layer of Array.from(glint.children) as HTMLElement[]) layer.style.transform = move
+        glint.dataset.on = 'true'
       }
-    })()
-    return () => {
-      disposed = true
-      ac.abort()
-      momentAcRef.current = null
-      ceremonyStartedRef.current = false
+      const fill = loadFillRef.current
+      if (fill?.dataset.indeterminate === 'true') {
+        const track = fill.parentElement?.clientWidth ?? 0
+        fill.style.transform = `translate3d(${loadSweepLeft(sweep, track).toFixed(1)}px, 0, 0)`
+      }
     }
-  }, [arrivalDone, canOpen, skipped, open, returning])
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [lightStill])
 
   const progressPct =
     loadProgress != null ? Math.round(Math.min(1, Math.max(0, loadProgress)) * 100) : null
@@ -535,7 +552,6 @@ export function EntranceCover({
         style={{
           ...layoutVars,
           ...openingStyle,
-          opacity: opening ? undefined : sheetAlpha || 1,
         }}
         role={!error && phase !== 'opening' ? 'button' : undefined}
         tabIndex={!error && phase !== 'opening' ? 0 : undefined}
@@ -599,39 +615,50 @@ export function EntranceCover({
             </p>
           </div>
           <div className="entrance-air entrance-air--mid" />
-          {error ? (
-            <div className="entrance-load">
-              <p className="entrance-load-label">{error}</p>
-              {onRetry && (
-                <button type="button" className="entrance-load-retry" onClick={onRetry}>
-                  Try again
-                </button>
-              )}
-            </div>
-          ) : showLoading ? (
-            <div className="entrance-load" aria-live="polite">
-              <p className="entrance-load-label">
-                {loadLabel || 'Opening the book…'}
-              </p>
-              <div
-                className={`entrance-load-track${showProgress ? '' : ' entrance-load-track--pulse'}`}
-                aria-hidden="true"
-              >
-                <div
-                  className="entrance-load-fill"
-                  style={showProgress ? { width: `${progressPct}%` } : undefined}
-                />
+          <div className="entrance-dua" style={{ opacity: captionOn ? 1 : 0 }}>
+            <p ref={duaRef} className="entrance-dua-ar" lang="ar" dir="rtl">
+              {ISTIADHA_ARABIC}
+            </p>
+            <p className="entrance-dua-en">{ISTIADHA_ENGLISH}</p>
+          </div>
+          {/* Loading lives in the lower air, so it never moves the du'a or
+              the title; it comes and goes with the du'a's caption. */}
+          <div className="entrance-air entrance-air--bot">
+            {error ? (
+              <div className="entrance-load">
+                <p className="entrance-load-label">{error}</p>
+                {onRetry && (
+                  <button type="button" className="entrance-load-retry" onClick={onRetry}>
+                    Try again
+                  </button>
+                )}
               </div>
-            </div>
-          ) : (
-            <div className="entrance-dua" style={{ opacity: captionOn ? 1 : 0 }}>
-              <p ref={duaRef} className="entrance-dua-ar" lang="ar" dir="rtl">
-                {ISTIADHA_ARABIC}
-              </p>
-              <p className="entrance-dua-en">{ISTIADHA_ENGLISH}</p>
-            </div>
-          )}
-          <div className="entrance-air entrance-air--bot" />
+            ) : showLoading ? (
+              <div
+                className="entrance-load"
+                aria-live="polite"
+                style={{ opacity: captionOn ? 1 : 0 }}
+              >
+                <p className="entrance-load-label">
+                  {loadLabel || 'Opening the book…'}
+                </p>
+                <div
+                  className="entrance-load-track"
+                  role="progressbar"
+                  aria-valuemin={showProgress ? 0 : undefined}
+                  aria-valuemax={showProgress ? 100 : undefined}
+                  aria-valuenow={showProgress ? progressPct ?? undefined : undefined}
+                >
+                  <div
+                    ref={loadFillRef}
+                    className="entrance-load-fill"
+                    data-indeterminate={showProgress ? undefined : 'true'}
+                    style={showProgress ? { width: `${progressPct}%`, transform: 'none' } : undefined}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
         <div ref={glintRef} className="entrance-glint" aria-hidden="true">
           <span /><span />

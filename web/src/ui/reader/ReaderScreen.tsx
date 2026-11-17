@@ -41,6 +41,7 @@ import {
   IconTune,
 } from '../icons/PlaybackIcons'
 import { AyahSelectorRail, type AyahSelectorRailHandle } from './AyahSelectorRail'
+import { railMarks } from './ayahRailMarks'
 import { AyahRailTip } from './AyahRailTip'
 import { BookmarkTip } from './BookmarkTip'
 import {
@@ -51,10 +52,13 @@ import {
 import { OrnateSurahTitle } from './OrnateSurahTitle'
 import { useMushafGrid } from './useMushafGrid'
 import { NextChapterFooter } from './NextChapterFooter'
+import { PreviousChapterPullChrome } from './PreviousChapterPullChrome'
+import { useChapterPull } from './useChapterPull'
 import { PageBreak } from './PageBreak'
 import { QuranRepository } from '../../data/repository'
 import { MushafReader } from './MushafReader'
-import { CopyVerseLink } from './CopyVerseLink'
+import { MushafPageDial, MushafTransportEnds } from './MushafPageDial'
+import { playMushafLeaf } from './mushafLeafState'
 import { MUSHAF_INK_IDLE, mushafReadHistory, type MushafInk, type MushafReadHistory } from './mushafInk'
 import { ayahKey } from '../../share/gather'
 import { buildReaderItems, sliceReaderItems } from './readerItems'
@@ -76,6 +80,41 @@ import type { Word } from '../../data/models'
 import { readerOpensOnTitle } from './readerOpening'
 import { scrollReadingAyah } from './readingPlace'
 import { isKeyboardControl, readerKeyboardAction, readerOwnsKeyboard } from './keyboardNavigation'
+import { MarkHoldOverlay } from '../../render/MarkHoldOverlay'
+import { ShareRibbon } from './ShareRibbon'
+import { watchReaderPinch } from './readerFontScale'
+import { paperSelectHaptic } from '../kit/paperHaptics'
+import { PLACE_RIBBON_PAUSE_HOLD_MS, pausedReadingPlaceRibbonAyah } from './readingPlaceRibbon'
+import { annotationFor } from '../../data/annotations'
+import { BackToPlacePill } from './BackToPlacePill'
+import { useBackToPlaceVisible } from '../root/backToPlaceStore'
+import './readerChrome.css'
+
+/** Touch / phone: the empty bookmark tip is always drawn, as on Android. */
+const IDLE_TIP_QUERY = '(hover: none), (pointer: coarse), (max-width: 719px)'
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia(query).matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const update = () => setMatches(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [query])
+  return matches
+}
+
+/** Android Icons.AutoMirrored.Rounded.ArrowBack. */
+function IconArrowBack() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M19 11H7.83l4.88-4.88a1 1 0 0 0-1.42-1.41l-6.59 6.59a1 1 0 0 0 0 1.41l6.59 6.59a1 1 0 0 0 1.41-1.41L7.83 13H19a1 1 0 0 0 0-2z" />
+    </svg>
+  )
+}
 
 const NO_SEARCH_FLASH_WORDS: number[] = []
 
@@ -240,10 +279,21 @@ export function ReaderScreen({
   const onPlayWord = useCallback((ayah: number, pos: number) => {
     void appStore.playFromWord(ayah, pos)
   }, [])
+  /** Tap a verse off its words: play from that ayah with follow on. */
+  const onAyahTap = useCallback((ayah: number) => {
+    // A held ribbon that just opened a note goes inert under the lifting
+    // finger, so that lift lands on the verse: it must not also play.
+    if (editingAtPointerDown.current || editingNoteRef.current != null || appStore.getSnapshot().gathering) return
+    followWasEnabled.current = false
+    void appStore.playAyah(ayah)
+  }, [])
   const sheetRef = useRef<HTMLDivElement>(null)
   const mushafGrid = useMushafGrid(sheetRef, mushaf)
   const inkReadRef = useRef<MushafReadHistory>({ ayah: null, activation: 0, read: false })
   const spread = useBookSpread(state.settings.pagePresentation)
+  // One leaf (no facing pages): Android's book window — no top bar, the dial
+  // under the leaf, Chapters and Settings at the ends of the transport.
+  const mushafLeafChrome = mushaf && !spread
   // Facing leaves with Chapters lying over the left one: touching the page
   // still being read, anywhere on it, puts Chapters away, and that touch
   // does nothing else. The page's own controls keep their meaning.
@@ -253,6 +303,8 @@ export function ReaderScreen({
   const initialFocusSettled = !mushaf && settledOpenRevision === state.readerOpenRevision
   const [ayahRailTipOpen, setAyahRailTipOpen] = useState(false)
   const [ayahRailTipCenterY, setAyahRailTipCenterY] = useState(Number.NaN)
+  /** Open ayah wheel: the page's verses fade back (Android obscuredBySelector). */
+  const [railOpen, setRailOpen] = useState(false)
   const [bookmarkTipOpen, setBookmarkTipOpen] = useState(false)
   const [bookmarkTipRendered, setBookmarkTipRendered] = useState(false)
   const [bookmarkTipAyah, setBookmarkTipAyah] = useState(0)
@@ -264,9 +316,50 @@ export function ReaderScreen({
   ayahRailTipOpenRef.current = ayahRailTipOpen
 
   const dismissBookmarkTip = useCallback(() => {
-    dismissEducation('bookmark_saved')
+    dismissEducation('bookmark_note')
     setBookmarkTipOpen(false)
   }, [])
+
+  // —— Verse notes (docs/ANNOTATIONS.md): the draft carries its own verse,
+  // so a late focus loss can never write onto whichever verse is open.
+  const [editingNote, setEditingNote] = useState<{ surahId: number; ayah: number; text: string } | null>(null)
+  const editingNoteRef = useRef(editingNote)
+  editingNoteRef.current = editingNote
+  /** Set at pointer-down: the tap that ends an edit does not also play. */
+  const editingAtPointerDown = useRef(false)
+  const commitOpenAnnotation = useCallback(() => {
+    const open = editingNoteRef.current
+    if (!open) return
+    editingNoteRef.current = null
+    appStore.setAnnotation(open.surahId, open.ayah, open.text)
+    setEditingNote(null)
+  }, [])
+  const onEditAnnotation = useCallback((ayah: number) => {
+    const snapshot = appStore.getSnapshot()
+    if (!snapshot.settings.annotationsEnabled || snapshot.gathering) return
+    paperSelectHaptic()
+    if (bookmarkTipOpenRef.current) {
+      dismissEducation('bookmark_note')
+      setBookmarkTipOpen(false)
+    }
+    commitOpenAnnotation()
+    const surahId = surahIdRef.current
+    const next = { surahId, ayah, text: annotationFor(snapshot.annotations, surahId, ayah) ?? '' }
+    editingNoteRef.current = next
+    setEditingNote(next)
+  }, [commitOpenAnnotation])
+  const onAnnotationChange = useCallback((text: string) => {
+    setEditingNote((open) => (open ? { ...open, text } : open))
+  }, [])
+  const onAnnotationEditDone = useCallback((ayah: number) => {
+    if (editingNoteRef.current?.ayah === ayah) commitOpenAnnotation()
+  }, [commitOpenAnnotation])
+  const onAnnotationDelete = useCallback((ayah: number) => {
+    const open = editingNoteRef.current
+    if (open?.ayah !== ayah) return
+    editingNoteRef.current = { ...open, text: '' }
+    commitOpenAnnotation()
+  }, [commitOpenAnnotation])
   const dismissAyahRailTip = useCallback(() => {
     dismissEducation('ayah_rail')
     setAyahRailTipOpen(false)
@@ -280,6 +373,8 @@ export function ReaderScreen({
       if (
         shouldShowBookmarkTip({
           educationGuidesEnabled: settings.educationGuidesEnabled,
+          developerMode: settings.developerMode,
+          annotationsEnabled: settings.annotationsEnabled,
           nowBookmarked,
         })
       ) {
@@ -367,6 +462,81 @@ export function ReaderScreen({
   // This sheet is keyed by chapter, so the ref starts false at every opening.
   const recitedSinceOpen = useRef(false)
 
+  // —— Green reading-place ribbon (Android parkedPlace). Snapshot the
+  // shared Continue target for this visit; a deliberate pause moves it.
+  const [parkedPlace, setParkedPlace] = useState<AyahRef | null>(() => {
+    const saved = appStore.getSnapshot().settings
+    return saved.lastSurah > 0 && saved.lastAyah > 0 ? { surahId: saved.lastSurah, ayah: saved.lastAyah } : null
+  })
+  const [placeUnfurl, setPlaceUnfurl] = useState<{ ayah: number; token: number }>({ ayah: 0, token: 0 })
+  const renderedSurahId = content?.surah.id ?? 0
+  const playingHere = state.player.nowPlaying?.surahId === renderedSurahId && state.player.isPlaying
+  const [playedHere, setPlayedHere] = useState(playingHere)
+  const pausedPlaceAyah = pausedReadingPlaceRibbonAyah({
+    renderedSurahId,
+    mediaSurahId: state.player.nowPlaying?.surahId,
+    mediaAyah: state.player.nowPlaying?.ayah,
+    isPlaying: state.player.isPlaying,
+    isBuffering: state.player.isBuffering,
+    playedHere,
+  })
+  useEffect(() => {
+    if (playingHere) {
+      setPlayedHere(true)
+      return
+    }
+    if (pausedPlaceAyah == null) return
+    const timer = window.setTimeout(() => {
+      setParkedPlace({ surahId: renderedSurahId, ayah: pausedPlaceAyah })
+      setPlaceUnfurl((previous) => ({ ayah: pausedPlaceAyah, token: previous.token + 1 }))
+      setPlayedHere(false)
+    }, PLACE_RIBBON_PAUSE_HOLD_MS)
+    return () => window.clearTimeout(timer)
+  }, [playingHere, pausedPlaceAyah, renderedSurahId])
+  const parkedPlaceAyah = parkedPlace?.surahId === renderedSurahId ? parkedPlace.ayah : null
+
+  const idleTipAlways = useMediaQuery(IDLE_TIP_QUERY)
+  const backToPlaceVisible = useBackToPlaceVisible()
+
+  // Keep the screen awake while reciting (Android FLAG_KEEP_SCREEN_ON).
+  useEffect(() => {
+    if (!recitingActive || typeof navigator === 'undefined' || !('wakeLock' in navigator)) return
+    let lock: WakeLockSentinel | null = null
+    let cancelled = false
+    const acquire = async () => {
+      try {
+        const next = await navigator.wakeLock.request('screen')
+        if (cancelled) void next.release().catch(() => undefined)
+        else lock = next
+      } catch {
+        /* denied / hidden tab */
+      }
+    }
+    void acquire()
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && (lock == null || lock.released)) void acquire()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onVisible)
+      void lock?.release().catch(() => undefined)
+    }
+  }, [recitingActive])
+
+  // A note left open commits when the reader leaves the sheet or chapter.
+  useEffect(() => {
+    if (!isTop) commitOpenAnnotation()
+  }, [isTop, commitOpenAnnotation])
+  useEffect(() => () => commitOpenAnnotation(), [commitOpenAnnotation])
+  // Switched off in Settings: annotations are simply not part of the page.
+  useEffect(() => {
+    if (!state.settings.annotationsEnabled || state.gathering) {
+      editingNoteRef.current = null
+      setEditingNote(null)
+    }
+  }, [state.settings.annotationsEnabled, state.gathering])
+
   // Virtualization center: follow the reciting ayah, else the open/focus verse.
   // Window only expands during scroll (never unmounts under the viewport).
   const mountCenter =
@@ -389,6 +559,21 @@ export function ReaderScreen({
     const scroll = scrollRef.current
     if (scroll) void onAdvanceChapter(nextId, scroll, showTopTitle)
   }, [onAdvanceChapter, showTopTitle])
+  const previousSurah = useMemo(() => {
+    const id = content?.surah.id
+    if (id == null || id <= 1) return null
+    return state.surahs.find((s) => s.id === id - 1) ?? null
+  }, [content?.surah.id, state.surahs])
+  // Pull past either end of the chapter to open its neighbour (Android).
+  const openPreviousByPull = useChapterPull({
+    scrollRef,
+    enabled: !mushaf && isTop && content != null,
+    surahId: content?.surah.id ?? 0,
+    nextSurahId: nextSurah?.id ?? null,
+    previousSurahId: previousSurah?.id ?? null,
+    advancing: chapterAdvancing,
+    onAdvanceNext: advanceToNextChapter,
+  })
 
   const activeQuery = activeSearchQuery(searchActive, searchQuery)
   // Keep the input snappy — match/highlight work trails by a frame or two.
@@ -558,12 +743,12 @@ export function ReaderScreen({
   // A reader can disable lessons from Reading help.
   useEffect(() => {
     if (
-      !state.settings.educationGuidesEnabled
+      !state.settings.educationGuidesEnabled || !state.settings.developerMode
     ) {
       setBookmarkTipOpen(false)
       setAyahRailTipOpen(false)
     }
-  }, [state.settings.educationGuidesEnabled])
+  }, [state.settings.educationGuidesEnabled, state.settings.developerMode])
 
   // Offer the rail lesson only as a chapter settles. Replaying hints over
   // an already-open reader waits for the next chapter opening —
@@ -584,6 +769,7 @@ export function ReaderScreen({
       if (
         shouldShowAyahRailTip({
           educationGuidesEnabled: settings.educationGuidesEnabled,
+          developerMode: settings.developerMode,
         }) &&
         !bookmarkTipOpenRef.current
       ) {
@@ -850,6 +1036,50 @@ export function ReaderScreen({
     }
   }, [content?.surah.id, state.activeAyah, state.activeBasmalah, state.followEnabled, isTop])
 
+  // Pinch the page to step the text size (Android readerFontScalePinch).
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || !isTop || mushaf) return
+    return watchReaderPinch(
+      el,
+      () => appStore.getSnapshot().settings.fontScale,
+      (fontScale) => {
+        appStore.updateSettings({ fontScale })
+        paperSelectHaptic()
+      },
+    )
+  }, [content?.surah.id, isTop, mushaf])
+
+  // The bar's name arrives in step with the header leaving (Android headerExit).
+  useEffect(() => {
+    const el = scrollRef.current
+    const header = headerRef.current
+    if (!el || !header || !isTop || mushaf) return
+    let raf = 0
+    const paint = () => {
+      raf = 0
+      const title = sheetRef.current?.querySelector<HTMLElement>('.reader-top-title[data-follows]')
+      if (!title) return
+      const rosette = header.querySelector<HTMLElement>('.rosette')
+      const name = header.querySelector<HTMLElement>('.ar-title')
+      const start = header.offsetTop + (rosette?.offsetTop ?? 0)
+      const end = header.offsetTop + (name ? name.offsetTop + name.offsetHeight : header.offsetHeight) + 40
+      const exit = Math.min(1, Math.max(0, (el.scrollTop - start) / Math.max(1, end - start)))
+      // FastOutSlowIn, as Android.
+      const t = exit <= 0 ? 0 : exit >= 1 ? 1 : 1 - Math.pow(1 - exit, 2.2)
+      title.style.setProperty('--title-t', t.toFixed(3))
+    }
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(paint)
+    }
+    paint()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      if (raf) cancelAnimationFrame(raf)
+      el.removeEventListener('scroll', onScroll)
+    }
+  }, [content?.surah.id, isTop, mushaf, showTopTitle])
+
   // Lyric-style auto-scroll: keep the active target on its adaptive anchor
   // (verse, or chapter-top basmalah header while the lead-in plays).
   // Also re-homes when the media item advances — fade-lead may have already
@@ -1000,8 +1230,13 @@ export function ReaderScreen({
   }
 
   const togglePlayback = useCallback(() => {
-    if (!content || (state.player.isBuffering && !state.player.isPlaying)) return
+    if (!content) return
+    // Mushaf: Play recites the leaf in view (Android `mushafPlayTarget`).
+    if (mushaf && !state.player.isPlaying && playMushafLeaf()) return
     const thisSurahLoaded = state.player.nowPlaying?.surahId === content.surah.id
+    // Only a cold Play on this chapter's own in-flight fetch waits (#289);
+    // a tap here while another chapter buffers starts this one (Android).
+    if (thisSurahLoaded && state.player.isBuffering && !state.player.isPlaying) return
     const selected = selectedPlaybackAyah({
       ayahCount: content.surah.ayahCount,
       requestedJumpAyah: pendingJumpAyah.current,
@@ -1016,7 +1251,7 @@ export function ReaderScreen({
       pendingJump: pendingJumpAyah.current != null,
       enableFollow: !state.player.isPlaying,
     })
-  }, [content, focusedAyah, state.activeAyah, state.followEnabled, state.player])
+  }, [content, focusedAyah, state.activeAyah, state.followEnabled, state.player, mushaf])
 
   // The reading line is the keyboard cursor. Reuse rail jumps so keys get the
   // same progressive mount, focus glide, playback parking, and follow policy.
@@ -1042,6 +1277,8 @@ export function ReaderScreen({
         else jumpToAyah(action.ayah, event.target instanceof Element && event.target.matches('[data-reader-word]'))
       }
       else if (action.type === 'playPause') {
+        // Gathering is not listening: Space never starts the voice there.
+        if (appStore.getSnapshot().gathering) return
         // Words are focusable so Enter can audition one. Space belongs to the
         // reader transport, even if the last Tab/click left a word focused.
         if (event.target instanceof HTMLElement) event.target.blur()
@@ -1051,6 +1288,7 @@ export function ReaderScreen({
       else if (action.type === 'search') {
         if (!recitingActive) setSearchActive(true)
       }
+      else if (appStore.getSnapshot().gathering) return
       else if (mushaf && leafPlace) appStore.toggleBookmarkAt(leafPlace.surahId, leafPlace.ayah)
       else onToggleBookmark(readingAyah)
     }
@@ -1112,6 +1350,8 @@ export function ReaderScreen({
       ? (content.surah.ayahCount - mountRange.hi) * AYAH_SPACER_EST_PX
       : 0
 
+  const railMarksForSurah = useMemo(() => (content ? railMarks(content.ayahs) : null), [content])
+
   if (!content) {
     return (
       <div
@@ -1149,10 +1389,13 @@ export function ReaderScreen({
       currentAyah={railAyah}
       currentPositionRef={focusedPositionRef}
       bookmarkedAyahs={bookmarkedAyahs}
+      placeAyah={parkedPlaceAyah}
+      marks={railMarksForSurah}
       side={side}
-      receded={receded}
+      receded={receded || editingNote != null}
       onJump={jumpToAyah}
       onExpandedChange={(expanded) => {
+        setRailOpen(expanded)
         if (expanded && ayahRailTipOpenRef.current) dismissAyahRailTip()
       }}
       onCollapsedCenterY={setAyahRailTipCenterY}
@@ -1171,7 +1414,7 @@ export function ReaderScreen({
   const nowPlaying = state.player.nowPlaying
   // Cover keeps this same bar and opens the return pill and Close into it.
   const coverChrome =
-    playbackPinned && stackLayer === COVER_LAYER && nowPlaying != null
+    playbackPinned && stackLayer === COVER_LAYER && nowPlaying != null && state.playbackSession
   const transportSurah = nowPlaying
     ? state.surahs.find((s) => s.id === nowPlaying.surahId) ?? null
     : null
@@ -1182,11 +1425,9 @@ export function ReaderScreen({
     : ''
   const openCoverVerse = () => {
     if (!nowPlaying) return
-    if (content.surah.id === nowPlaying.surahId) {
-      appStore.revealLayer(READER_LAYER)
-      return
-    }
-    appStore.openSurah(nowPlaying.surahId, Math.max(1, nowPlaying.ayah))
+    // Android: the return pill opens the reader AT the playing verse, even
+    // when its chapter is already the loaded one (openSurah only re-aims).
+    appStore.openReading(nowPlaying.surahId, Math.max(1, nowPlaying.ayah))
   }
   const keepWordInView =
     state.followEnabled && recitingActive && activeExceedsViewport
@@ -1216,8 +1457,12 @@ export function ReaderScreen({
       }
     : MUSHAF_INK_IDLE
   const reciterName =
-    state.reciters.find((r) => r.id === state.settings.reciterId)?.name ?? 'Reciter'
+    state.reciters.find((r) => r.id === state.settings.reciterId)?.name ?? ''
   const playerNotice = state.player.error
+  // Pause / spinner only when *this* chapter is the one playing (Android).
+  const thisSurahLoaded = nowPlaying?.surahId === content.surah.id
+  const bufferingHere = thisSurahLoaded && state.player.isBuffering && !state.player.isPlaying
+  const playingHereNow = thisSurahLoaded && state.player.isPlaying
   const matchLabel =
     searchMatches.length === 0
       ? activeQuery == null
@@ -1266,10 +1511,11 @@ export function ReaderScreen({
         />
       ) : null}
 
-      <div ref={mushafGrid.topRef} className="reader-top" data-receded={receded} data-search={searchActive}>
+      {mushafLeafChrome && !searchActive ? null : (
+      <div ref={mushafGrid.topRef} className="reader-top" data-receded={receded || editingNote != null} data-search={searchActive}>
         <button
           type="button"
-          className="back"
+          className={searchActive ? 'back' : 'back back--arrow'}
           aria-label={searchActive ? 'Close search' : 'Back to chapters'}
           disabled={!searchActive && recitingActive}
           onClick={() => {
@@ -1277,7 +1523,7 @@ export function ReaderScreen({
             else appStore.revealLayer(COVER_LAYER)
           }}
         >
-          {searchActive ? <IconClose /> : <span aria-hidden="true">←</span>}
+          {searchActive ? <IconClose /> : <IconArrowBack />}
         </button>
 
         {!mushaf && !searchActive && (pinnedTopNavTitle || content) ? (
@@ -1285,8 +1531,19 @@ export function ReaderScreen({
             className="reader-top-title"
             data-visible={showTopTitle && !chapterAdvancing}
             data-advancing={chapterAdvancing && pinnedTopNavTitle != null ? true : undefined}
+            data-follows={pinnedTopNavTitle == null ? true : undefined}
             aria-hidden={!showTopTitle && !pinnedTopNavTitle}
           >
+            <button
+              type="button"
+              className="reader-top-title-button"
+              aria-label="Scroll to top"
+              tabIndex={showTopTitle && !chapterAdvancing ? 0 : -1}
+              onClick={() => {
+                if (!showTopTitle || chapterAdvancing) return
+                scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+            >
             <OrnateSurahTitle
               ayahCount={pinnedTopNavTitle?.ayahCount ?? readerSurah!.ayahCount}
               chapterNumber={
@@ -1300,6 +1557,7 @@ export function ReaderScreen({
                 readerSurah!.nameTransliteration
               }
             />
+            </button>
           </div>
         ) : null}
 
@@ -1372,6 +1630,7 @@ export function ReaderScreen({
           </div>
         )}
       </div>
+      )}
 
       {/* Overlay on the sheet edge — never a flex sibling of the verse column. */}
       {rail}
@@ -1404,7 +1663,9 @@ export function ReaderScreen({
                   return
                 }
                 if (surahId !== content.surah.id) {
-                  appStore.openSurah(surahId, ayah)
+                  // Another chapter's words on this leaf: load it and recite
+                  // from the tapped word (Android `onMushafWordClick`).
+                  void appStore.openSurahAndPlay(surahId, ayah, position)
                   return
                 }
                 void appStore.playFromWord(ayah, position)
@@ -1412,15 +1673,22 @@ export function ReaderScreen({
             />
           ) : (
           <div className="edge-fade">
+            {previousSurah != null ? (
+              <PreviousChapterPullChrome surah={previousSurah} onOpen={openPreviousByPull} />
+            ) : null}
             <div
               className="scroll"
               ref={scrollRef}
               data-reciting={recessingAyahs || undefined}
+              data-rail-open={(railOpen && !mushaf) || undefined}
               data-stream-wait={streamWait || undefined}
               data-search-flash={flashTarget != null || undefined}
               data-search-focus-active={flashTarget?.focusActive || undefined}
               data-chapter-advancing={chapterAdvancing || undefined}
               data-english={state.settings.readingMode === 'english_only' || undefined}
+              onPointerDownCapture={() => {
+                editingAtPointerDown.current = editingNoteRef.current != null
+              }}
               style={{
                 ['--upcoming-alpha' as string]: String(inkTuning.upcomingAlpha),
                 ['--upcoming-cover' as string]: String(1 - inkTuning.upcomingAlpha),
@@ -1529,14 +1797,38 @@ export function ReaderScreen({
                       bookmarked={bookmarkedAyahs.has(ayah.number)}
                       bookmarkSide={bookmarkTipSide}
                       bookmarkChromeAlpha={1}
-                      bookmarkInteractive={!recitingActive}
+                      bookmarkInteractive={!recitingActive && editingNote == null}
                       speed={state.settings.playbackSpeed}
                       fontScale={state.settings.fontScale}
+                      placeMarked={ayah.number === parkedPlaceAyah}
+                      placeUnfurlSignal={ayah.number === placeUnfurl.ayah ? placeUnfurl.token : 0}
+                      idleTipAlways={idleTipAlways}
+                      onAyahTap={onAyahTap}
+                      annotationText={
+                        state.gathering || !state.settings.annotationsEnabled || !bookmarkedAyahs.has(ayah.number)
+                          ? null
+                          : editingNote?.ayah === ayah.number
+                            ? editingNote.text
+                            : annotationFor(state.annotations, content.surah.id, ayah.number)
+                      }
+                      isEditingAnnotation={
+                        !state.gathering && state.settings.annotationsEnabled &&
+                        bookmarkedAyahs.has(ayah.number) && editingNote?.ayah === ayah.number
+                      }
+                      annotationsHidden={recitingActive}
+                      recededForAnnotationEdit={editingNote != null && editingNote.ayah !== ayah.number}
+                      onAnnotationChange={onAnnotationChange}
+                      onAnnotationEditDone={onAnnotationEditDone}
+                      onEditAnnotation={
+                        state.gathering || !state.settings.annotationsEnabled ? undefined : onEditAnnotation
+                      }
+                      onAnnotationDelete={onAnnotationDelete}
                       onPlayWord={(ayahNumber, position) => {
                         if (state.gathering) {
                           appStore.onVerseTap(content.surah.id, ayahNumber)
                           return
                         }
+                        if (editingAtPointerDown.current || editingNoteRef.current != null) return
                         onPlayWord(ayahNumber, position)
                       }}
                       onToggleBookmark={onToggleBookmark}
@@ -1547,6 +1839,10 @@ export function ReaderScreen({
                       gathering={state.gathering}
                       gatherOrdinal={ordinals.get(ayahKey(content.surah.id, ayah.number)) ?? null}
                       onMarkTap={() => appStore.onMarkTap(content.surah.id, ayah.number)}
+                      onMarkHold={() => {
+                        commitOpenAnnotation()
+                        appStore.onMarkTap(content.surah.id, ayah.number)
+                      }}
                       onVerseBodyTap={() => appStore.onVerseTap(content.surah.id, ayah.number)}
                       searchQuery={
                         deferredQuery != null && matchAyahSet.has(ayah.number)
@@ -1596,8 +1892,12 @@ export function ReaderScreen({
           </div>
           )}
 
+          {backToPlaceVisible && !state.gathering ? <BackToPlacePill /> : null}
+
           {showReturn &&
           recitingActive &&
+          !playerNotice &&
+          !backToPlaceVisible &&
           playbackFocusTarget(state.activeAyah, state.activeBasmalah) != null ? (
             <ReturnToAyahButton
               pointUp={returnPointUp}
@@ -1610,42 +1910,19 @@ export function ReaderScreen({
           ) : null}
 
           {state.gathering ? (
-            <div ref={mushafGrid.footRef} className="share-ribbon" role="group" aria-label={
-              state.gatherSelection.length === 1
-                ? '1 verse selected'
-                : `${state.gatherSelection.length} verses selected`
-            }>
-              <button type="button" className="share-ribbon-icon" aria-label="Cancel share" onClick={() => appStore.exitGather()}>
-                <IconClose />
-              </button>
-              <span className="share-ribbon-error">{state.shareError}</span>
-              <CopyVerseLink selection={state.gatherSelection} />
-              <button
-                type="button"
-                className="share-ribbon-icon"
-                aria-label="Share as text"
-                disabled={state.gatherSelection.length === 0}
-                onClick={() => void appStore.shareGatheredText()}
-              >
-                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-                  <path fill="currentColor" d="M6 17h3l2-4V7H5v6h3l-2 4zm8 0h3l2-4V7h-6v6h3l-2 4z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="share-ribbon-icon"
-                aria-label="Share as image"
-                disabled={state.gatherSelection.length === 0}
-                onClick={() => void appStore.shareGatheredImage()}
-              >
-                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-                  <path fill="currentColor" d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5 11 16.5 14.5 12 19 18H5l3.5-4.5z" />
-                </svg>
-              </button>
-            </div>
+            <ShareRibbon
+              barRef={mushafGrid.footRef}
+              selection={state.gatherSelection}
+              error={state.shareError}
+              preparing={state.sharePreparing}
+              onCancel={() => appStore.exitGather()}
+              onShareText={() => void appStore.shareGatheredText()}
+              onShareImage={() => void appStore.shareGatheredImage()}
+            />
           ) : (
           <PlaybackPin active={playbackPinned}>
-          <div ref={mushafGrid.footRef} className={`player-bar${coverChrome ? ' cover-chrome' : ''}`} inert={ayahRailTipOpen || ayahRailTipRendered || bookmarkTipOpen || bookmarkTipRendered}>
+          <div ref={mushafGrid.footRef} className={`player-bar${coverChrome ? ' cover-chrome' : ''}`} data-mushaf-leaf={mushafLeafChrome || undefined} inert={ayahRailTipOpen || ayahRailTipRendered || bookmarkTipOpen || bookmarkTipRendered}>
+            {mushafLeafChrome ? <MushafPageDial /> : null}
             <div className="player-reciter-row">
               {playerNotice ? (
                 <div className="player-error">
@@ -1695,8 +1972,7 @@ export function ReaderScreen({
               >
                 <span className="player-return-chapter">{coverChapter}</span>
                 <span className="player-return-sep" aria-hidden="true">
-                  {' '}
-                  ·{' '}
+                  {'  ·  '}
                 </span>
                 <span className="player-return-ayah">{coverAyahLabel}</span>
                 <svg className="player-return-arrow" viewBox="0 0 24 24" aria-hidden="true">
@@ -1708,14 +1984,14 @@ export function ReaderScreen({
               </button>
             ) : null}
             <div className="player-transport">
+              {mushafLeafChrome ? <MushafTransportEnds reciting={recitingActive} /> : null}
               <button
                 type="button"
                 className="ctrl repeat-control"
                 data-receded={receded && repeatMode === 'off'}
                 data-active={repeatMode !== 'off'}
                 aria-pressed={repeatMode !== 'off'}
-                aria-label="Open repeat options"
-                aria-haspopup="dialog"
+                aria-label="Repeat"
                 aria-expanded={repeatOpen}
                 onClick={() => setRepeatOpen(true)}
               >
@@ -1725,6 +2001,7 @@ export function ReaderScreen({
                 type="button"
                 className="ctrl"
                 aria-label="Fast backward"
+                disabled={!thisSurahLoaded}
                 onClick={() => void appStore.fastBackward()}
               >
                 <IconFastRewind />
@@ -1733,21 +2010,19 @@ export function ReaderScreen({
                 type="button"
                 className="play"
                 aria-label={
-                  state.player.isBuffering && !state.player.isPlaying
+                  bufferingHere
                     ? 'Buffering'
-                    : state.player.isPlaying
+                    : playingHereNow
                       ? 'Pause'
                       : 'Play'
                 }
                 aria-keyshortcuts="Space"
-                aria-busy={
-                  (state.player.isBuffering && !state.player.isPlaying) || undefined
-                }
+                aria-busy={bufferingHere || undefined}
                 onClick={togglePlayback}
               >
-                {state.player.isBuffering && !state.player.isPlaying ? (
+                {bufferingHere ? (
                   <IconBuffering />
-                ) : state.player.isPlaying ? (
+                ) : playingHereNow ? (
                   <IconPause />
                 ) : (
                   <IconPlay />
@@ -1757,6 +2032,7 @@ export function ReaderScreen({
                 type="button"
                 className="ctrl"
                 aria-label="Fast forward"
+                disabled={!thisSurahLoaded}
                 onClick={() => void appStore.fastForward()}
               >
                 <IconFastForward />
@@ -1825,6 +2101,8 @@ export function ReaderScreen({
         ) : null}
       </PlaybackPin>
 
+      {isTop && !mushaf ? <MarkHoldOverlay /> : null}
+
       {/* Ink bleed lives on this sheet — not a full-viewport layer over the deck. */}
       <RootViewer />
       {repeatOpen && content ? <RepeatSheet
@@ -1833,6 +2111,10 @@ export function ReaderScreen({
         currentAyah={state.player.nowPlaying?.surahId === content.surah.id
           ? Math.max(1, state.player.nowPlaying.ayah) : focusedAyah || state.openAyah || 1}
         mode={repeatMode} range={state.player.repeatRange} retainedChoice={retainedRepeat.current}
+        liveAyah={() => {
+          const np = appStore.getSnapshot().player.nowPlaying
+          return np?.surahId === content.surah.id && np.ayah >= 1 ? np.ayah : null
+        }}
         onDismiss={() => setRepeatOpen(false)}
         onApply={(mode, range, choice) => {
           retainedRepeat.current = choice

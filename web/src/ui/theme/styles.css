@@ -174,88 +174,6 @@
   color-scheme: dark;
 }
 
-/* Settings → Developer → Legacy colours. The pre-ladder palette, verbatim. */
-:root[data-colors='legacy'] {
-  --ink-rung-strong: rgb(28 27 24 / 0.86);
-  --ink-rung-body: rgb(28 27 24 / 0.74);
-  --ink-rung-secondary: rgb(28 27 24 / 0.68);
-  --ink-rung-tertiary: rgb(110 104 88 / 0.85);
-  --ink-rung-muted: rgb(110 104 88 / 0.7);
-  --ink-rung-quiet: rgb(110 104 88 / 0.55);
-  --ink-rung-furniture: rgb(110 104 88 / 0.45);
-  --ink-rung-hairline: rgb(110 104 88 / 0.25);
-  --ink-rung-wash: rgb(110 104 88 / 0.12);
-  --gold: #b8901c;
-  --gold-ink: rgb(184 144 28 / 0.75);
-  --gold-bright: #e9cd7a;
-  --gold-deep: #8a6b1e;
-  --green-ink: rgb(14 92 74 / 0.88);
-  --green-quiet: rgb(14 92 74 / 0.75);
-  --green-wash: rgb(14 92 74 / 0.1);
-  --repeat: #b4551e;
-  --bookmark: #b3122f;
-  --annotation: #6b2838;
-}
-
-:root[data-colors='legacy'][data-theme='dark'] {
-  --paper: #0a0b0c;
-  --paper-surface: #111315;
-  --paper-high: #1a1d20;
-  --ink: #e8e2d5;
-  --ink-muted: #97917f;
-  --ink-rung-strong: rgb(232 226 213 / 0.86);
-  --ink-rung-body: rgb(232 226 213 / 0.74);
-  --ink-rung-secondary: rgb(232 226 213 / 0.68);
-  --ink-rung-tertiary: rgb(151 145 127 / 0.85);
-  --ink-rung-muted: rgb(151 145 127 / 0.7);
-  --ink-rung-quiet: rgb(151 145 127 / 0.55);
-  --ink-rung-furniture: rgb(151 145 127 / 0.45);
-  --ink-rung-hairline: rgb(151 145 127 / 0.25);
-  --ink-rung-wash: rgb(151 145 127 / 0.12);
-  --accent: #7fb8a4;
-  --on-accent: #0a0b0c;
-  --accent-soft: #7fb8a4;
-  --accent-container: #282d30;
-  --gold: #d9b44a;
-  --gold-ink: rgb(217 180 74 / 0.75);
-  --gold-bright: #edd188;
-  --gold-deep: #9a7b2a;
-  --green-ink: rgb(127 184 164 / 0.88);
-  --green-quiet: rgb(127 184 164 / 0.75);
-  --green-wash: rgb(127 184 164 / 0.1);
-  --repeat: #e06a18;
-  --bookmark: #d64358;
-  --annotation: #f0a5b1;
-  --glint: #f8e9be;
-}
-
-:root[data-colors='legacy'][data-theme='royal_green'] {
-  --ink: #e8e2d5;
-  --ink-muted: #97917f;
-  --ink-rung-strong: rgb(232 226 213 / 0.86);
-  --ink-rung-body: rgb(232 226 213 / 0.74);
-  --ink-rung-secondary: rgb(232 226 213 / 0.68);
-  --ink-rung-tertiary: rgb(151 145 127 / 0.85);
-  --ink-rung-muted: rgb(151 145 127 / 0.7);
-  --ink-rung-quiet: rgb(151 145 127 / 0.55);
-  --ink-rung-furniture: rgb(151 145 127 / 0.45);
-  --ink-rung-hairline: rgb(151 145 127 / 0.25);
-  --ink-rung-wash: rgb(151 145 127 / 0.12);
-  --accent: #7fb8a4;
-  --on-accent: #062c24;
-  --gold: #d9b44a;
-  --gold-ink: rgb(217 180 74 / 0.75);
-  --gold-bright: #edd188;
-  --gold-deep: #9a7b2a;
-  --green-ink: rgb(127 184 164 / 0.88);
-  --green-quiet: rgb(127 184 164 / 0.75);
-  --green-wash: rgb(127 184 164 / 0.1);
-  --repeat: #e06a18;
-  --bookmark: #d64358;
-  --annotation: #f0a5b1;
-  --glint: #f8e9be;
-}
-
 *,
 *::before,
 *::after {
@@ -445,11 +363,7 @@ select {
   --paper: #0a382e;
 }
 
-:root[data-colors='legacy'][data-theme='dark'] .sheet[data-name='settings'] {
-  --paper: #1a1d20;
-}
-
-:root:not([data-colors='legacy']) .sheet[data-name='settings'] {
+.sheet[data-name='settings'] {
   --ink-rung-strong: rgb(28 27 24 / 0.979);
   --ink-rung-body: rgb(28 27 24 / 0.81);
   --ink-rung-secondary: rgb(28 27 24 / 0.708);
@@ -461,7 +375,7 @@ select {
   --ink-rung-wash: rgb(110 104 88 / 0.14);
 }
 
-:root:not([data-colors='legacy'])[data-theme='dark'] .sheet[data-name='settings'] {
+[data-theme='dark'] .sheet[data-name='settings'] {
   --ink-rung-strong: rgb(243 236 223 / 0.967);
   --ink-rung-body: rgb(243 236 223 / 0.889);
   --ink-rung-secondary: rgb(243 236 223 / 0.826);
@@ -473,7 +387,7 @@ select {
   --ink-rung-wash: rgb(203 196 179 / 0.23);
 }
 
-:root:not([data-colors='legacy'])[data-theme='royal_green'] .sheet[data-name='settings'] {
+[data-theme='royal_green'] .sheet[data-name='settings'] {
   --ink-rung-strong: rgb(248 242 228 / 0.967);
   --ink-rung-body: rgb(248 242 228 / 0.885);
   --ink-rung-secondary: rgb(248 242 228 / 0.822);
@@ -598,6 +512,101 @@ select {
 .app-shell[data-skip-reader='true'] .sheet[data-name='reader'] {
   transition: none;
   visibility: hidden;
+}
+
+/*
+ * Phone paper deck — Android `paperLayerTransform`, driven by one stack
+ * position (`--stack-pos`): the layer at rest, a fraction while a sideways
+ * stroke holds a sheet (App.tsx sets it inline then). Chapters is the top
+ * sheet and turns away to the left (−5°), revealing the reader settling up
+ * from 5.5% right and 0.985 scale; the reader turns away (−4°) over
+ * Settings; Bookmarks comes in from the left. No shadows: flat paper.
+ */
+@media (max-width: 899px) {
+  .app-shell:not([data-spread='true']) {
+    --stack-pos: 0;
+    --settings-layer: 2;
+  }
+  .app-shell:not([data-spread='true'])[data-stack='-1'] { --stack-pos: -1; }
+  .app-shell:not([data-spread='true'])[data-stack='1'] { --stack-pos: 1; }
+  .app-shell:not([data-spread='true'])[data-stack='2'] { --stack-pos: 2; }
+  .app-shell:not([data-spread='true'])[data-has-reader='false'] { --settings-layer: 1; }
+
+  .app-shell:not([data-spread='true'])[data-stack] .sheet[data-name='home'] {
+    --turn: clamp(0, var(--stack-pos), 1);
+    z-index: 3;
+    opacity: 1;
+    transform: perspective(1200px) translateX(calc((-100% - 36px) * var(--turn))) rotateY(calc(-5deg * var(--turn)));
+    transition: transform 460ms cubic-bezier(0.24, 0.02, 0.12, 1);
+  }
+  /* Turned away: stay painted while it turns, then drop out. */
+  .app-shell:not([data-spread='true'])[data-stack='1'] .sheet[data-name='home'],
+  .app-shell:not([data-spread='true'])[data-stack='2'] .sheet[data-name='home'] {
+    visibility: hidden;
+    transition:
+      transform 460ms cubic-bezier(0.24, 0.02, 0.12, 1),
+      visibility 0s linear 460ms;
+  }
+
+  .app-shell:not([data-spread='true'])[data-stack] .sheet[data-name='reader'] {
+    --reveal: clamp(0, var(--stack-pos), 1);
+    --turn: clamp(0, var(--stack-pos) - 1, 1);
+    opacity: 1;
+    transform: perspective(1200px)
+      translateX(calc(5.5% * (1 - var(--reveal)) + (-100% - 36px) * var(--turn)))
+      scale(calc(0.985 + 0.015 * var(--reveal)))
+      rotateY(calc(-4deg * var(--turn)));
+  }
+  /* Parked under Chapters: keep its words while Chapters turns back over
+     it, then drop the long surah out of layout/paint as before. */
+  .app-shell:not([data-spread='true']):not([data-skip-reader='true'])[data-stack] .sheet[data-name='reader'][data-depth='0'][data-active='false'] {
+    transition:
+      transform 460ms cubic-bezier(0.24, 0.02, 0.12, 1),
+      content-visibility 0s linear 460ms allow-discrete;
+  }
+
+  .app-shell:not([data-spread='true'])[data-stack] .sheet[data-name='bookmarks'] {
+    --reveal: clamp(0, -1 * var(--stack-pos), 1);
+    opacity: 1;
+    transform: perspective(1200px)
+      translateX(calc((-100% - 36px) * (1 - var(--reveal))))
+      rotateY(calc(-4deg * (1 - var(--reveal))));
+  }
+  .app-shell:not([data-spread='true'])[data-stack] .sheet[data-name='bookmarks'][data-active='false'] {
+    visibility: hidden;
+    transition:
+      transform 460ms cubic-bezier(0.24, 0.02, 0.12, 1),
+      visibility 0s linear 460ms,
+      content-visibility 0s linear 460ms allow-discrete;
+  }
+
+  .app-shell:not([data-spread='true'])[data-stack] .sheet[data-name='settings'] {
+    --reveal: clamp(0, var(--stack-pos) / var(--settings-layer), 1);
+    transform: scale(calc(0.985 + 0.015 * var(--reveal)));
+  }
+
+  /* A stroke holds the sheets: they follow the finger, not a transition. */
+  .app-shell[data-dragging='true'] .sheet {
+    transition: none !important;
+  }
+  .app-shell[data-dragging='true'] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .app-shell:not([data-spread='true'])[data-dragging='true'][data-stack] .sheet:is([data-name='home'], [data-name='bookmarks'], [data-name='settings']),
+  .app-shell:not([data-spread='true'])[data-dragging='true'][data-has-reader='true']:not([data-skip-reader='true']) .sheet[data-name='reader'] {
+    visibility: visible;
+    content-visibility: visible;
+  }
+
+  /* A sideways stroke anywhere on a sheet belongs to the stack: without
+     this the browser claims it as a pan (pointercancel) outside the
+     chapter scrollers — on the player bar, and on the whole Settings page,
+     which scrolls itself. */
+  .app-shell:not([data-spread='true']),
+  .app-shell:not([data-spread='true']) .sheet[data-name='settings'] .settings {
+    touch-action: pan-y pinch-zoom;
+  }
 }
 
 /* Left-edge hit target — desktop peek gutter only (phones have no peek). */
@@ -3345,7 +3354,7 @@ button.ayah-mark {
 
 .player-bar .ctrl.speed {
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: lining-nums;
   min-width: 48px;
 }
@@ -3494,7 +3503,7 @@ button.ayah-mark {
 }
 
 /* Idle tip only while the verse is hovered; saved ribbons stay visible. */
-.ayah-block:not(:hover) .verse-ribbon[data-on='false']:not(:focus-visible) .verse-ribbon-canvas {
+.ayah-block:not(:hover) .verse-ribbon[data-on='false']:not(:focus-visible):not([data-idle-tip='always']) .verse-ribbon-canvas {
   opacity: 0;
 }
 

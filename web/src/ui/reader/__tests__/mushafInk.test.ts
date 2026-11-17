@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import type { ActiveWord } from '../../../data/models'
 import { InkState } from '../InkEngine'
-import { MUSHAF_INK_IDLE, mushafMarkWaits, mushafReadHistory, mushafTokenInk, type MushafInk } from '../mushafInk'
+import { MUSHAF_INK_IDLE, mushafMarkWaits, mushafReadHistory, mushafTokenInk, mushafVerseInk, type MushafInk } from '../mushafInk'
+
+describe('mushafVerseInk', () => {
+  const reciting: MushafInk = { ...MUSHAF_INK_IDLE, reciting: true, inkAyah: 5, leadAyah: null }
+  it('washes the voiced verse, holds read ones, recesses the rest', () => {
+    expect(mushafVerseInk({ surahId: 2, ayah: 5 }, 2, reciting, true)).toBe('active')
+    expect(mushafVerseInk({ surahId: 2, ayah: 4 }, 2, reciting, true)).toBe('plain')
+    expect(mushafVerseInk({ surahId: 2, ayah: 6 }, 2, reciting, true)).toBe('upcoming')
+    expect(mushafVerseInk({ surahId: 3, ayah: 1 }, 2, reciting, true)).toBe('upcoming')
+    expect(mushafVerseInk({ surahId: 1, ayah: 7 }, 2, reciting, true)).toBe('plain')
+  })
+  it('stays plain away from the voice', () => {
+    expect(mushafVerseInk({ surahId: 2, ayah: 6 }, 2, reciting, false)).toBe('plain')
+    expect(mushafVerseInk({ surahId: 2, ayah: 6 }, 2, MUSHAF_INK_IDLE, true)).toBe('plain')
+  })
+})
 
 const word = (ayah: number, wordPosition: number, extra: Partial<ActiveWord> = {}): ActiveWord => ({
   ayah,
