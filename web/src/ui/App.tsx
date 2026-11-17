@@ -49,7 +49,8 @@ function retryBoot() {
         await Promise.all(regs.map((r) => r.unregister()))
       }
       if (window.caches) {
-        const keys = await caches.keys()
+        // Recitation audio (incl. downloads) cannot break boot; keep it.
+        const keys = (await caches.keys()).filter((k) => !k.startsWith('beautiful-quran-audio-'))
         await Promise.all(keys.map((k) => caches.delete(k)))
       }
     } catch {
@@ -134,11 +135,6 @@ export function App() {
       const resolved = resolveTheme(state.settings.themeMode)
       if (resolved === 'light') document.documentElement.removeAttribute('data-theme')
       else document.documentElement.setAttribute('data-theme', resolved)
-      if (state.settings.colorSystem === 'legacy') {
-        document.documentElement.dataset.colors = 'legacy'
-      } else {
-        delete document.documentElement.dataset.colors
-      }
 
       // Cover owns theme-color while the leather is up.
       if (!entranceDone) return
@@ -146,7 +142,7 @@ export function App() {
       if (meta) {
         meta.setAttribute(
           'content',
-          resolved === 'light' ? '#FAF3E8' : resolved === 'royal_green' ? '#062C24' : state.settings.colorSystem === 'legacy' ? '#0A0B0C' : '#0C0B09',
+          resolved === 'light' ? '#FAF3E8' : resolved === 'royal_green' ? '#062C24' : '#0C0B09',
         )
       }
     }
@@ -155,7 +151,7 @@ export function App() {
     const preference = window.matchMedia('(prefers-color-scheme: dark)')
     preference.addEventListener('change', apply)
     return () => preference.removeEventListener('change', apply)
-  }, [state.settings.themeMode, state.settings.colorSystem, entranceDone])
+  }, [state.settings.themeMode, entranceDone])
 
   useEffect(() => {
     window.addEventListener('pointerdown', unlockPageTurnSounds, true)

@@ -174,88 +174,6 @@
   color-scheme: dark;
 }
 
-/* Settings → Developer → Legacy colours. The pre-ladder palette, verbatim. */
-:root[data-colors='legacy'] {
-  --ink-rung-strong: rgb(28 27 24 / 0.86);
-  --ink-rung-body: rgb(28 27 24 / 0.74);
-  --ink-rung-secondary: rgb(28 27 24 / 0.68);
-  --ink-rung-tertiary: rgb(110 104 88 / 0.85);
-  --ink-rung-muted: rgb(110 104 88 / 0.7);
-  --ink-rung-quiet: rgb(110 104 88 / 0.55);
-  --ink-rung-furniture: rgb(110 104 88 / 0.45);
-  --ink-rung-hairline: rgb(110 104 88 / 0.25);
-  --ink-rung-wash: rgb(110 104 88 / 0.12);
-  --gold: #b8901c;
-  --gold-ink: rgb(184 144 28 / 0.75);
-  --gold-bright: #e9cd7a;
-  --gold-deep: #8a6b1e;
-  --green-ink: rgb(14 92 74 / 0.88);
-  --green-quiet: rgb(14 92 74 / 0.75);
-  --green-wash: rgb(14 92 74 / 0.1);
-  --repeat: #b4551e;
-  --bookmark: #b3122f;
-  --annotation: #6b2838;
-}
-
-:root[data-colors='legacy'][data-theme='dark'] {
-  --paper: #0a0b0c;
-  --paper-surface: #111315;
-  --paper-high: #1a1d20;
-  --ink: #e8e2d5;
-  --ink-muted: #97917f;
-  --ink-rung-strong: rgb(232 226 213 / 0.86);
-  --ink-rung-body: rgb(232 226 213 / 0.74);
-  --ink-rung-secondary: rgb(232 226 213 / 0.68);
-  --ink-rung-tertiary: rgb(151 145 127 / 0.85);
-  --ink-rung-muted: rgb(151 145 127 / 0.7);
-  --ink-rung-quiet: rgb(151 145 127 / 0.55);
-  --ink-rung-furniture: rgb(151 145 127 / 0.45);
-  --ink-rung-hairline: rgb(151 145 127 / 0.25);
-  --ink-rung-wash: rgb(151 145 127 / 0.12);
-  --accent: #7fb8a4;
-  --on-accent: #0a0b0c;
-  --accent-soft: #7fb8a4;
-  --accent-container: #282d30;
-  --gold: #d9b44a;
-  --gold-ink: rgb(217 180 74 / 0.75);
-  --gold-bright: #edd188;
-  --gold-deep: #9a7b2a;
-  --green-ink: rgb(127 184 164 / 0.88);
-  --green-quiet: rgb(127 184 164 / 0.75);
-  --green-wash: rgb(127 184 164 / 0.1);
-  --repeat: #e06a18;
-  --bookmark: #d64358;
-  --annotation: #f0a5b1;
-  --glint: #f8e9be;
-}
-
-:root[data-colors='legacy'][data-theme='royal_green'] {
-  --ink: #e8e2d5;
-  --ink-muted: #97917f;
-  --ink-rung-strong: rgb(232 226 213 / 0.86);
-  --ink-rung-body: rgb(232 226 213 / 0.74);
-  --ink-rung-secondary: rgb(232 226 213 / 0.68);
-  --ink-rung-tertiary: rgb(151 145 127 / 0.85);
-  --ink-rung-muted: rgb(151 145 127 / 0.7);
-  --ink-rung-quiet: rgb(151 145 127 / 0.55);
-  --ink-rung-furniture: rgb(151 145 127 / 0.45);
-  --ink-rung-hairline: rgb(151 145 127 / 0.25);
-  --ink-rung-wash: rgb(151 145 127 / 0.12);
-  --accent: #7fb8a4;
-  --on-accent: #062c24;
-  --gold: #d9b44a;
-  --gold-ink: rgb(217 180 74 / 0.75);
-  --gold-bright: #edd188;
-  --gold-deep: #9a7b2a;
-  --green-ink: rgb(127 184 164 / 0.88);
-  --green-quiet: rgb(127 184 164 / 0.75);
-  --green-wash: rgb(127 184 164 / 0.1);
-  --repeat: #e06a18;
-  --bookmark: #d64358;
-  --annotation: #f0a5b1;
-  --glint: #f8e9be;
-}
-
 *,
 *::before,
 *::after {
@@ -445,11 +363,7 @@ select {
   --paper: #0a382e;
 }
 
-:root[data-colors='legacy'][data-theme='dark'] .sheet[data-name='settings'] {
-  --paper: #1a1d20;
-}
-
-:root:not([data-colors='legacy']) .sheet[data-name='settings'] {
+.sheet[data-name='settings'] {
   --ink-rung-strong: rgb(28 27 24 / 0.979);
   --ink-rung-body: rgb(28 27 24 / 0.81);
   --ink-rung-secondary: rgb(28 27 24 / 0.708);
@@ -461,7 +375,7 @@ select {
   --ink-rung-wash: rgb(110 104 88 / 0.14);
 }
 
-:root:not([data-colors='legacy'])[data-theme='dark'] .sheet[data-name='settings'] {
+[data-theme='dark'] .sheet[data-name='settings'] {
   --ink-rung-strong: rgb(243 236 223 / 0.967);
   --ink-rung-body: rgb(243 236 223 / 0.889);
   --ink-rung-secondary: rgb(243 236 223 / 0.826);
@@ -473,7 +387,7 @@ select {
   --ink-rung-wash: rgb(203 196 179 / 0.23);
 }
 
-:root:not([data-colors='legacy'])[data-theme='royal_green'] .sheet[data-name='settings'] {
+[data-theme='royal_green'] .sheet[data-name='settings'] {
   --ink-rung-strong: rgb(248 242 228 / 0.967);
   --ink-rung-body: rgb(248 242 228 / 0.885);
   --ink-rung-secondary: rgb(248 242 228 / 0.822);

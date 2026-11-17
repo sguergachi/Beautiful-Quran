@@ -6,51 +6,40 @@ import {
   type RuntimeCacheFailure,
   type RuntimeCacheStatus,
 } from '../../data/runtimeMushaf'
+import { QF_TIMING_RECITERS, runtimeTimingsCache } from '../../data/runtimeTimings'
 import {
   MUSHAF_GLYPH_WIDENS,
   type HomeBookmarkStyle,
-  type BrushCircleStyle,
   type MushafGlyphWiden,
 } from '../../data/settings'
 import { customizeSummary } from '../../data/customizePolicy'
+import { formatUsage } from '../../playback/recitationDownloads'
 import { CustomizeScreen } from './CustomizeScreen'
 import { AcknowledgementsScreen } from './AcknowledgementsScreen'
+import { ComponentKitScreen, type InkLabState } from './ComponentKitScreen'
+import { DownloadManagerScreen, useRecitationUsage } from './DownloadManagerScreen'
 import { ReadingHelp } from './ReadingHelp'
 import { ReciterChoices, RecitersScreen } from './RecitersScreen'
-import { NuqtaLab } from './NuqtaLab'
 import { settingsLayerFor, type StackLayer } from '../paper/stack'
 import {
-  BRUSH_CHECK_KNOB_SLIDERS,
-  formatBrushCheckCopy,
-  formatBrushCheckVerifyLines,
-  parseBrushCheckFromText,
   SHIPPED_CHECK_PARAMS,
   SHIPPED_CHECK_REVISION,
-  type BrushCheckKnobKey,
   type BrushCheckParams,
 } from '../kit/brushCheck'
 import {
-  BRUSH_CIRCLE_STYLE_IDS,
-  BRUSH_KNOB_SLIDERS,
   brushCircleParams,
-  formatBrushKnobsExact,
-  formatBrushKnobsVerifyLines,
-  formatBrushParamsCopy,
-  parseBrushParamsFromText,
   SHIPPED_BRUSH_REVISION,
   type BrushCircleParams,
-  type BrushKnobKey,
 } from '../kit/brushMark'
 import { AlphaTag } from '../kit/AlphaTag'
 import { BackChevron } from '../kit/BackChevron'
 import { DisclosureChevron } from '../kit/DisclosureChevron'
-import { InkCheckMark } from '../kit/InkCheckMark'
 import { PaperChoiceList } from '../kit/PaperChoiceList'
-import { PaperSlider } from '../kit/PaperSlider'
 import { NuqtaParamsContext, SHIPPED_NUQTA, type NuqtaParams } from '../kit/nuqta'
 import { PaperSwitch } from '../kit/PaperSwitch'
 import { rearmEducation } from '../../data/education'
 import { version as APP_VERSION } from '../../../package.json'
+import './settings.css'
 
 const HOME_BOOKMARK_OPTIONS: { value: HomeBookmarkStyle; label: string }[] = [
   { value: 'top_bound', label: 'Top-bound ribbon' },
@@ -59,6 +48,8 @@ const HOME_BOOKMARK_OPTIONS: { value: HomeBookmarkStyle; label: string }[] = [
 
 /** Triple-tap window for developer unlock — matches Android SettingsScreen. */
 const DEVELOPER_TAP_RESET_MS = 1500
+
+type SettingsPage = 'main' | 'reciters' | 'customize' | 'downloads' | 'acknowledgements' | 'help' | 'kit'
 
 export function SettingsScreen({
   stackLayer,
@@ -70,6 +61,7 @@ export function SettingsScreen({
   // Settings ignores karaoke emits — only settings / reciter catalog matter.
   const s = useAppSelector((st) => st.settings)
   const reciters = useAppSelector((st) => st.reciters)
+  const surahs = useAppSelector((st) => st.surahs)
   const layer = settingsLayerFor(hasReader)
   const isTop = stackLayer === layer
   // Once it has been laid on the page, the sheet is drawn back off it when it
@@ -77,9 +69,10 @@ export function SettingsScreen({
   const [laid, setLaid] = useState(false)
   if (isTop && !laid) setLaid(true)
   const depth = Math.max(0, stackLayer - layer)
-  const [page, setPage] = useState<'main' | 'reciters' | 'customize' | 'acknowledgements' | 'help'>('main')
+  const [page, setPage] = useState<SettingsPage>('main')
   const scrollRef = useRef<HTMLDivElement>(null)
   const favoriteReciters = reciters.filter((reciter) => s.favoriteReciterIds.includes(reciter.id))
+  const usage = useRecitationUsage(isTop && page === 'main')
 
   useEffect(() => {
     if (!isTop) setPage('main')
@@ -101,7 +94,8 @@ export function SettingsScreen({
     return () => window.removeEventListener('keydown', onKey, true)
   }, [isTop, page])
 
-  // Session-only live knobs for the brush labs (not persisted).
+  // Session-only live knobs for the ink labs (not persisted). Owned here so
+  // Customize and every Settings control follow the Component kit live.
   const [brushParams, setBrushParams] = useState<BrushCircleParams>(() =>
     brushCircleParams(s.brushCircleStyle),
   )
@@ -111,36 +105,14 @@ export function SettingsScreen({
   const [paintToken, setPaintToken] = useState(0)
   const [checkPaintToken, setCheckPaintToken] = useState(0)
   const [nuqtaParams, setNuqtaParams] = useState<NuqtaParams>(() => ({ ...SHIPPED_NUQTA }))
-  const [checkPreviewOn, setCheckPreviewOn] = useState(true)
-  const [, setCacheClock] = useState(0)
-
-  useEffect(() => {
-    if (!s.developerMode) return
-    const tick = () => setCacheClock((value) => value + 1)
-    const unsubscribes = [
-      runtimeMushafCache?.subscribeDiagnostics(tick),
-    ]
-    const interval = window.setInterval(tick, 60_000)
-    return () => {
-      unsubscribes.forEach((unsubscribe) => unsubscribe?.())
-      window.clearInterval(interval)
-    }
-  }, [s.developerMode])
   /** Bumps when paste/reset/preset loads so Base UI sliders remount with exact values. */
   const [sliderEpoch, setSliderEpoch] = useState(0)
   const [checkSliderEpoch, setCheckSliderEpoch] = useState(0)
-  const [copyNote, setCopyNote] = useState<string | null>(null)
-  const [presetsOpen, setPresetsOpen] = useState(false)
-  const [pasteText, setPasteText] = useState('')
-  const [checkPasteText, setCheckPasteText] = useState('')
   const [developerTapCount, setDeveloperTapCount] = useState(0)
   const [educationRearmed, setEducationRearmed] = useState(false)
-  const pasteRef = useRef<HTMLTextAreaElement>(null)
-  const checkPasteRef = useRef<HTMLTextAreaElement>(null)
   const lastStyleRef = useRef(s.brushCircleStyle)
   const lastShipRef = useRef(SHIPPED_BRUSH_REVISION)
   const lastCheckShipRef = useRef(SHIPPED_CHECK_REVISION)
-  const runtimeCacheStatus = runtimeMushafCache?.status() ?? null
 
   // Reseed when the saved preset changes, or when shipped BASE revision bumps.
   useEffect(() => {
@@ -178,31 +150,26 @@ export function SettingsScreen({
     return () => window.clearTimeout(t)
   }, [developerTapCount])
 
-  // Clear copy flash after a beat.
-  useEffect(() => {
-    if (!copyNote) return
-    const t = window.setTimeout(() => setCopyNote(null), 2200)
-    return () => window.clearTimeout(t)
-  }, [copyNote])
-
-  const setKnob = (key: BrushKnobKey, value: number) => {
-    setBrushParams((prev) => ({ ...prev, label: 'Custom', [key]: value }))
-    setPaintToken((n) => n + 1)
+  const lab: InkLabState = {
+    brushStyle: s.brushCircleStyle,
+    brushParams,
+    setBrushParams,
+    paintToken,
+    bumpPaint: () => setPaintToken((n) => n + 1),
+    sliderEpoch,
+    bumpSliders: () => setSliderEpoch((n) => n + 1),
+    checkParams,
+    setCheckParams,
+    checkPaintToken,
+    bumpCheckPaint: () => setCheckPaintToken((n) => n + 1),
+    checkSliderEpoch,
+    bumpCheckSliders: () => setCheckSliderEpoch((n) => n + 1),
+    nuqtaParams,
+    setNuqtaParams,
+    noteStyle: (style) => {
+      lastStyleRef.current = style
+    },
   }
-
-  const setCheckKnob = (key: BrushCheckKnobKey, value: number) => {
-    setCheckParams((prev) => ({ ...prev, [key]: value }))
-    setCheckPaintToken((n) => n + 1)
-  }
-
-  const loadPreset = (id: BrushCircleStyle) => {
-    appStore.updateSettings({ brushCircleStyle: id })
-    setBrushParams(brushCircleParams(id))
-    setPaintToken((n) => n + 1)
-    setSliderEpoch((n) => n + 1)
-  }
-
-  const flashNote = (msg: string) => setCopyNote(msg)
 
   const onLogoClick = () => {
     const next = developerTapCount + 1
@@ -214,143 +181,7 @@ export function SettingsScreen({
     }
   }
 
-  /** Clipboard API often fails in preview iframes — fall back to execCommand + field. */
-  const copyTextRobust = (text: string): boolean => {
-    try {
-      const el = document.createElement('textarea')
-      el.value = text
-      el.setAttribute('readonly', '')
-      el.style.position = 'fixed'
-      el.style.top = '0'
-      el.style.left = '0'
-      el.style.width = '1px'
-      el.style.height = '1px'
-      el.style.padding = '0'
-      el.style.border = 'none'
-      el.style.outline = 'none'
-      el.style.boxShadow = 'none'
-      el.style.background = 'transparent'
-      el.style.opacity = '0'
-      document.body.appendChild(el)
-      el.focus()
-      el.select()
-      el.setSelectionRange(0, text.length)
-      const ok = document.execCommand('copy')
-      document.body.removeChild(el)
-      if (ok) return true
-    } catch {
-      // continue
-    }
-    return false
-  }
-
-  const copyParams = async () => {
-    const text = formatBrushParamsCopy(brushParams)
-    if (navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(text)
-        flashNote('Copied TS + Kotlin params')
-        return
-      } catch {
-        // fall through
-      }
-    }
-    if (copyTextRobust(text)) {
-      flashNote('Copied TS + Kotlin params')
-      return
-    }
-    setPasteText(text)
-    window.requestAnimationFrame(() => {
-      pasteRef.current?.focus()
-      pasteRef.current?.select()
-    })
-    flashNote('Selected in field — press ⌘/Ctrl+C')
-  }
-
-  const applyPaste = (raw: string) => {
-    const parsed = parseBrushParamsFromText(raw, brushParams)
-    if (!parsed) {
-      flashNote('No brush knobs found in paste')
-      return
-    }
-    if (s.brushCircleStyle !== 'baseline') {
-      lastStyleRef.current = 'baseline'
-      appStore.updateSettings({ brushCircleStyle: 'baseline' })
-    }
-    setBrushParams({ ...parsed, label: 'Custom' })
-    setPaintToken((n) => n + 1)
-    setSliderEpoch((n) => n + 1)
-    setPasteText(raw.trim())
-    flashNote(`Applied: ${formatBrushKnobsExact(parsed)}`)
-  }
-
-  const copyCheckParams = async () => {
-    const text = formatBrushCheckCopy(checkParams)
-    if (navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(text)
-        flashNote('Copied check params')
-        return
-      } catch {
-        // fall through
-      }
-    }
-    if (copyTextRobust(text)) {
-      flashNote('Copied check params')
-      return
-    }
-    setCheckPasteText(text)
-    window.requestAnimationFrame(() => {
-      checkPasteRef.current?.focus()
-      checkPasteRef.current?.select()
-    })
-    flashNote('Selected in field — press ⌘/Ctrl+C')
-  }
-
-  const applyCheckPaste = (raw: string) => {
-    const parsed = parseBrushCheckFromText(raw, checkParams)
-    if (!parsed) {
-      flashNote('No check knobs found in paste')
-      return
-    }
-    setCheckParams(parsed)
-    setCheckPaintToken((n) => n + 1)
-    setCheckSliderEpoch((n) => n + 1)
-    setCheckPasteText(raw.trim())
-    flashNote('Applied check params')
-  }
-
-  const pasteCheckFromClipboard = async () => {
-    if (navigator.clipboard?.readText) {
-      try {
-        const text = await navigator.clipboard.readText()
-        if (text.trim()) {
-          applyCheckPaste(text)
-          return
-        }
-      } catch {
-        // fall through
-      }
-    }
-    flashNote('Paste into the check field below, then Apply')
-    checkPasteRef.current?.focus()
-  }
-
-  const pasteFromClipboard = async () => {
-    if (navigator.clipboard?.readText) {
-      try {
-        const text = await navigator.clipboard.readText()
-        if (text.trim()) {
-          applyPaste(text)
-          return
-        }
-      } catch {
-        // fall through
-      }
-    }
-    flashNote('Paste into the field below, then Apply')
-    pasteRef.current?.focus()
-  }
+  const back = () => setPage('main')
 
   return (
     <div
@@ -370,7 +201,7 @@ export function SettingsScreen({
             favorites={s.favoriteReciterIds}
             onSelect={(reciterId) => appStore.updateSettings({ reciterId })}
             onToggleFavorite={(id) => appStore.toggleFavoriteReciter(id)}
-            onBack={() => setPage('main')}
+            onBack={back}
           />
         ) : page === 'customize' ? (
           <CustomizeScreen
@@ -379,12 +210,16 @@ export function SettingsScreen({
             paintToken={paintToken}
             checkParams={checkParams}
             checkPaintToken={checkPaintToken}
-            onBack={() => setPage('main')}
+            onBack={back}
           />
+        ) : page === 'downloads' ? (
+          <DownloadManagerScreen reciters={reciters} surahs={surahs} onBack={back} />
+        ) : page === 'kit' ? (
+          <ComponentKitScreen lab={lab} onBack={back} />
         ) : page === 'help' ? (
-          <ReadingHelp hintsEnabled={s.educationGuidesEnabled} onBack={() => setPage('main')} />
+          <ReadingHelp onBack={back} />
         ) : page === 'acknowledgements' ? (
-          <AcknowledgementsScreen onBack={() => setPage('main')} />
+          <AcknowledgementsScreen onBack={back} />
         ) : (
           <>
         <button
@@ -413,43 +248,26 @@ export function SettingsScreen({
           </button>
         </section>
 
-        {/* Android: Customize follows reciter selection, without another heading. */}
-        <section className="settings-section">
-          <button
-            type="button"
-            className="settings-nav"
-            onClick={() => setPage('customize')}
-          >
-            <span className="settings-nav-copy">
-              <span className="settings-nav-label">Customize</span>
-              <span className="settings-nav-note">{customizeSummary(s)}</span>
-            </span>
-            <DisclosureChevron expanded={false} />
-          </button>
-        </section>
-
-        <section className="settings-section">
-          <button type="button" className="settings-nav" onClick={() => setPage('help')}>
-            <span className="settings-nav-copy">
-              <span className="settings-nav-label">Reading help</span>
-              <span className="settings-nav-note">Word meanings, bookmarks, sharing and keyboard shortcuts</span>
-            </span>
-            <DisclosureChevron expanded={false} />
-          </button>
-        </section>
-
-        <section className="settings-section">
-          <button
-            type="button"
-            className="settings-nav"
+        {/* Android: Customize follows reciter selection, without another
+            heading; then Download manager and Acknowledgements, 20px apart.
+            Reading help (keyboard shortcuts) is the web's own, so it follows. */}
+        <section className="settings-section settings-section-nav">
+          <NavRow label="Customize" note={customizeSummary(s)} onClick={() => setPage('customize')} />
+          <NavRow
+            label="Download manager"
+            note={usage ? formatUsage(usage) : '…'}
+            onClick={() => setPage('downloads')}
+          />
+          <NavRow
+            label="Acknowledgements"
+            note="Quran text, timings, audio, typeface"
             onClick={() => setPage('acknowledgements')}
-          >
-            <span className="settings-nav-copy">
-              <span className="settings-nav-label">Acknowledgements</span>
-              <span className="settings-nav-note">Quran text, timings, audio, typeface</span>
-            </span>
-            <DisclosureChevron expanded={false} />
-          </button>
+          />
+          <NavRow
+            label="Reading help"
+            note="Word meanings, bookmarks, sharing and keyboard shortcuts"
+            onClick={() => setPage('help')}
+          />
         </section>
 
         {s.developerMode ? (
@@ -457,52 +275,32 @@ export function SettingsScreen({
             <h2>Developer</h2>
             <p className="settings-caption">Tools for testing work in progress.</p>
 
-            <div className="settings-dev-block">
-              <p>Quran Foundation word &amp; QCF cache</p>
-              <p className="settings-caption">
-                {formatRuntimeCache(runtimeCacheStatus)}
-              </p>
-              <button
-                type="button"
-                className="settings-dev-link settings-dev-primary"
-                disabled={!runtimeMushafCache || runtimeCacheStatus?.phase === 'refreshing'}
-                onClick={() => void runtimeMushafCache?.refresh()}
-              >
-                {runtimeCacheStatus?.phase === 'refreshing'
-                  ? 'Updating Quran cache…'
-                  : 'Force seven-day cache update'}
-              </button>
-              <p className="settings-caption">
-                Forces the authenticated Content Sync used when the cache is due.
-                Only QF changes are applied from the saved checkpoint.
-              </p>
+            <div className="settings-dev-row">
+              <RuntimeCacheStatus active={isTop && page === 'main'} />
             </div>
 
-            <div className="settings-dev-block">
+            <div className="settings-dev-row">
               <PaperSwitch
-                id="setting-legacy-colours"
-                label="Legacy colours"
-                checked={s.colorSystem === 'legacy'}
+                id="setting-feature-guides"
+                label="Contextual feature guides"
+                checked={s.educationGuidesEnabled}
                 checkParams={checkParams}
                 paintToken={checkPaintToken}
-                onChange={(legacy) =>
-                  appStore.updateSettings({ colorSystem: legacy ? 'legacy' : 'ladder' })
-                }
+                onChange={(enabled) => {
+                  if (enabled) rearmEducation()
+                  setEducationRearmed(enabled)
+                  appStore.updateSettings({ educationGuidesEnabled: enabled })
+                }}
               />
               <p className="settings-caption">
-                Repaints the app in the palette that preceded the ink ladder —
-                the blue-cast Nightfall sheet and the un-corrected accents.
-                Close to the old build but not exact: the ladder collapsed 54
-                alphas onto 10 rungs, so each rung comes back at the weight
-                most of its call sites used to carry. Switch with a chapter
-                open to compare.
+                Off by default. Guides appear only after their matching gesture.
               </p>
             </div>
 
-            <div className="settings-dev-block">
+            <div className="settings-dev-row">
               <button
                 type="button"
-                className="settings-dev-link settings-dev-primary"
+                className="settings-dev-link"
                 onClick={() => {
                   rearmEducation()
                   appStore.updateSettings({ educationGuidesEnabled: true })
@@ -518,19 +316,30 @@ export function SettingsScreen({
               </p>
             </div>
 
-            <button
-              type="button"
-              className="settings-dev-link settings-dev-primary"
-              onClick={() => {
-                location.hash = '#lab'
-              }}
-            >
-              Ornaments Lab
-            </button>
-            <p className="settings-caption">
-              Explore, design, and save seeds for the procedural ornament
-              generator.
-            </p>
+            <div className="settings-dev-row">
+              <button
+                type="button"
+                className="settings-dev-link"
+                onClick={() => {
+                  location.hash = '#lab'
+                }}
+              >
+                Ornaments Lab
+              </button>
+              <p className="settings-caption">
+                Explore, design, and save seeds for the procedural star-and-cross
+                ornament generator.
+              </p>
+            </div>
+
+            <div className="settings-dev-row">
+              <button type="button" className="settings-dev-link" onClick={() => setPage('kit')}>
+                Component kit
+              </button>
+              <p className="settings-caption">
+                Tune the nuqta, ink check and brush circle live, one component per page.
+              </p>
+            </div>
 
             <div className="settings-dev-block">
               <PaperSwitch
@@ -584,217 +393,6 @@ export function SettingsScreen({
               />
             </div>
 
-            <div className="settings-dev-block">
-              <p className="settings-body-label">Selector brush circle</p>
-              <button
-                type="button"
-                className="settings-dev-link brush-lab-presets-toggle"
-                aria-expanded={presetsOpen}
-                onClick={() => setPresetsOpen((o) => !o)}
-              >
-                <span>Presets</span>
-                <DisclosureChevron expanded={presetsOpen} />
-                <span className="brush-lab-presets-current">
-                  {brushCircleParams(s.brushCircleStyle).label}
-                </span>
-              </button>
-              {presetsOpen ? (
-                <PaperChoiceList
-                  aria-label="Selector brush circle preset"
-                  value={s.brushCircleStyle}
-                  options={BRUSH_CIRCLE_STYLE_IDS.map((id) => ({
-                    value: id,
-                    label: brushCircleParams(id).label,
-                  }))}
-                  onChange={(v) => loadPreset(v as BrushCircleStyle)}
-                />
-              ) : null}
-              <div className="brush-lab-sliders">
-                {BRUSH_KNOB_SLIDERS.map((spec) => (
-                  <PaperSlider
-                    key={`${spec.key}-${sliderEpoch}`}
-                    id={`brush-${spec.key}`}
-                    label={spec.label}
-                    value={brushParams[spec.key]}
-                    min={spec.min}
-                    max={spec.max}
-                    step={spec.step}
-                    format={spec.format}
-                    onChange={(v) => setKnob(spec.key, v)}
-                  />
-                ))}
-              </div>
-              <pre className="brush-lab-verify" aria-live="polite">
-                {formatBrushKnobsVerifyLines(brushParams)}
-              </pre>
-              <div className="brush-lab-actions">
-                <button
-                  type="button"
-                  className="settings-dev-link"
-                  onClick={() => {
-                    setBrushParams(brushCircleParams(s.brushCircleStyle))
-                    setPaintToken((n) => n + 1)
-                    setSliderEpoch((n) => n + 1)
-                  }}
-                >
-                  Reset to preset
-                </button>
-                <button
-                  type="button"
-                  className="settings-dev-link"
-                  onClick={() => setPaintToken((n) => n + 1)}
-                >
-                  Replay paint
-                </button>
-                <button
-                  type="button"
-                  className="settings-dev-link"
-                  onClick={() => void copyParams()}
-                >
-                  Copy values
-                </button>
-                <button
-                  type="button"
-                  className="settings-dev-link"
-                  onClick={() => void pasteFromClipboard()}
-                >
-                  Paste values
-                </button>
-              </div>
-              <textarea
-                ref={pasteRef}
-                className="brush-lab-paste"
-                rows={4}
-                spellCheck={false}
-                placeholder="Paste saved brush params here (TS or Kotlin), then Apply…"
-                value={pasteText}
-                onChange={(e) => setPasteText(e.target.value)}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                    e.preventDefault()
-                    applyPaste(pasteText)
-                  }
-                }}
-              />
-              <div className="brush-lab-actions">
-                <button
-                  type="button"
-                  className="settings-dev-link"
-                  disabled={!pasteText.trim()}
-                  onClick={() => applyPaste(pasteText)}
-                >
-                  Apply paste
-                </button>
-              </div>
-            </div>
-
-            <div className="settings-dev-block">
-              <p className="settings-body-label">Ink check mark</p>
-              <div className="check-lab-preview">
-                <button
-                  type="button"
-                  className="settings-dev-link"
-                  onClick={() => {
-                    setCheckPreviewOn((v) => !v)
-                    setCheckPaintToken((n) => n + 1)
-                  }}
-                >
-                  Preview — see toggles above
-                </button>
-                <InkCheckMark
-                  checked={checkPreviewOn}
-                  params={checkParams}
-                  paintToken={checkPaintToken}
-                />
-              </div>
-              <div className="brush-lab-sliders">
-                {BRUSH_CHECK_KNOB_SLIDERS.map((spec) => (
-                  <PaperSlider
-                    key={`${spec.key}-${checkSliderEpoch}`}
-                    id={`check-${spec.key}`}
-                    label={spec.label}
-                    value={checkParams[spec.key]}
-                    min={spec.min}
-                    max={spec.max}
-                    step={spec.step}
-                    format={spec.format}
-                    onChange={(v) => setCheckKnob(spec.key, v)}
-                  />
-                ))}
-              </div>
-              <pre className="brush-lab-verify" aria-live="polite">
-                {formatBrushCheckVerifyLines(checkParams)}
-              </pre>
-              <div className="brush-lab-actions">
-                <button
-                  type="button"
-                  className="settings-dev-link"
-                  onClick={() => {
-                    setCheckParams({ ...SHIPPED_CHECK_PARAMS })
-                    setCheckPaintToken((n) => n + 1)
-                    setCheckSliderEpoch((n) => n + 1)
-                  }}
-                >
-                  Reset check
-                </button>
-                <button
-                  type="button"
-                  className="settings-dev-link"
-                  onClick={() => {
-                    setCheckPreviewOn(true)
-                    setCheckPaintToken((n) => n + 1)
-                  }}
-                >
-                  Replay paint
-                </button>
-                <button
-                  type="button"
-                  className="settings-dev-link"
-                  onClick={() => void copyCheckParams()}
-                >
-                  Copy check
-                </button>
-                <button
-                  type="button"
-                  className="settings-dev-link"
-                  onClick={() => void pasteCheckFromClipboard()}
-                >
-                  Paste check
-                </button>
-              </div>
-              <textarea
-                ref={checkPasteRef}
-                className="brush-lab-paste"
-                rows={4}
-                spellCheck={false}
-                placeholder="Paste check params here (TS or Kotlin), then Apply…"
-                value={checkPasteText}
-                onChange={(e) => setCheckPasteText(e.target.value)}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                    e.preventDefault()
-                    applyCheckPaste(checkPasteText)
-                  }
-                }}
-              />
-              <div className="brush-lab-actions">
-                <button
-                  type="button"
-                  className="settings-dev-link"
-                  disabled={!checkPasteText.trim()}
-                  onClick={() => applyCheckPaste(checkPasteText)}
-                >
-                  Apply paste
-                </button>
-              </div>
-              {copyNote ? (
-                <p className="settings-caption" role="status">
-                  {copyNote}
-                </p>
-              ) : null}
-            </div>
-
-            <NuqtaLab params={nuqtaParams} onChange={setNuqtaParams} />
           </section>
         ) : null}
 
@@ -824,34 +422,99 @@ export function SettingsScreen({
   )
 }
 
-function formatRuntimeCache(status: RuntimeCacheStatus | null): string {
-  if (!status) return 'Unavailable · Quran content withheld · API calls this launch 0'
-  const now = Date.now()
+/** Opens a sub-page on this same sheet — label, quiet summary, chevron. */
+function NavRow({ label, note, onClick }: { label: string; note: string; onClick: () => void }) {
+  return (
+    <button type="button" className="settings-nav" onClick={onClick}>
+      <span className="settings-nav-copy">
+        <span className="settings-nav-label">{label}</span>
+        <span className="settings-nav-note">{note}</span>
+      </span>
+      <DisclosureChevron expanded={false} />
+    </button>
+  )
+}
+
+const TIMING_PROVIDER_IDS = Object.keys(QF_TIMING_RECITERS).map(Number)
+
+/** Android `MushafRuntimeCacheStatus`: the QF cache and reviewed timings. */
+function RuntimeCacheStatus({ active }: { active: boolean }) {
+  const [, setClock] = useState(0)
+  useEffect(() => {
+    if (!active) return
+    const tick = () => setClock((value) => value + 1)
+    const unsubscribes = [runtimeMushafCache?.subscribeDiagnostics(tick), runtimeTimingsCache.subscribe(tick)]
+    const interval = window.setInterval(tick, 60_000)
+    return () => {
+      unsubscribes.forEach((unsubscribe) => unsubscribe?.())
+      window.clearInterval(interval)
+    }
+  }, [active])
+  const status: RuntimeCacheStatus | null = runtimeMushafCache?.status() ?? null
+  const checked = TIMING_PROVIDER_IDS.filter((id) => runtimeTimingsCache.resource(id) != null).length
+  const refreshing = status?.phase === 'refreshing'
+  return (
+    <>
+      <p className="settings-body-label">Quran Foundation word &amp; QCF cache</p>
+      {runtimeCacheLines(status, Date.now()).map((line) => (
+        <p key={line} className="settings-caption">
+          {line}
+        </p>
+      ))}
+      {status ? (
+        <>
+          <p className="settings-caption">
+            Recitation timings · {checked} of {TIMING_PROVIDER_IDS.length} providers checked
+          </p>
+          <button
+            type="button"
+            className="settings-dev-link"
+            disabled={refreshing}
+            onClick={() => {
+              void runtimeMushafCache?.refresh()
+              void runtimeTimingsCache.refreshLoaded()
+            }}
+          >
+            {refreshing ? 'Updating Quran cache…' : 'Force Quran cache update'}
+          </button>
+          <p className="settings-caption">
+            Refreshes authenticated Content Sync and reviewed recitation timings.
+          </p>
+        </>
+      ) : null}
+    </>
+  )
+}
+
+/** Android's status lines, one fact each. */
+function runtimeCacheLines(status: RuntimeCacheStatus | null, now: number): string[] {
+  if (!status) return ['Unavailable · QF-provided fields withheld']
   const state = {
     empty: 'Empty · downloading when online',
     fresh: `Fresh · refresh ${cacheCountdown(status.refreshAtMs, now)}`,
     refresh_due: 'Refresh due · retrying in the background',
-    expired: 'Expired · Quran content withheld',
+    expired: 'Expired · QF-provided fields withheld',
     refreshing: 'Refreshing in the background',
-    error: "Couldn't refresh · will retry when you're back online",
+    error: 'Refresh failed · retrying when internet returns',
   }[status.phase]
-  const refreshed = status.lastRefreshApiCalls == null
-    ? 'not recorded'
-    : `${status.lastRefreshApiCalls} calls`
-  const updated = status.updatedAtMs == null ? '' : ` · updated ${cacheAge(status.updatedAtMs, now)}`
-  const expiry = status.expiresAtMs == null
-    ? ''
-    : ` · seven-day limit ${cacheCountdown(status.expiresAtMs, now)}`
+  const lastRefresh = status.lastRefreshApiCalls == null ? 'not recorded' : `${status.lastRefreshApiCalls} calls`
+  const lines = [state, `API usage · last refresh ${lastRefresh} · this launch ${status.apiCalls} calls`]
+  if (status.updatedAtMs != null) {
+    lines.push(
+      `Updated ${cacheAge(status.updatedAtMs, now)} · seven-day limit ${cacheCountdown(status.expiresAtMs, now)}`,
+    )
+  }
   const error = status.lastError ? lastAttempt(status.lastError) : ''
-  return `${state} · last refresh ${refreshed} · this launch ${status.apiCalls} calls${updated}${expiry}${error}`
+  if (error) lines.push(`Last error · ${error}`)
+  return lines
 }
 
 /** Reader-facing reason for the last failed refresh; local faults stay unspoken. */
 function lastAttempt(failure: RuntimeCacheFailure): string {
   switch (failure) {
-    case 'offline': return ' · Last attempt: no connection'
-    case 'server': return " · Last attempt: the server didn't respond"
-    case 'revoked': return ' · Last attempt: access to this content was withdrawn'
+    case 'offline': return 'no connection'
+    case 'server': return "the server didn't respond"
+    case 'revoked': return 'access to this content was withdrawn'
     case 'other': return ''
   }
 }
