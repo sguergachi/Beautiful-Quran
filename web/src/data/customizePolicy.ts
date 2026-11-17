@@ -1,4 +1,5 @@
 import type {
+  EnglishLeafText,
   ReadingLayout,
   ReadingMode,
   Settings,
@@ -26,6 +27,33 @@ export function applyReadingLayout(
 
 export function applyReadingMode(mode: ReadingMode): Partial<Settings> {
   return { readingMode: mode }
+}
+
+/** Which English the English Mushaf leaf may be set from (Android ENGLISH_LEAF_TEXTS). */
+export const ENGLISH_LEAF_TEXTS: EnglishLeafText[] = ['translation', 'gloss']
+
+/** Printed mushaf has no annotation margin, no ayah rail and no size dial. */
+export function showsScrollChrome(layout: ReadingLayout): boolean {
+  return layout === 'scroll'
+}
+
+/** The faded leaf only shows a sample ḥāshiya on a scroll page with notes on. */
+export function showsPreviewAnnotation(layout: ReadingLayout, annotationsEnabled: boolean): boolean {
+  return showsScrollChrome(layout) && annotationsEnabled
+}
+
+/**
+ * Verse-mark script is offered wherever Western digits are a real option:
+ * every scroll view, and the English leaf. The Arabic leaf's marks are drawn
+ * by the page face and cannot be restyled.
+ */
+export function showsVerseNumberChrome(layout: ReadingLayout, mode: ReadingMode): boolean {
+  return showsScrollChrome(layout) || mode === 'english_only'
+}
+
+/** Only the English leaf asks which English to set (Android CustomizeScreen). */
+export function showsEnglishLeafChrome(layout: ReadingLayout, mode: ReadingMode): boolean {
+  return layout === 'mushaf' && mode === 'english_only'
 }
 
 /** Word gloss lives under Arabic tiles — only the bilingual scroll view. */

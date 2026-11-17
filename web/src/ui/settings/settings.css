@@ -79,12 +79,19 @@
   border: 1.5px solid var(--swatch-gilt, #c9a227);
 }
 
-/* ToggleRow: 8px padding, even 12px between rows, 20px before the group. */
+/* ToggleRow: 8px padding, even 12px between rows, 20px before the group.
+   Spacing lives inside each reveal so a closed one leaves no gap behind. */
 .sheet[data-name='settings'] .customize-toggles {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-top: 20px;
+  padding: 20px 0;
+}
+
+.sheet[data-name='settings'] .customize-toggles > .customize-reveal > .customize-reveal-inner > * {
+  /* A margin inside the clip, unlike padding on it, closes with the reveal. */
+  margin-bottom: 12px;
+}
+
+.sheet[data-name='settings'] .customize-toggle-group > * + * {
+  margin-top: 12px;
 }
 
 .sheet[data-name='settings'] .customize-toggles .setting-row {
@@ -120,6 +127,14 @@
 .customize-reveal > .customize-reveal-inner {
   min-height: 0;
   overflow: hidden;
+  /* The clip is vertical; brush circles overhang the column sideways. */
+  margin-inline: calc(-1 * var(--sheet-pad));
+  padding-inline: var(--sheet-pad);
+}
+
+/* …and that widened clip box must never become a sideways scroll. */
+.sheet[data-name='settings'] .customize-scroll {
+  overflow-x: hidden;
 }
 
 .customize-reveal[data-visible='false'] {
@@ -379,4 +394,240 @@
   flex-direction: column;
   justify-content: center;
   min-height: 132px;
+}
+
+/* ── Customize preview (Android ReadingPreview) ──────────────────────── */
+
+/* A faded leaf: reading paper, 3px corners, a 0.5px gold hairline at 28%,
+   the whole miniature at 74%; never taller than 36% of the window. */
+.sheet[data-name='settings'] .reading-preview {
+  display: block;
+  position: relative;
+  padding: 12px 14px;
+  gap: 0;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 0.5px rgb(from var(--gold) r g b / 0.28);
+  opacity: 0.74;
+  max-height: 36vh;
+  max-height: 36dvh;
+  overflow: hidden;
+}
+
+.sheet[data-name='settings'] .reading-preview--rail-left {
+  padding-inline-start: 24px;
+}
+
+.sheet[data-name='settings'] .reading-preview--rail-right {
+  padding-inline-end: 24px;
+}
+
+/* Every view stacks in one grid cell: the box takes the tallest, so Layout,
+   View, gloss, notes and folio script never resize it. */
+.reading-preview__stack {
+  display: grid;
+}
+
+.reading-preview__stack > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.reading-preview__ghost {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.reading-preview__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sheet[data-name='settings'] .reading-preview__arabic {
+  margin: 0;
+  font-family: var(--font-arabic);
+  font-size: calc(24px * var(--preview-scale, 1));
+  line-height: 1.9;
+  text-align: right;
+  color: var(--ink);
+}
+
+.sheet[data-name='settings'] .reading-preview__mark {
+  font-size: 0.67em;
+  margin-inline-start: 0;
+  vertical-align: baseline;
+}
+
+.sheet[data-name='settings'] .reading-preview__words {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.sheet[data-name='settings'] .reading-preview__word .reading-preview__arabic {
+  line-height: 1.4;
+}
+
+.sheet[data-name='settings'] .reading-preview__words > .reading-preview__mark {
+  display: inline-flex;
+  align-items: center;
+  height: calc(24px * var(--preview-scale, 1) * 1.4);
+  font-size: calc(24px * var(--preview-scale, 1) * 0.67);
+}
+
+.sheet[data-name='settings'] .reading-preview__gloss {
+  font-size: calc(10px * var(--preview-scale, 1));
+  line-height: calc(13px * var(--preview-scale, 1));
+  color: color-mix(in srgb, var(--ink) 62%, transparent);
+}
+
+.reading-preview__translit {
+  margin: 8px 0 0;
+  font-family: var(--font-body);
+  font-size: calc(13px * var(--preview-scale, 1));
+  line-height: 1.4;
+  color: var(--ink-rung-tertiary);
+}
+
+.sheet[data-name='settings'] .reading-preview__english {
+  margin: 12px 0 0;
+  font-family: var(--font-body);
+  font-size: calc(13px * var(--preview-scale, 1));
+  line-height: calc(21px * var(--preview-scale, 1));
+  color: var(--ink-rung-secondary);
+}
+
+.reading-preview__lyric {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: calc(18px * var(--preview-scale, 1));
+  line-height: 1.5;
+  color: var(--ink-rung-strong);
+}
+
+.reading-preview__lyric .reading-preview__mark,
+.reading-preview__leaf-english .reading-preview__mark {
+  font-size: 0.77em;
+}
+
+/* Settled ḥāshiya: a ruby rule and the scribe's italic, as in the reader. */
+.reading-preview__note {
+  display: flex;
+  gap: 12px;
+  margin: 12px 0 0;
+  font-family: var(--font-scribe);
+  font-style: italic;
+  font-weight: 500;
+  font-size: calc(14px * 0.8 * (0.9 + 0.1 * var(--preview-scale, 1)));
+  line-height: calc(20px * 0.8 * (0.9 + 0.1 * var(--preview-scale, 1)));
+  letter-spacing: 0.15px;
+  color: rgb(from var(--annotation) r g b / 0.85);
+}
+
+.reading-preview__note::before {
+  content: '';
+  flex: 0 0 2px;
+  border-radius: 1px;
+  background: rgb(from var(--bookmark) r g b / 0.92);
+}
+
+.sheet[data-name='settings'] .reading-preview .page-break {
+  height: auto;
+  max-width: none;
+  padding: 6px 0;
+  margin: 0;
+}
+
+/* Mushaf miniatures */
+.reading-preview__leaf {
+  display: flex;
+  flex-direction: column;
+}
+
+.reading-preview__head {
+  display: grid;
+  grid-template-columns: 1fr 3fr 1fr;
+  align-items: baseline;
+  direction: ltr;
+  margin-bottom: 8px;
+  font-size: 9px;
+  line-height: 1.4;
+  letter-spacing: 0.1em;
+  color: var(--ink-rung-muted);
+}
+
+.reading-preview__head:not([data-both]) {
+  grid-template-columns: auto 1fr;
+}
+
+.reading-preview__head-figure {
+  text-align: left;
+  font-variant-numeric: lining-nums;
+  white-space: nowrap;
+}
+
+.reading-preview__head[data-both] .reading-preview__head-figure:last-child {
+  text-align: right;
+}
+
+.reading-preview__head-figure[lang='ar'] {
+  font-family: var(--font-arabic);
+  letter-spacing: 0;
+  font-size: 11px;
+}
+
+.reading-preview__head-chapter {
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reading-preview__head:not([data-both]) .reading-preview__head-chapter {
+  text-align: right;
+}
+
+.reading-preview__qlines {
+  --leaf-fit: 1;
+  font-family: var(--font-arabic);
+  font-size: calc(20px * var(--leaf-fit));
+  line-height: 1.85;
+  color: var(--ink);
+}
+
+.reading-preview__qline {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.25em;
+  white-space: nowrap;
+}
+
+.reading-preview__qmark {
+  color: var(--gold);
+}
+
+.reading-preview__qblock {
+  margin: 0;
+  font-family: var(--font-arabic);
+  font-size: 20px;
+  line-height: 1.85;
+  text-align: justify;
+  text-align-last: right;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+
+.reading-preview__leaf-english {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.4;
+  text-align: left;
+  hyphens: none;
+  color: var(--ink-rung-strong);
 }
