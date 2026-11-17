@@ -1,0 +1,105 @@
+/* Bookmarks (Android BookmarksScreen) — loaded before styles.css, so every
+   override is scoped under the sheet to outrank the shared rules. */
+
+/* Title and search are the list's first items: they scroll with it. */
+.sheet[data-name='bookmarks'] .bookmarks-scroll > .bookmarks-header {
+  padding: 8px 0 0;
+}
+
+.sheet[data-name='bookmarks'] .bookmarks-scroll > .bookmarks-search {
+  margin: 24px 0 0;
+}
+
+/* Android headlineMedium at typeScale(36) on a 44 line. */
+.sheet[data-name='bookmarks'] .bookmarks-header h1 {
+  font-size: 34.9px;
+  line-height: 44px;
+}
+
+/* The way back is an arrow in body ink, not an accent text link. */
+.sheet[data-name='bookmarks'] .bookmarks-header .bookmarks-back {
+  display: grid;
+  place-items: center end;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  color: var(--ink-rung-body);
+}
+
+.bookmarks-back svg {
+  width: 24px;
+  height: 24px;
+}
+
+.sheet[data-name='bookmarks'] .bookmark-section-arabic {
+  color: var(--accent);
+}
+
+/* —— Notes (docs/ANNOTATIONS.md): the reader's own hand, Junicode italic
+   500 at 15 × 0.969 on 21, 0.15px tracking, maroon annotation ink at 85%. */
+.bookmark-note {
+  display: block;
+  width: calc(100% - 2 * var(--bookmark-spine));
+  margin: 6px var(--bookmark-spine) 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-scribe);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 14.5px;
+  line-height: 21px;
+  letter-spacing: 0.15px;
+  color: color-mix(in srgb, var(--annotation) 85%, transparent);
+  text-align: start;
+  cursor: text;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: pre-wrap;
+}
+
+.bookmark-note-field {
+  display: block;
+  resize: none;
+  outline: none;
+  overflow: hidden;
+  caret-color: var(--bookmark);
+  -webkit-line-clamp: none;
+}
+
+.bookmark-note-field::placeholder {
+  color: color-mix(in srgb, var(--annotation) 42%, transparent);
+  font-style: italic;
+}
+
+.bookmark-note:focus-visible {
+  outline: none;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--annotation) 40%, transparent);
+}
+
+/* "Add note" sits at the end of the Ayah line. */
+.bookmark-add-note {
+  margin-inline: auto var(--bookmark-spine);
+  min-height: 44px;
+  padding: 0;
+  color: var(--accent);
+  font: 500 13.6px/20px var(--font-body);
+}
+
+.bookmark-verse[data-editing] .bookmark-verse-copy {
+  cursor: default;
+}
+
+.bookmark-verse-copy:disabled {
+  opacity: 1;
+  color: inherit;
+}
+
+/* The hold wrapper adds no box: the ribbon keeps its own placement. */
+.bookmark-ribbon-hold {
+  display: contents;
+}
