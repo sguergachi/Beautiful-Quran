@@ -1,6 +1,11 @@
 import { suppliedWords } from './suppliedWords'
 import { foldEnglish } from '../domain/EnglishTypography'
-import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
+import { markHold, MARK_HOLD_SLOP } from './markHold'
+import { VerseAnnotation } from './VerseAnnotation'
+import { GatherOrdinal } from './GatherOrdinal'
+import { paperToggleHaptic } from '../ui/kit/paperHaptics'
+import './readerVerse.css'
 import type { ActiveWord, Ayah, Word } from '../data/models'
 import type { ReadingMode, VerseNumberScript } from '../data/settings'
 import {
@@ -51,11 +56,88 @@ interface Props {
   onPlayWord: (ayah: number, wordPosition: number) => void
   onToggleBookmark: (ayah: number) => boolean
   onHoldWord: (ayah: number, word: Word) => void
-  /** Gather mode. The mark enters it; the verse body toggles once inside. */
+  /** Gather mode. Holding the mark enters it; the verse body toggles once inside. */
   gathering?: boolean
   gatherOrdinal?: number | null
   onMarkTap?: () => void
+  /** Holding ﴿N﴾ until its shamsa fills (Android `onAyahMarkHold`). */
+  onMarkHold?: () => void
   onVerseBodyTap?: () => void
+  /** A tap on the verse off its words: play from this ayah (Android `onAyahClick`). */
+  onAyahTap?: (ayah: number) => void
+  /** Passive green reading-place ribbon (Android `placeMarked`). */
+  placeMarked?: boolean
+  placeUnfurlSignal?: number
+  /** Always draw the empty bookmark tip (touch / phone, as Android). */
+  idleTipAlways?: boolean
+  /** Verse note shown under the translation; null hides it. */
+  annotationText?: string | null
+  isEditingAnnotation?: boolean
+  annotationsHidden?: boolean
+  recededForAnnotationEdit?: boolean
+  onAnnotationChange?: (text: string) => void
+  onAnnotationEditDone?: (ayah: number) => void
+  onEditAnnotation?: (ayah: number) => void
+  onAnnotationDelete?: (ayah: number) => void
+}
+
+/** Android `highlightMatches`: a soft gold marker behind each match only. */
+function markSearchMatches(text: string, query: string | null): ReactNode {
+  if (!query) return suppliedWords(text)
+  const folded = foldEnglish(text).toLowerCase()
+  const parts: ReactNode[] = []
+  let cursor = 0
+  let i = folded.indexOf(query)
+  while (i >= 0) {
+    if (i > cursor) parts.push(...suppliedWords(text.slice(cursor, i), `m${cursor}`))
+    parts.push(
+      <mark className="translation-search-marker" key={`hit-${i}`}>
+        {text.slice(i, i + query.length)}
+      </mark>,
+    )
+    cursor = i + query.length
+    i = folded.indexOf(query, cursor)
+  }
+  if (cursor === 0) return suppliedWords(text)
+  if (cursor < text.length) parts.push(...suppliedWords(text.slice(cursor), `m${cursor}`))
+  return parts
+}
+
+/**
+ * Gather's gold soak — Android `inkSpotHighlight(fillBox)`: spreads from the
+ * touch across the verse in 250 ms, and draws back when the verse is dropped.
+ */
+function GatherSpot({
+  selected,
+  seed,
+  origin,
+}: {
+  selected: boolean
+  seed: number
+  origin: RefObject<{ x: number; y: number } | null>
+}) {
+  const ref = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    const box = el?.parentElement?.getBoundingClientRect()
+    if (!el || !box || !selected) return
+    const o = origin.current
+    const x = o ? ((o.x - box.left) / Math.max(1, box.width)) * 100 : 50
+    const y = o ? ((o.y - box.top) / Math.max(1, box.height)) * 100 : 30
+    el.style.setProperty('--spot-x', `${Math.min(100, Math.max(0, x))}%`)
+    el.style.setProperty('--spot-y', `${Math.min(100, Math.max(0, y))}%`)
+  }, [selected, origin])
+  // Seeded, so each verse's stain has its own slightly different reach.
+  const wobble = ((seed * 9301 + 49297) % 233280) / 233280
+  return (
+    <span
+      ref={ref}
+      className="gather-spot"
+      data-selected={selected || undefined}
+      style={{ ['--spot-soft' as string]: `${10 + wobble * 8}%` }}
+      aria-hidden="true"
+    />
+  )
 }
 
 function AyahBlockInner({
@@ -88,7 +170,20 @@ function AyahBlockInner({
   gathering = false,
   gatherOrdinal = null,
   onMarkTap,
+  onMarkHold,
   onVerseBodyTap,
+  onAyahTap,
+  placeMarked = false,
+  placeUnfurlSignal = 0,
+  idleTipAlways = false,
+  annotationText = null,
+  isEditingAnnotation = false,
+  annotationsHidden = false,
+  recededForAnnotationEdit = false,
+  onAnnotationChange,
+  onAnnotationEditDone,
+  onEditAnnotation,
+  onAnnotationDelete,
 }: Props) {
   const englishOnly = readingMode === 'english_only'
   const arabicOnly = readingMode === 'arabic_only'
@@ -132,14 +227,13 @@ function AyahBlockInner({
     if (!focused) ayahRef.current?.querySelectorAll<HTMLElement>('[data-reader-word]').forEach((word) => { word.tabIndex = -1 })
   }, [focused])
   const [hovered, setHovered] = useState(false)
+  const spotOrigin = useRef<{ x: number; y: number } | null>(null)
   const query = searchQuery?.toLowerCase() ?? null
-  const translationHit =
-    query != null && foldEnglish(ayah.translation).toLowerCase().includes(query)
   const hits = (translation: string) =>
     query != null && foldEnglish(translation).toLowerCase().includes(query)
   const translationRef = useRef<HTMLParagraphElement>(null)
   const translationContent = useMemo<ReactNode>(() => {
-    if (flashWordPosition !== 0) return suppliedWords(ayah.translation)
+    if (flashWordPosition !== 0) return markSearchMatches(ayah.translation, query)
     const ranges = searchHitTextRanges(ayah.translation, searchFlashText)
     if (!ranges.length) return suppliedWords(ayah.translation)
     const parts: ReactNode[] = []
@@ -159,7 +253,7 @@ function AyahBlockInner({
     }
     if (cursor < ayah.translation.length) parts.push(...suppliedWords(ayah.translation.slice(cursor), `p${cursor}`))
     return parts
-  }, [ayah.translation, flashWordPosition, searchFlashText])
+  }, [ayah.translation, flashWordPosition, searchFlashText, query])
 
   useEffect(() => {
     if (flashWordPosition !== 0) return
@@ -177,19 +271,72 @@ function AyahBlockInner({
     if (el) onKeepWordInView(el)
   }, [keepActiveWordInView, onKeepWordInView, activeWord?.wordPosition])
 
+  // A hold that popped owns its own lift: the click that follows must not
+  // also toggle the verse the reader just gathered.
+  const poppedThisPress = useRef(false)
+  const startMarkHold = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    poppedThisPress.current = false
+    if (gathering || !onMarkHold) return
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    const glyph = event.currentTarget.querySelector<HTMLElement>('.ayah-mark-glyph') ?? event.currentTarget
+    const r = glyph.getBoundingClientRect()
+    const id = event.pointerId
+    const sx = event.clientX
+    const sy = event.clientY
+    markHold.send('down', {
+      bounds: { left: r.left, top: r.top, width: r.width, height: r.height },
+      baseline: null,
+      finger: { x: sx, y: sy },
+      rtl: !englishOnly,
+      onHold: () => {
+        poppedThisPress.current = true
+        onMarkHold()
+      },
+    })
+    const end = (kind: 'released' | 'cancelled') => {
+      window.removeEventListener('pointermove', move, true)
+      window.removeEventListener('pointerup', up, true)
+      window.removeEventListener('pointercancel', cancel, true)
+      markHold.send(kind)
+    }
+    const move = (e: PointerEvent) => {
+      if (e.pointerId === id && Math.hypot(e.clientX - sx, e.clientY - sy) > MARK_HOLD_SLOP) end('cancelled')
+    }
+    const up = (e: PointerEvent) => {
+      if (e.pointerId === id) end('released')
+    }
+    const cancel = (e: PointerEvent) => {
+      if (e.pointerId === id) end('cancelled')
+    }
+    window.addEventListener('pointermove', move, true)
+    window.addEventListener('pointerup', up, true)
+    window.addEventListener('pointercancel', cancel, true)
+  }
   const markButton = (
     <button
       type="button"
       className={verseNumberScript === 'arabic' ? 'ayah-mark' : 'ayah-mark ayah-mark--ltr'}
       dir={verseNumberScript === 'arabic' ? undefined : 'ltr'}
-      aria-label={`Gather ayah ${ayah.number}`}
+      aria-label={gathering ? `Ayah ${ayah.number}` : `Hold to gather ayah ${ayah.number}`}
       tabIndex={focused ? 0 : -1}
+      onPointerDown={startMarkHold}
+      onContextMenu={(event) => event.preventDefault()}
       onClick={(event) => {
         event.stopPropagation()
-        onMarkTap?.()
+        if (poppedThisPress.current) {
+          poppedThisPress.current = false
+          return
+        }
+        if (gathering) {
+          paperToggleHaptic(gatherOrdinal == null)
+          onMarkTap?.()
+        } else if (event.detail === 0) {
+          // Keyboard / assistive activation has no hold to watch.
+          onMarkHold?.()
+        }
       }}
     >
-      {ayahMark}
+      <span className="ayah-mark-glyph">{ayahMark}</span>
     </button>
   )
   // Word tiles only: prose (English, continuous Hafs) breaks inline already.
@@ -203,14 +350,24 @@ function AyahBlockInner({
       data-ayah={ayah.number}
       data-word-group=""
       data-gathered={gatherOrdinal != null || undefined}
-      onClick={
-        gathering
-          ? (event) => {
-              if ((event.target as HTMLElement).closest('button')) return
-              onVerseBodyTap?.()
-            }
-          : undefined
-      }
+      data-annotation-recede={recededForAnnotationEdit || undefined}
+      onPointerDown={(event) => {
+        spotOrigin.current = { x: event.clientX, y: event.clientY }
+      }}
+      onClick={(event) => {
+        const target = event.target as HTMLElement
+        if (gathering) {
+          if (target.closest('button')) return
+          paperToggleHaptic(gatherOrdinal == null)
+          onVerseBodyTap?.()
+          return
+        }
+        // Off the words (translation, paper between words): play from here.
+        if (!onAyahTap || target.closest('[data-reader-word], button, a, input, textarea, .verse-annotation')) return
+        const selection = window.getSelection()
+        if (selection && !selection.isCollapsed) return
+        onAyahTap(ayah.number)
+      }}
       data-ayah-active={isActiveAyah || undefined}
       data-dimmed={dimmed || undefined}
       data-search-flash-ayah={searchTargetAyah || undefined}
@@ -223,18 +380,19 @@ function AyahBlockInner({
           Avoids hundreds of simultaneous opacity transitions on play. */}
       <span className="ayah-recess-veil" aria-hidden="true" />
       {gathering ? (
-        gatherOrdinal != null ? (
-          <span
-            className="gather-ordinal"
-            data-side={bookmarkSide}
-            aria-label={`Selected, ${gatherOrdinal}`}
-          >
-            {gatherOrdinal}
-          </span>
-        ) : null
+        <>
+          <GatherSpot selected={gatherOrdinal != null} seed={ayah.surahId * 1000 + ayah.number} origin={spotOrigin} />
+          {gatherOrdinal != null ? (
+            <GatherOrdinal ordinal={gatherOrdinal} side={bookmarkSide} />
+          ) : null}
+        </>
       ) : (
         <VerseBookmarkRibbon
           bookmarked={bookmarked}
+          placeMarked={placeMarked}
+          placeUnfurlSignal={placeUnfurlSignal}
+          reservePlaceLane
+          idleTipAlways={idleTipAlways}
           focused={focused}
           hovered={hovered}
           side={bookmarkSide}
@@ -242,6 +400,7 @@ function AyahBlockInner({
           interactive={bookmarkInteractive}
           tabIndex={focused ? 0 : -1}
           onToggle={() => onToggleBookmark(ayah.number)}
+          onLongPress={bookmarked && onEditAnnotation ? () => onEditAnnotation(ayah.number) : undefined}
         />
       )}
 
@@ -340,7 +499,6 @@ function AyahBlockInner({
           ref={translationRef}
           className="ayah-translation"
           data-search-recessed={(searchTargetAyah && flashWordPosition !== 0) || undefined}
-          data-search-hit={translationHit ? 'true' : undefined}
           // Combined alpha documented for tests/devtools; visual recess is CSS.
           style={{
             ['--ayah-translation-alpha' as string]: String(ayahTranslationAlpha(dimmed)),
@@ -348,6 +506,18 @@ function AyahBlockInner({
         >
           {translationContent}
         </p>
+      ) : null}
+
+      {bookmarked && !gathering && (isEditingAnnotation || annotationText != null) ? (
+        <VerseAnnotation
+          text={annotationText ?? ''}
+          isEditing={isEditingAnnotation}
+          hidden={annotationsHidden && !isEditingAnnotation}
+          onChange={onAnnotationChange}
+          onEditDone={() => onAnnotationEditDone?.(ayah.number)}
+          onStartEdit={onEditAnnotation ? () => onEditAnnotation(ayah.number) : undefined}
+          onDelete={() => onAnnotationDelete?.(ayah.number)}
+        />
       ) : null}
     </article>
     </WordMotionProvider>
@@ -382,6 +552,15 @@ export const AyahBlock = memo(AyahBlockInner, (prev, next) => {
     prev.searchFocusActive === next.searchFocusActive &&
     prev.searchFlashText === next.searchFlashText &&
     prev.gathering === next.gathering &&
-    prev.gatherOrdinal === next.gatherOrdinal
+    prev.gatherOrdinal === next.gatherOrdinal &&
+    prev.placeMarked === next.placeMarked &&
+    prev.placeUnfurlSignal === next.placeUnfurlSignal &&
+    prev.idleTipAlways === next.idleTipAlways &&
+    prev.annotationText === next.annotationText &&
+    prev.isEditingAnnotation === next.isEditingAnnotation &&
+    prev.annotationsHidden === next.annotationsHidden &&
+    prev.recededForAnnotationEdit === next.recededForAnnotationEdit &&
+    (prev.onAyahTap == null) === (next.onAyahTap == null) &&
+    (prev.onEditAnnotation == null) === (next.onEditAnnotation == null)
   )
 })
