@@ -455,7 +455,9 @@ class AppStore {
     }
     if (this.state.stackLayer === BOOKMARKS_LAYER) {
       this.setStackLayer(COVER_LAYER)
-    } else {
+    } else if (this.state.stackLayer > COVER_LAYER) {
+      // Chapters is the bottom of Back (Android MainActivity BackHandler):
+      // Bookmarks is reached by its own gesture, never by going back.
       this.setStackLayer(this.state.stackLayer - 1)
     }
   }
