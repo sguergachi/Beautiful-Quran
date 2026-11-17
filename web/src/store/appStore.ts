@@ -1014,6 +1014,29 @@ class AppStore {
   }
 
   /**
+   * Open [surahId] and recite from [ayah] — from word [position] when given —
+   * once its audio and timings are in. Android `load(startPlaybackAtAyah,
+   * startPlaybackAtWord, keepContent = true)`: a Mushaf word, mark or Play on
+   * another chapter's leaf loads that chapter and plays, rather than only
+   * opening it.
+   */
+  async openSurahAndPlay(surahId: number, ayah: number, position?: number) {
+    this.openSurah(surahId, ayah, undefined, undefined, [], 'reading')
+    if (this.state.content?.surah.id !== surahId) return
+    const token = this.openToken
+    const reciter = this.state.reciters.find((r) => r.id === this.state.settings.reciterId)
+    // Timings load in an idle task after the first reader frame; a reciter
+    // without them only needs the audio queued.
+    const deadline = performance.now() + (reciter?.hasTimings ? 4_000 : 400)
+    while (token === this.openToken && !this.state.hasTimings && performance.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 40))
+    }
+    if (token !== this.openToken || this.state.content?.surah.id !== surahId) return
+    if (position != null && position > 1) await this.playFromWord(ayah, position)
+    else await this.playAyah(ayah)
+  }
+
+  /**
    * Word timings of the basmalah lead-in clip (Al-Fatihah 1:1) for the open
    * chapter's reciter, so the calligraphy wash can ride the same word clock the
    * clip does — Android `ReaderViewModel.timingsWithBasmalahLeadIn` parity.

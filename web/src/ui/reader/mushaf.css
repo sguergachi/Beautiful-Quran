@@ -1,0 +1,283 @@
+/* Mushaf leaf chrome — Android `MushafReadingSheet` / `MushafPageDial`.
+   A single leaf (phone, or any window without facing pages) carries no top
+   bar: the dial sits under the leaf, Chapters and Settings stand at the ends
+   of the transport row, and the reciter's name goes beneath it. */
+
+/* ---- the page dial -------------------------------------------------- */
+
+.mushaf-dial {
+  position: relative;
+  /* Head air 8, the rule's slot 13 and 8 of grab paper beneath. */
+  height: 21px;
+  margin-top: 8px;
+  color: var(--ink);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+.mushaf-dial[data-held] {
+  cursor: grabbing;
+}
+
+.mushaf-dial-rule {
+  position: absolute;
+  inset: 0 auto auto 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* The label's plate: a full-width band of the page's own paper, dissolving
+   only at the top, so the last lines stay covered while the words follow
+   the comb. Ink on paper, never a capsule. */
+.mushaf-dial-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% - 11.5px + 7px + 2px + 6px);
+  height: 3.6rem;
+  pointer-events: none;
+  background: linear-gradient(to top, var(--paper) calc(100% - 14px), transparent);
+}
+
+.mushaf-dial-label-text {
+  position: absolute;
+  bottom: 0.25rem;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  line-height: 1.25;
+  max-width: calc(100% - 16px);
+}
+
+.mushaf-dial-label-head {
+  font-size: 0.95rem;
+  color: var(--ink);
+  opacity: 0.82;
+}
+
+.mushaf-dial-label-foot {
+  font-size: 0.8rem;
+  color: var(--ink);
+  opacity: 0.48;
+  min-height: 1.25em;
+}
+
+/* The way back: a small ink roundel at the old leaf's seat, its arrow cut
+   out of the centre. Furniture, not a float. */
+.mushaf-dial-return {
+  position: absolute;
+  top: 0;
+  height: 21px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.mushaf-dial-return-dot {
+  position: absolute;
+  top: calc(11.5px - 13px);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink) 76%, transparent);
+  color: var(--paper);
+  animation: mushaf-dial-return-in 220ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  transition: transform 240ms ease, opacity 240ms ease;
+}
+
+.mushaf-dial-return[data-fading] .mushaf-dial-return-dot {
+  transform: scale(0.3);
+  opacity: 0;
+}
+
+.mushaf-dial-return svg[data-way='right'] {
+  transform: scaleX(-1);
+}
+
+@keyframes mushaf-dial-return-in {
+  from { transform: scale(0.55); opacity: 0.55; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* ---- the transport under a single leaf ------------------------------ */
+
+.player-bar[data-mushaf-leaf] {
+  padding-left: 0;
+  padding-right: 0;
+  padding-top: 0.35rem;
+  gap: 0;
+}
+
+.player-bar[data-mushaf-leaf] > .mushaf-dial {
+  order: 0;
+  align-self: stretch;
+  margin-inline: 14px;
+}
+
+.player-bar[data-mushaf-leaf] > .player-transport {
+  order: 1;
+  position: relative;
+  max-width: none;
+  height: 56px;
+  margin-block: 2px;
+  padding-inline: 58px;
+  box-sizing: border-box;
+  gap: 0;
+  justify-content: space-evenly;
+}
+
+.player-bar[data-mushaf-leaf] > .player-reciter-row {
+  order: 2;
+  min-height: 48px;
+  align-items: center;
+}
+
+.mushaf-transport-end {
+  position: absolute;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  margin-top: -20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  opacity: 0.34;
+  cursor: pointer;
+  transition: opacity var(--recess-ms, 400ms) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mushaf-transport-end svg {
+  width: 20px;
+  height: 20px;
+}
+
+.mushaf-transport-end--start {
+  left: 18px;
+}
+
+.mushaf-transport-end--end {
+  right: 18px;
+}
+
+.mushaf-transport-end[data-receded] {
+  opacity: 0.017;
+  pointer-events: none;
+}
+
+.mushaf-transport-end:disabled {
+  cursor: default;
+}
+
+/* No top bar: the leaf takes the top safe area itself. */
+.sheet[data-name='reader']:not(:has(> .reader-top)) .mushaf {
+  padding-top: calc(env(safe-area-inset-top, 0px) + var(--mushaf-step));
+}
+
+/* ---- the leaf itself ------------------------------------------------- */
+
+/* Both fore-edges feathered into the paper, always: solid at the very edge,
+   gone by the time the measure begins (the margin and the mark gutter). */
+.mushaf-feather {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.mushaf-feather--left {
+  left: 0;
+  background: linear-gradient(to right, var(--paper), color-mix(in srgb, var(--paper) 70%, transparent) 45%, transparent);
+}
+
+.mushaf-feather--right {
+  right: 0;
+  background: linear-gradient(to left, var(--paper), color-mix(in srgb, var(--paper) 70%, transparent) 45%, transparent);
+}
+
+/* The return pill under a leaf the reader turned away from the voice. */
+.mushaf-return {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--mushaf-transport-h, 6.5rem) + 8px);
+  transform: translateX(-50%);
+  z-index: 8;
+}
+
+.mushaf-return .return-ayah {
+  position: static;
+  transform: none;
+  margin: 0;
+}
+
+/* The roundel's arrow points down; turned, it points along the book to
+   the leaf the voice is on. */
+.mushaf-return[data-way='left'] canvas {
+  transform: rotate(90deg);
+}
+
+.mushaf-return[data-way='right'] canvas {
+  transform: rotate(-90deg);
+}
+
+/* A leaf under a hand: it follows the finger, so it takes no other touch. */
+.mushaf-host {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The opening basmalah: tappable, and washed while it is recited. */
+.mushaf-basmalah {
+  cursor: pointer;
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-family: var(--font-arabic);
+  width: 100%;
+}
+
+.mushaf-basmalah[data-state='Upcoming'] {
+  opacity: var(--upcoming-alpha, 0.2661);
+}
+
+.mushaf-basmalah[data-state='Active'] > span {
+  /* Washed in from the right with a soft leading edge, never a hard peel. */
+  -webkit-mask-image: linear-gradient(to left, #000 40%, transparent 60%);
+  mask-image: linear-gradient(to left, #000 40%, transparent 60%);
+  -webkit-mask-size: 250% 100%;
+  mask-size: 250% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation: mushaf-basmalah-wash var(--basmalah-ms, 2400ms) linear both;
+}
+
+@keyframes mushaf-basmalah-wash {
+  from { -webkit-mask-position: 0% 0; mask-position: 0% 0; }
+  to { -webkit-mask-position: 100% 0; mask-position: 100% 0; }
+}
+
+/* Search hit: the found verse's words breathe on the settled leaf. */
+.mushaf-lines [data-search-hit] .hafs-glyph,
+.mushaf-lines .hafs-word[data-search-hit] {
+  animation: mushaf-search-breath calc(var(--search-breath-ms, 790ms)) cubic-bezier(0.45, 0, 0.55, 1) 140ms 3 both;
+}
+
+@keyframes mushaf-search-breath {
+  0%, 100% { color: inherit; }
+  45% { color: var(--gold); }
+}
