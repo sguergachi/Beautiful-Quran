@@ -1,3 +1,5 @@
+import { concordanceReturnTarget } from './backToPlace'
+import { backToPlace } from './backToPlaceStore'
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useBookSpread, useLooseSheetSlot } from '../paper/bookSpread'
@@ -492,6 +494,13 @@ function RootViewerBleed({
                                 data-current={current ? 'true' : undefined}
                                 key={`${entry.surahId}:${entry.ayahNumber}:${entry.position}`}
                                 onClick={() => {
+                                  // Remember where the hold began so the reader can offer a way back.
+                                  const origin = concordanceReturnTarget(
+                                    { surahId: rv.surahId, ayah: rv.ayah },
+                                    { surahId: entry.surahId, ayah: entry.ayahNumber },
+                                    appStore.getSnapshot().surahs.find((surah) => surah.id === rv.surahId)?.nameTransliteration ?? '',
+                                  )
+                                  if (origin) backToPlace.remember(origin)
                                   // Concordance jump: do not resume the pre-open session.
                                   appStore.closeRootViewer(false)
                                   appStore.openSurah(entry.surahId, entry.ayahNumber)

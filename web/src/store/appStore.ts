@@ -186,6 +186,8 @@ export interface AppState {
   gathering: boolean
   gatherSelection: { surahId: number; ayah: number }[]
   shareError: string | null
+  /** Which export is being prepared (Android ShareUiState.preparingText/Image). */
+  sharePreparing: 'text' | 'image' | null
 }
 
 type Listener = () => void
@@ -288,6 +290,7 @@ class AppStore {
     gathering: false,
     gatherSelection: [],
     shareError: null,
+    sharePreparing: null,
   }
 
   constructor() {
@@ -542,7 +545,7 @@ class AppStore {
     else this.setStackLayer(settingsLayerFor(this.hasReader()))
   }
 
-  /** Tap ﴿N﴾. The first tap gathers that verse and pauses. Later taps toggle. */
+  /** Hold ﴿N﴾ to enter gather with that verse (pauses); once inside, taps toggle. */
   onMarkTap(surahId: number, ayah: number) {
     if (surahId < 1 || ayah < 1) return
     const action = onMarkTap(this.state.gathering, { surahId, ayah })
@@ -593,7 +596,8 @@ class AppStore {
 
   /** Image: the paper card, via the system share sheet or a downloaded PNG. */
   async shareGatheredImage(): Promise<void> {
-    if (!this.state.gathering || this.state.gatherSelection.length === 0) return
+    if (!this.state.gathering || this.state.gatherSelection.length === 0 || this.state.sharePreparing) return
+    this.set({ sharePreparing: 'image', shareError: null })
     try {
       const blob = await renderShareCard(this.shareVerses())
       const file = new File([blob], 'beautiful-quran.png', { type: 'image/png' })
@@ -609,33 +613,43 @@ class AppStore {
         link.remove()
         window.setTimeout(() => URL.revokeObjectURL(url), 1000)
       }
-      this.set({ shareError: null })
+      // Sent: the gather is done (Android ShareHost exits after the chooser).
+      this.set({ sharePreparing: null })
+      this.exitGather()
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        this.set({ sharePreparing: null })
+        return
+      }
       console.warn('[share] image share failed', error)
-      this.set({ shareError: "Couldn't share the image. Please try again." })
+      this.set({ sharePreparing: null, shareError: "Couldn't create the image. Please try again." })
     }
   }
 
   /** Quote: the system share sheet, or the clipboard when share is unavailable. */
   async shareGatheredText(): Promise<void> {
-    if (!this.state.gathering || this.state.gatherSelection.length === 0) return
+    if (!this.state.gathering || this.state.gatherSelection.length === 0 || this.state.sharePreparing) return
     const text = composeShareText(this.shareVerses())
     if (!text) {
-      this.set({ shareError: 'Those verses have no text yet' })
+      this.set({ shareError: "Couldn't load those verses. Please try again." })
       return
     }
+    this.set({ sharePreparing: 'text', shareError: null })
     try {
       if (navigator.share) {
         await navigator.share({ text })
       } else {
         await navigator.clipboard.writeText(text)
       }
-      this.set({ shareError: null })
+      this.set({ sharePreparing: null })
+      this.exitGather()
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        this.set({ sharePreparing: null })
+        return
+      }
       console.warn('[share] text share failed', error)
-      this.set({ shareError: "Couldn't share the text. Please try again." })
+      this.set({ sharePreparing: null, shareError: "Couldn't prepare the share. Please try again." })
     }
   }
 
