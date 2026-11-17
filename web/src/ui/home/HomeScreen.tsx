@@ -1,23 +1,22 @@
 import { suppliedWords } from '../../render/suppliedWords'
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react'
-import {
-  IconBuffering,
-  IconClose,
-  IconFastForward,
-  IconFastRewind,
-  IconPause,
-  IconPlay,
-  IconTune,
-} from '../icons/PlaybackIcons'
+import { IconTune } from '../icons/PlaybackIcons'
 import { PaperInput } from '../kit/PaperInput'
-import { ContinueRow } from './ContinueRow'
 import { ChapterRow } from './ChapterRow'
+import { ContinueFloat } from './ContinueFloat'
+import { FloatingPlayback } from './FloatingPlayback'
+import { SearchDials } from './SearchDials'
+import { PinChapterTip } from './PinChapterTip'
+import { usePinChapterLesson } from './usePinChapterLesson'
+import { chapterOpenAyah, shouldDismissSearchOnScroll } from './continuePlace'
+import { readChapterListScroll, writeChapterListScroll } from './chapterListScroll'
 import { chapterRowKey, pinnedChapterLists, reflowDeltas } from './pinnedChapters'
 import {
   appStore,
@@ -40,6 +39,7 @@ import {
 import { wordSearchSources } from '../../data/customizePolicy'
 import { BOOKMARKS_LAYER, type StackLayer } from '../paper/stack'
 import { createWheelTurn, isSidewaysWheel } from '../reader/wheelTurn'
+import './home.css'
 
 export function HomeScreen({
   stackLayer,
@@ -62,6 +62,7 @@ export function HomeScreen({
       settings: s.settings,
       surahs: s.surahs,
       player: s.player,
+      playbackSession: s.playbackSession,
       content: s.content,
       ready: s.ready,
     }),
@@ -75,17 +76,22 @@ export function HomeScreen({
       a.player.isBuffering === b.player.isBuffering &&
       a.player.nowPlaying?.surahId === b.player.nowPlaying?.surahId &&
       a.player.nowPlaying?.ayah === b.player.nowPlaying?.ayah &&
-      a.player.error === b.player.error,
+      a.player.error === b.player.error &&
+      a.playbackSession === b.playbackSession,
   )
   const hasBookmarks = state.bookmarks.length > 0
-  const bookmarkStyle = state.settings.homeBookmarkStyle
   // Local query — typing must not emit through appStore (that re-renders the
   // whole paper stack, including the mounted reader under the cover).
   const [search, setSearch] = useState('')
   const [searchFocused, setSearchFocused] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searching = search.trim().length > 0
+  // Search mode: the field focused, or a query still on the sheet (results
+  // stay after the keyboard goes). The float and ribbons stand down for it.
+  const searchActive = searchFocused || searching
   const sheetRef = useRef<HTMLDivElement>(null)
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const searchBoxRef = useRef<HTMLDivElement>(null)
   const { surahs: filtered, ayahTarget } = useMemo(
     () => filterSurahs(state.surahs, search),
     [state.surahs, search],
@@ -106,6 +112,11 @@ export function HomeScreen({
   const previousBookmarkCount = useRef(state.bookmarks.length)
   const pendingRibbonUnfurl = useRef(false)
   const [ribbonUnfurlSignal, setRibbonUnfurlSignal] = useState(0)
+  const [placeUnfurlSignal, setPlaceUnfurlSignal] = useState(0)
+  const visitedReader = useRef(false)
+  const isTop = stackLayer === COVER_LAYER
+  const depth = Math.max(0, stackLayer - COVER_LAYER)
+  const readingLayout = state.settings.readingLayout
 
   useEffect(() => {
     const dismissSearch = (event: KeyboardEvent) => {
@@ -126,12 +137,12 @@ export function HomeScreen({
   useEffect(() => {
     const shell = document.querySelector('.app-shell')
     if (!(shell instanceof HTMLElement)) return
-    if (searchFocused || searching) shell.dataset.coverSearch = 'true'
+    if (searchActive) shell.dataset.coverSearch = 'true'
     else delete shell.dataset.coverSearch
     return () => {
       delete shell.dataset.coverSearch
     }
-  }, [searchFocused, searching])
+  }, [searchActive])
 
   // Pinning from the very top of the sheet brings the band into view (as
   // Android scrolls to the first item); a reader deep in the list keeps
@@ -158,8 +169,7 @@ export function HomeScreen({
     return () => window.clearTimeout(done)
   }, [dryingKey])
   useEffect(() => {
-    const scroller = sheetRef.current?.querySelector('.scroll')
-    if (revealPinned.current) scroller?.scrollTo({ top: 0, behavior: 'smooth' })
+    if (revealPinned.current) scrollerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
     revealPinned.current = false
     const key = focusAfterPin.current
     focusAfterPin.current = null
@@ -170,6 +180,8 @@ export function HomeScreen({
     }
   }, [pinnedSurahIds])
 
+  // Quran-wide results read the selected layout's English, and a layout
+  // change re-runs the search (Android combines query and sources).
   useEffect(() => {
     setExpandedSurahIds(new Set())
     if (!shouldRunWordSearch(search)) {
@@ -184,7 +196,7 @@ export function HomeScreen({
       void QuranRepository.searchWordsAsync(
         search,
         () => cancelled,
-        wordSearchSources(),
+        wordSearchSources(readingLayout),
       ).then((hits) => {
         if (cancelled) return
         setWordHits(hits)
@@ -196,7 +208,7 @@ export function HomeScreen({
       cancelled = true
       window.clearTimeout(handle)
     }
-  }, [search])
+  }, [search, readingLayout])
 
   useEffect(() => {
     if (state.bookmarks.length > previousBookmarkCount.current) {
@@ -205,10 +217,20 @@ export function HomeScreen({
     previousBookmarkCount.current = state.bookmarks.length
   }, [state.bookmarks.length])
 
+  // A mark added in the reader unfurls once Chapters is uncovered; so does
+  // the place ribbon, coming back from any reader visit (Android
+  // `shouldUnfurlReadingPlaceRibbon`).
   useEffect(() => {
-    if (stackLayer !== COVER_LAYER || !pendingRibbonUnfurl.current) return
-    pendingRibbonUnfurl.current = false
-    setRibbonUnfurlSignal((value) => value + 1)
+    if (stackLayer >= READER_LAYER) visitedReader.current = true
+    if (stackLayer !== COVER_LAYER) return
+    if (pendingRibbonUnfurl.current) {
+      pendingRibbonUnfurl.current = false
+      setRibbonUnfurlSignal((value) => value + 1)
+    }
+    if (visitedReader.current) {
+      visitedReader.current = false
+      setPlaceUnfurlSignal((value) => value + 1)
+    }
   }, [stackLayer])
 
   const visibleWordHits = useMemo(
@@ -221,14 +243,13 @@ export function HomeScreen({
   )
   const correctedQuery = useMemo(() => spellingCorrection(visibleWordHits), [visibleWordHits])
 
-  // Android's sole place marker: the last verse heard. Reading alone
-  // never creates one, so there is no Continue row before any listening.
+  // Android's sole place marker: the last verse heard. Reading alone never
+  // creates one. Its chapter row carries the green place ribbon in situ.
+  const lastSurah = state.settings.lastSurah
+  const lastAyah = Math.max(1, state.settings.lastAyah)
   const continueSurah =
-    !searching && state.settings.lastSurah > 0
-      ? state.surahs.find((s) => s.id === state.settings.lastSurah)
-      : null
-  const depth = Math.max(0, stackLayer - COVER_LAYER)
-  const isTop = stackLayer === COVER_LAYER
+    lastSurah > 0 ? state.surahs.find((s) => s.id === lastSurah) ?? null : null
+  const placeKey = continueSurah ? chapterRowKey(continueSurah.id) : null
 
   // Two fingers swept back across Chapters close the book, as a finger
   // dragged back across it does. The sweep is taken from the browser's own
@@ -250,9 +271,11 @@ export function HomeScreen({
     sheet.addEventListener('wheel', onWheel, { passive: false })
     return () => sheet.removeEventListener('wheel', onWheel)
   }, [canCloseBook])
+
   const nowPlaying = state.player.nowPlaying
-  // Hide the float for the whole search session (focused field or query).
-  const showFloat = nowPlaying != null && isTop && !searchFocused && !searching
+  // A listening session only (a chapter open parks a silent clip), and
+  // never through the search session (focused field or query).
+  const showFloat = nowPlaying != null && state.playbackSession && isTop && !searchActive
   const floatAyah = nowPlaying != null ? Math.max(1, nowPlaying.ayah) : 1
   const floatSurah =
     nowPlaying != null
@@ -265,12 +288,10 @@ export function HomeScreen({
   // idle session, and for the moment before the reader sheet can draw that bar.
   const pinnedCoverBar = showFloat && playbackPinned && state.content != null
 
+  // Android: the return pill opens the reader AT the playing verse, even
+  // when that chapter is the one already loaded.
   const openNowPlaying = () => {
     if (!nowPlaying) return
-    if (state.content?.surah.id === nowPlaying.surahId) {
-      appStore.revealLayer(READER_LAYER)
-      return
-    }
     appStore.openReading(nowPlaying.surahId, floatAyah)
   }
 
@@ -295,12 +316,77 @@ export function HomeScreen({
     appStore.prepareSurah(surahId)
   }
 
+  // Focusing search lifts the list to the top; a deliberate scroll beyond
+  // 24px then puts the keyboard away, leaving any results (Android
+  // `shouldDismissSearchOnScroll`). The lift itself never counts.
+  useEffect(() => {
+    const scroller = scrollerRef.current
+    if (!searchFocused || !scroller) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let lifting = scroller.scrollTop > 0
+    scroller.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
+    const liftDone = window.setTimeout(() => {
+      lifting = false
+    }, 700)
+    const onScroll = () => {
+      if (lifting) {
+        if (scroller.scrollTop <= 0) lifting = false
+        return
+      }
+      if (shouldDismissSearchOnScroll(scroller.scrollTop)) searchInputRef.current?.blur()
+    }
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.clearTimeout(liftDone)
+      scroller.removeEventListener('scroll', onScroll)
+    }
+  }, [searchFocused])
+
+  // The list is the app's home: a reload opens on the chapter last under
+  // the thumb, not the top (Android `chapterListAnchor`).
+  const restoredScroll = useRef(false)
+  const listReady = state.surahs.length > 0
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current
+    if (restoredScroll.current || !listReady || !scroller) return
+    restoredScroll.current = true
+    const saved = readChapterListScroll()
+    if (saved > 0 && scroller.scrollTop === 0) scroller.scrollTop = saved
+  }, [listReady])
+  useEffect(() => {
+    const scroller = scrollerRef.current
+    if (!scroller || searchActive || !isTop) return
+    let idle = 0
+    const onScroll = () => {
+      window.clearTimeout(idle)
+      idle = window.setTimeout(() => writeChapterListScroll(scroller.scrollTop), 180)
+    }
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.clearTimeout(idle)
+      scroller.removeEventListener('scroll', onScroll)
+    }
+  }, [searchActive, isTop])
+
   // Pinned chapters lead the list on the band and leave the list below.
   const chapterLists = pinnedChapterLists(filtered, pinnedSurahIds, searching)
   const bandIds = new Set(chapterLists.pinned.map((s) => s.id))
+
+  // The pin lesson (developer guides): offered after a long read of a late
+  // chapter, pointing at that chapter's row once Chapters is back.
+  const pinLesson = usePinChapterLesson({
+    stackLayer,
+    readingChapterId: state.content?.surah.id ?? 0,
+    pinnedCount: pinnedSurahIds.length,
+    developerMode: state.settings.developerMode,
+    guidesEnabled: state.settings.educationGuidesEnabled,
+  })
+
   const togglePinned = (surahId: number) => {
     const pinned = pinnedSurahIds.includes(surahId)
-    const scroller = sheetRef.current?.querySelector('.scroll')
+    // The lesson completes on a real pin.
+    if (!pinned) pinLesson.complete()
+    const scroller = scrollerRef.current
     revealPinned.current = !pinned && !searching && (scroller?.scrollTop ?? 0) <= 0
     if (document.activeElement?.closest('.surah-item')) {
       // Focus follows the row only when the reader will see where it went;
@@ -321,6 +407,12 @@ export function HomeScreen({
     const neighbour = rows[at + 1] ?? rows[at - 1]
     return neighbour ? chapterRowKey(neighbour.id) : null
   }
+  const openChapter = (surahId: number) => {
+    pinLesson.close()
+    const ayah = chapterOpenAyah({ surahId, ayahTarget: ayahTarget ?? null, lastSurah, lastAyah })
+    if (ayah != null) appStore.openReading(surahId, ayah)
+    else appStore.openSurah(surahId)
+  }
   const chapterRow = (s: (typeof filtered)[number]) => {
     const onBand = bandIds.has(s.id)
     const key = chapterRowKey(s.id)
@@ -333,14 +425,25 @@ export function HomeScreen({
         onBand={onBand}
         drying={dryingKey === key}
         holdable={!searching}
+        placeAyah={key === placeKey ? lastAyah : null}
+        placeUnfurlSignal={key === placeKey ? placeUnfurlSignal : 0}
         onPrepare={() => prepareChapter(s.id)}
-        onOpen={() => {
-          if (searching) appStore.openReading(s.id, ayahTarget ?? 1)
-          else appStore.openSurah(s.id)
-        }}
+        onOpen={() => openChapter(s.id)}
         onToggle={() => togglePinned(s.id)}
       />
     )
+  }
+
+  const [continueHolding, setContinueHolding] = useState(false)
+  const onContinueFloat = useCallback((holding: boolean) => setContinueHolding(holding), [])
+  const continueEligible = continueSurah != null && isTop && !searchActive && !showFloat
+
+  // Empty-query dials fade in under the focused field.
+  const dialsVisible = searchFocused && search.length === 0
+
+  const scrollToTop = () => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    scrollerRef.current?.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
   }
 
   return (
@@ -379,8 +482,10 @@ export function HomeScreen({
         className="sheet-frame"
         data-search-focused={searchFocused || undefined}
       >
-        {hasBookmarks && bookmarkStyle !== 'saved_passages' ? (
-          <div className={`home-bookmark-ribbon home-bookmark-${bookmarkStyle}`}>
+        {/* The ribbon is the bookmarks entry; search owns the sheet while
+            active (dials or results), so it steps aside until then. */}
+        {hasBookmarks && !searchActive ? (
+          <div className="home-bookmark-ribbon home-bookmark-top_bound">
             <VerseBookmarkRibbon
               bookmarked
               focused
@@ -409,7 +514,15 @@ export function HomeScreen({
           aria-hidden={searchFocused || undefined}
         >
           <h1>
-            <span>Beautiful Quran</span>
+            {/* The masthead is the way back to the top of the list. */}
+            <button
+              type="button"
+              className="home-title"
+              tabIndex={searchFocused ? -1 : undefined}
+              onClick={scrollToTop}
+            >
+              Beautiful Quran
+            </button>
           </h1>
           <button
             type="button"
@@ -423,7 +536,10 @@ export function HomeScreen({
         </header>
 
         <div className="edge-fade">
-          <div className={`scroll${showFloat ? ' scroll-with-float' : ''}${pinnedCoverBar ? ' scroll-with-chapter' : ''}`}>
+          <div
+            ref={scrollerRef}
+            className={`scroll${showFloat ? ' scroll-with-float' : ''}${pinnedCoverBar ? ' scroll-with-chapter' : ''}${continueHolding && !showFloat ? ' scroll-with-continue' : ''}`}
+          >
             <div
               className="home-scroll-page"
               data-has-bookmarks={hasBookmarks || undefined}
@@ -431,9 +547,11 @@ export function HomeScreen({
             >
               <div className="search-row">
                 <div
+                  ref={searchBoxRef}
                   className="home-search"
                   onFocusCapture={() => {
                     setSearchFocused(true)
+                    pinLesson.close()
                     void Promise.all([
                       QuranRepository.warmWordSearchIndex(),
                       QuranRepository.warmSearchConcepts(),
@@ -474,49 +592,6 @@ export function HomeScreen({
                 </div>
               </div>
 
-            {continueSurah ? (
-              <ContinueRow
-                surahId={continueSurah.id}
-                ayah={state.settings.lastAyah}
-                transliteration={continueSurah.nameTransliteration}
-                arabic={continueSurah.nameArabic}
-                onPrepare={() => prepareChapter(continueSurah.id)}
-              />
-            ) : null}
-
-            {hasBookmarks && bookmarkStyle === 'saved_passages' && !searching ? (
-              <div className="saved-passages-row">
-                <span className="saved-passages-mark" aria-hidden="true">
-                  <VerseBookmarkRibbon
-                    bookmarked
-                    focused
-                    side="left"
-                    interactive={false}
-                    animateOnTap={false}
-                    topInset={0}
-                    bottomGap={0}
-                    edgeInset={6.5}
-                    unfurlSignal={ribbonUnfurlSignal}
-                    onToggle={() => true}
-                    decorative
-                  />
-                </span>
-                <span className="saved-passages-copy">
-                  <span className="saved-passages-title">Saved passages</span>
-                  <span className="saved-passages-note">
-                    {state.bookmarks.length}{' '}
-                    {state.bookmarks.length === 1 ? 'saved ayah' : 'saved ayahs'}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  className="saved-passages-open"
-                  aria-label="Open bookmarks"
-                  onClick={() => appStore.revealLayer(BOOKMARKS_LAYER)}
-                />
-              </div>
-            ) : null}
-
             {showSurahMatches ? (
               <p className="search-section-label">Surahs</p>
             ) : null}
@@ -544,7 +619,7 @@ export function HomeScreen({
                 <p className="search-section-label">
                   {wordLoading && wordSections.length === 0
                     ? 'Searching ayahs…'
-                    : `In the Quran · ${visibleWordHits.length} relevant ${visibleWordHits.length === 1 ? 'ayah' : 'ayahs'}`}
+                    : `In the Quran · ${visibleWordHits.length} relevant ${visibleWordHits.length === 1 ? 'ayah' : 'ayahs'}${wordLoading ? ' · refining…' : ''}`}
                 </p>
                 {wordSections.map((section) => (
                   <WordSearchSection
@@ -575,70 +650,46 @@ export function HomeScreen({
         </div>
       </div>
 
-      {showFloat && !pinnedCoverBar ? (
-        <div className="floating-play" role="group" aria-label="Playback">
-          <button
-            type="button"
-            className="float-close"
-            aria-label="Close playback"
-            onClick={() => appStore.dismissFloatingPlayback()}
-          >
-            <IconClose />
-          </button>
-          <button
-            type="button"
-            className="float-now-playing"
-            aria-label={
-              chapterLabel && ayahLabel
-                ? `Open ${chapterLabel} · ${ayahLabel}`
-                : 'Open now playing'
-            }
-            onClick={openNowPlaying}
-          >
-            <span className="float-chapter">{chapterLabel}</span>
-            {chapterLabel && ayahLabel ? (
-              <span className="float-sep" aria-hidden="true">
-                {' '}
-                ·{' '}
-              </span>
-            ) : null}
-            <span className="float-ayah">{ayahLabel}</span>
-          </button>
-          <div className="float-transport">
-            <button type="button" aria-label="Fast backward" onClick={() => void appStore.prev()}>
-              <IconFastRewind />
-            </button>
-            <button
-              type="button"
-              aria-label={
-                state.player.isBuffering && !state.player.isPlaying
-                  ? 'Buffering'
-                  : state.player.isPlaying
-                    ? 'Pause'
-                    : 'Play'
-              }
-              aria-busy={
-                (state.player.isBuffering && !state.player.isPlaying) || undefined
-              }
-              onClick={() => {
-                if (state.player.isBuffering && !state.player.isPlaying) return
-                void appStore.playPause()
-              }}
-            >
-              {state.player.isBuffering && !state.player.isPlaying ? (
-                <IconBuffering />
-              ) : state.player.isPlaying ? (
-                <IconPause />
-              ) : (
-                <IconPlay />
-              )}
-            </button>
-            <button type="button" aria-label="Fast forward" onClick={() => void appStore.next()}>
-              <IconFastForward />
-            </button>
-          </div>
-        </div>
+      <SearchDials
+        visible={dialsVisible}
+        surahs={state.surahs}
+        anchorRef={searchBoxRef}
+        sheetRef={sheetRef}
+        onDismiss={() => searchInputRef.current?.blur()}
+        onOpen={(surahId, ayah) => {
+          searchInputRef.current?.blur()
+          appStore.openReading(surahId, ayah)
+        }}
+      />
+
+      <ContinueFloat
+        surah={continueSurah}
+        ayah={lastAyah}
+        eligible={continueEligible}
+        rowKey={placeKey}
+        sheetRef={sheetRef}
+        scrollerRef={scrollerRef}
+        layoutKey={`${filtered.length}|${pinnedSurahIds.join(',')}|${showFloat}`}
+        onFloatChange={onContinueFloat}
+        onPrepare={() => continueSurah && prepareChapter(continueSurah.id)}
+        onOpen={() => continueSurah && appStore.openReading(continueSurah.id, lastAyah)}
+      />
+
+      {!pinnedCoverBar ? (
+        <FloatingPlayback
+          visible={showFloat}
+          chapterLabel={chapterLabel}
+          ayahLabel={ayahLabel}
+          onOpenNowPlaying={openNowPlaying}
+        />
       ) : null}
+
+      <PinChapterTip
+        lesson={pinLesson}
+        eligible={isTop && !searchActive && pinnedSurahIds.length === 0 && !showFloat}
+        sheetRef={sheetRef}
+        scrollerRef={scrollerRef}
+      />
     </div>
   )
 }

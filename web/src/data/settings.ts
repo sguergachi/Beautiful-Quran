@@ -11,16 +11,11 @@ export type PageNumberScript = 'both' | 'arabic' | 'english'
 export type AyahSelectorSide = 'left' | 'right'
 /** Android `EnglishLeafText`: what the English Mushaf leaf prints. */
 export type EnglishLeafText = 'translation' | 'gloss'
-export type HomeBookmarkStyle = 'top_bound' | 'saved_passages'
 
 /** Percent. The print elongates letters to fill a line; this is the web's stand-in. */
 export type MushafGlyphWiden = 0 | 4 | 6 | 8
 export const MUSHAF_GLYPH_WIDENS: MushafGlyphWiden[] = [0, 4, 6, 8]
 
-export const HOME_BOOKMARK_STYLES: HomeBookmarkStyle[] = [
-  'top_bound',
-  'saved_passages',
-]
 export const VERSE_NUMBER_SCRIPTS: VerseNumberScript[] = ['arabic', 'english']
 export const PAGE_NUMBER_SCRIPTS: PageNumberScript[] = ['both', 'arabic', 'english']
 export const READING_MODES: ReadingMode[] = [
@@ -91,8 +86,6 @@ export interface Settings {
    * before space is added between its words. 0 turns widening off.
    */
   mushafGlyphWiden: MushafGlyphWiden
-  /** Developer-selectable Chapters bookmark treatment. */
-  homeBookmarkStyle: HomeBookmarkStyle
   /** Developer-only: ink-brush circle style around selected enums. */
   brushCircleStyle: BrushCircleStyle
 }
@@ -121,7 +114,6 @@ const DEFAULTS: Settings = {
   educationGuidesEnabled: false,
   gapless5Playback: true,
   mushafGlyphWiden: 6,
-  homeBookmarkStyle: 'top_bound',
   brushCircleStyle: 'baseline',
 }
 
@@ -160,6 +152,9 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
   delete clean.lastReadAyah
   // Retired developer A/B (Android removed `colorSystem` too).
   delete clean.colorSystem
+  // Android retired its Chapters bookmark experiment (homeBookmarkStyle):
+  // the top-bound ribbon is the one entry, so the stored choice goes too.
+  delete clean.homeBookmarkStyle
   const developerMode = Boolean(partial.developerMode ?? DEFAULTS.developerMode)
   return {
     ...DEFAULTS,
@@ -182,11 +177,6 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
     mushafGlyphWiden: MUSHAF_GLYPH_WIDENS.includes(partial.mushafGlyphWiden as MushafGlyphWiden)
       ? (partial.mushafGlyphWiden as MushafGlyphWiden)
       : DEFAULTS.mushafGlyphWiden,
-    homeBookmarkStyle: HOME_BOOKMARK_STYLES.includes(
-      partial.homeBookmarkStyle as HomeBookmarkStyle,
-    )
-      ? (partial.homeBookmarkStyle as HomeBookmarkStyle)
-      : DEFAULTS.homeBookmarkStyle,
     brushCircleStyle: clampBrushStyle(
       partial.brushCircleStyle ?? DEFAULTS.brushCircleStyle,
     ),

@@ -111,7 +111,7 @@ export function App() {
       mushaf: s.settings.readingLayout === 'mushaf',
       gathering: s.gathering,
       stackLayer: s.stackLayer,
-      coverSession: s.player.nowPlaying != null,
+      coverSession: s.playbackSession,
     }),
   )
   const spread = useBookSpread(state.settings.pagePresentation)

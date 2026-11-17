@@ -9,7 +9,6 @@ import {
 import { QF_TIMING_RECITERS, runtimeTimingsCache } from '../../data/runtimeTimings'
 import {
   MUSHAF_GLYPH_WIDENS,
-  type HomeBookmarkStyle,
   type MushafGlyphWiden,
 } from '../../data/settings'
 import { customizeSummary } from '../../data/customizePolicy'
@@ -40,11 +39,6 @@ import { PaperSwitch } from '../kit/PaperSwitch'
 import { rearmEducation } from '../../data/education'
 import { version as APP_VERSION } from '../../../package.json'
 import './settings.css'
-
-const HOME_BOOKMARK_OPTIONS: { value: HomeBookmarkStyle; label: string }[] = [
-  { value: 'top_bound', label: 'Top-bound ribbon' },
-  { value: 'saved_passages', label: 'Saved passages line' },
-]
 
 /** Triple-tap window for developer unlock — matches Android SettingsScreen. */
 const DEVELOPER_TAP_RESET_MS = 1500
@@ -357,21 +351,6 @@ export function SettingsScreen({
                 use the media path so pitch stays natural. Turn off to compare dual-element
                 joins at 1×.
               </p>
-            </div>
-
-            <div className="settings-dev-block">
-              <p className="settings-body-label">Home bookmark</p>
-              <p className="settings-caption">
-                Changes the Chapters shortcut; bookmark ribbons inside verses are unchanged.
-              </p>
-              <PaperChoiceList
-                aria-label="Home bookmark"
-                value={s.homeBookmarkStyle}
-                options={HOME_BOOKMARK_OPTIONS}
-                onChange={(homeBookmarkStyle) =>
-                  appStore.updateSettings({ homeBookmarkStyle })
-                }
-              />
             </div>
 
             <div className="settings-dev-block">

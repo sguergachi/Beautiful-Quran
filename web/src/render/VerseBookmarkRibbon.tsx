@@ -523,11 +523,12 @@ export function VerseBookmarkRibbon({
     [draw, stopControls],
   )
 
+  // The place cloth replays its unfurl too (Android `placeUnfurlSignal`).
   useEffect(() => {
-    if (unfurlSignal <= 0 || !bookmarked) return
+    if (unfurlSignal <= 0 || !marked) return
     const frame = window.requestAnimationFrame(() => runAnimation(true))
     return () => window.cancelAnimationFrame(frame)
-  }, [bookmarked, runAnimation, unfurlSignal])
+  }, [marked, runAnimation, unfurlSignal])
 
   useEffect(() => () => stopControls(), [stopControls])
 
