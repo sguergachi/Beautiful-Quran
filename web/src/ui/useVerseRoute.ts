@@ -3,6 +3,7 @@ import { appStore } from '../store/appStore'
 import { player } from '../playback/player'
 import type { AyahRef } from '../share/gather'
 import { parseVerseHash, verseHash } from './verseRoute'
+import { COVER_LAYER, READER_LAYER } from './paper/stack'
 
 /** Explicit opens add history; settled scroll/page movement updates the current entry. */
 export function useVerseRoute(ready: boolean, place: AyahRef | null, revision: number, onLinkedOpen: () => void) {
@@ -19,8 +20,15 @@ export function useVerseRoute(ready: boolean, place: AyahRef | null, revision: n
       // History navigation leaves the word sheet and must not resume its old
       // playback snapshot over the arriving page.
       if (state.rootViewer) appStore.closeRootViewer(false)
-      player.pause()
       if (state.gathering) appStore.exitGather()
+      // The chapter already open is only uncovered: the voice reading it
+      // carries on, as Android's Back never stops it.
+      if (target && state.content?.surah.id === target.surahId) {
+        appStore.revealLayer(READER_LAYER)
+        linkedOpen.current()
+        return
+      }
+      player.pause()
       if (target) {
         appStore.openReading(target.surahId, target.ayah)
         lastRevision.current = appStore.getSnapshot().readerOpenRevision
@@ -29,9 +37,16 @@ export function useVerseRoute(ready: boolean, place: AyahRef | null, revision: n
     }
     read()
     // Back/Forward emits popstate; a hand-edited hash emits hashchange too.
-    const changed = () => {
+    const changed = (event: Event) => {
       if (location.hash === lastHash.current) return
       lastHash.current = location.hash
+      // Back from a sheet over Chapters peels that sheet (Android Back),
+      // whatever verse the previous entry names.
+      const state = appStore.getSnapshot()
+      if (event.type === 'popstate' && (state.stackLayer > COVER_LAYER || state.rootViewer)) {
+        appStore.goBack()
+        return
+      }
       read()
     }
     window.addEventListener('popstate', changed)

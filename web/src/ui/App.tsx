@@ -18,9 +18,10 @@ import { EntranceCover } from './entrance/EntranceCover'
 import { OrnamentsLab } from './lab/OrnamentsLab'
 import { bookmarkSwipeDestination, closesBook, spreadLayers, useBookSpread } from './paper/bookSpread'
 import { BookSpread } from './paper/BookSpread'
-import { unlockPageTurnSounds } from './paper/pageTurnSounds'
+import { PAGE_TURN_SCHEDULE, playFlip, unlockPageTurnSounds } from './paper/pageTurnSounds'
 import { useSheetFocus } from './paper/sheetFocus'
 import { useVerseRoute } from './useVerseRoute'
+import { stackSwipeDestination } from './paper/stackSwipe'
 
 /** True while the URL hash routes to the Ornaments Lab (`#lab`). */
 function useLabRoute(): boolean {
@@ -92,7 +93,7 @@ export function App() {
   }, [])
   const isLab = useLabRoute()
   useVerseRoute(state.ready, state.readingPlace, state.readerOpenRevision, () => setEntranceDone(true))
-  const swipeStart = useRef<{ x: number; y: number; pointerId: number; layer: StackLayer; field: boolean } | null>(null)
+  const swipeStart = useRef<{ x: number; y: number; pointerId: number; layer: StackLayer; field: boolean; at: number } | null>(null)
   const stack = state.stackLayer
   // The layer the deck last settled from, so Chapters ↔ Settings can skip
   // the reader sheet between them instead of sweeping it across the page.
@@ -162,6 +163,17 @@ export function App() {
     }
   }, [])
 
+  // A phone's sheets are paper: every turn of the stack sounds the
+  // three-part flip (Android PageTurnSounds, fed the stack position). The
+  // Mushaf's own leaves turn silently; on facing pages the piles sound.
+  const soundedStack = useRef(stack)
+  useEffect(() => {
+    if (soundedStack.current === stack) return
+    soundedStack.current = stack
+    if (spread || !entranceDone || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    playFlip(PAGE_TURN_SCHEDULE)
+  }, [stack, spread, entranceDone])
+
   // Escape peels one sheet back through the paper stack (cover handles its own).
   useEffect(() => {
     if (!entranceDone) return
@@ -182,6 +194,15 @@ export function App() {
   const showStack = state.ready
 
   const beginBookmarkSwipe = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!spread) {
+      // Phone: any sheet turns by a sideways stroke (Android paperStackDrag).
+      // Controls that use a horizontal drag themselves claim it first.
+      if (event.pointerType === 'mouse' && event.button !== 0) return
+      const target = event.target as Element
+      if (target.closest('input, textarea, select, [role="slider"], .mushaf-dial, .mushaf, .mushaf-host, [data-claims-swipe]')) return
+      swipeStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId, layer: stack, field: false, at: event.timeStamp }
+      return
+    }
     const sheet = (event.target as Element).closest('.sheet')
     const layer = sheet?.getAttribute('data-name') === 'home' ? pageLayers.home
       : sheet?.getAttribute('data-name') === 'bookmarks' ? stack : null
@@ -189,7 +210,7 @@ export function App() {
     if (event.pointerType === 'mouse' && event.button !== 0) return
     // A drag inside a text field selects text; it never closes the book.
     const field = (event.target as Element).closest('input, textarea') != null
-    swipeStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId, layer, field }
+    swipeStart.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId, layer, field, at: event.timeStamp }
   }
 
   const finishBookmarkSwipe = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -198,6 +219,17 @@ export function App() {
     if (!start || start.pointerId !== event.pointerId) return
     const dx = event.clientX - start.x
     const dy = event.clientY - start.y
+    if (!spread) {
+      // One sheet per stroke; Chapters never closes the book on a phone.
+      const to = stackSwipeDestination({
+        layer: start.layer, dx, dy, ms: event.timeStamp - start.at, width: window.innerWidth,
+        hasReader, hasBookmarks: state.bookmarks.length > 0,
+        mushafReaderOnTop: state.settings.readingLayout === 'mushaf',
+      })
+      if (to === 'back') appStore.goBack()
+      else if (to != null) appStore.revealLayer(to)
+      return
+    }
     if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.35) return
     if (!start.field && closesBook(start.layer, dx)) {
       closeBook()
@@ -258,7 +290,7 @@ export function App() {
           <HomeScreen
             stackLayer={pageLayers.home}
             playbackPinned={playbackPinned && !spread}
-            onCloseBook={entranceDone ? closeBook : undefined}
+            onCloseBook={entranceDone && spread ? closeBook : undefined}
             closeStrip={spread}
           />
           <SettingsScreen stackLayer={stack} hasReader={hasReader} />

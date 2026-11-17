@@ -54,6 +54,8 @@ import { NextChapterFooter } from './NextChapterFooter'
 import { PageBreak } from './PageBreak'
 import { QuranRepository } from '../../data/repository'
 import { MushafReader } from './MushafReader'
+import { MushafPageDial, MushafTransportEnds } from './MushafPageDial'
+import { playMushafLeaf } from './mushafLeafState'
 import { MUSHAF_INK_IDLE, mushafReadHistory, type MushafInk, type MushafReadHistory } from './mushafInk'
 import { ayahKey } from '../../share/gather'
 import { buildReaderItems, sliceReaderItems } from './readerItems'
@@ -286,6 +288,9 @@ export function ReaderScreen({
   const mushafGrid = useMushafGrid(sheetRef, mushaf)
   const inkReadRef = useRef<MushafReadHistory>({ ayah: null, activation: 0, read: false })
   const spread = useBookSpread(state.settings.pagePresentation)
+  // One leaf (no facing pages): Android's book window — no top bar, the dial
+  // under the leaf, Chapters and Settings at the ends of the transport.
+  const mushafLeafChrome = mushaf && !spread
   // Facing leaves with Chapters lying over the left one: touching the page
   // still being read, anywhere on it, puts Chapters away, and that touch
   // does nothing else. The page's own controls keep their meaning.
@@ -1206,6 +1211,8 @@ export function ReaderScreen({
 
   const togglePlayback = useCallback(() => {
     if (!content) return
+    // Mushaf: Play recites the leaf in view (Android `mushafPlayTarget`).
+    if (mushaf && !state.player.isPlaying && playMushafLeaf()) return
     const thisSurahLoaded = state.player.nowPlaying?.surahId === content.surah.id
     // Only a cold Play on this chapter's own in-flight fetch waits (#289);
     // a tap here while another chapter buffers starts this one (Android).
@@ -1224,7 +1231,7 @@ export function ReaderScreen({
       pendingJump: pendingJumpAyah.current != null,
       enableFollow: !state.player.isPlaying,
     })
-  }, [content, focusedAyah, state.activeAyah, state.followEnabled, state.player])
+  }, [content, focusedAyah, state.activeAyah, state.followEnabled, state.player, mushaf])
 
   // The reading line is the keyboard cursor. Reuse rail jumps so keys get the
   // same progressive mount, focus glide, playback parking, and follow policy.
@@ -1479,6 +1486,7 @@ export function ReaderScreen({
         />
       ) : null}
 
+      {mushafLeafChrome && !searchActive ? null : (
       <div ref={mushafGrid.topRef} className="reader-top" data-receded={receded || editingNote != null} data-search={searchActive}>
         <button
           type="button"
@@ -1597,6 +1605,7 @@ export function ReaderScreen({
           </div>
         )}
       </div>
+      )}
 
       {/* Overlay on the sheet edge — never a flex sibling of the verse column. */}
       {rail}
@@ -1629,7 +1638,9 @@ export function ReaderScreen({
                   return
                 }
                 if (surahId !== content.surah.id) {
-                  appStore.openSurah(surahId, ayah)
+                  // Another chapter's words on this leaf: load it and recite
+                  // from the tapped word (Android `onMushafWordClick`).
+                  void appStore.openSurahAndPlay(surahId, ayah, position)
                   return
                 }
                 void appStore.playFromWord(ayah, position)
@@ -1881,7 +1892,8 @@ export function ReaderScreen({
             />
           ) : (
           <PlaybackPin active={playbackPinned}>
-          <div ref={mushafGrid.footRef} className={`player-bar${coverChrome ? ' cover-chrome' : ''}`} inert={ayahRailTipOpen || ayahRailTipRendered || bookmarkTipOpen || bookmarkTipRendered}>
+          <div ref={mushafGrid.footRef} className={`player-bar${coverChrome ? ' cover-chrome' : ''}`} data-mushaf-leaf={mushafLeafChrome || undefined} inert={ayahRailTipOpen || ayahRailTipRendered || bookmarkTipOpen || bookmarkTipRendered}>
+            {mushafLeafChrome ? <MushafPageDial /> : null}
             <div className="player-reciter-row">
               {playerNotice ? (
                 <div className="player-error">
@@ -1943,6 +1955,7 @@ export function ReaderScreen({
               </button>
             ) : null}
             <div className="player-transport">
+              {mushafLeafChrome ? <MushafTransportEnds reciting={recitingActive} /> : null}
               <button
                 type="button"
                 className="ctrl repeat-control"

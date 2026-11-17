@@ -1,6 +1,6 @@
 import { memo, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { LEAF_TURN_MS } from '../paper/bookSpread'
-import { hasPagePicture, keepPagePicture, startPageTurn, type PagePlace } from '../paper/pageTurn'
+import { hasPagePicture, keepPagePicture, startPageTurn, type PagePlace, type TurnDrive } from '../paper/pageTurn'
 
 /** The share of the block below which a turning pile is drawn as one leaf. */
 export const WAD_VISIBLE = 0.02
@@ -28,6 +28,7 @@ export const TurningLeaf = memo(function TurningLeaf({
   back,
   backKey,
   backFrom,
+  drive,
   onEnd,
 }: {
   /**
@@ -54,6 +55,8 @@ export const TurningLeaf = memo(function TurningLeaf({
   back?: ReactNode
   backKey?: string
   backFrom?: () => Element | null
+  /** A leaf under a finger (see [TurnDrive]). */
+  drive?: TurnDrive
   onEnd: () => void
 }) {
   const root = useRef<HTMLDivElement>(null)
@@ -83,6 +86,7 @@ export const TurningLeaf = memo(function TurningLeaf({
         backKey,
         frontSource: faceFrom?.() ?? undefined,
         backSource: backFrom?.() ?? undefined,
+        drive,
       },
       () => ended.current(),
     )
