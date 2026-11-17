@@ -1,0 +1,62 @@
+/* Entrance cover parity with Android `EntranceCover`. Imported by
+   EntranceCover.tsx; selectors are qualified so they win over the older
+   entrance rules in the shared stylesheet regardless of load order. */
+
+/* Opaque from the first frame: no fade-in of the board. */
+.entrance .entrance-board {
+  transition: none;
+}
+
+/* The light is always on the gilding: the idle sweep, or the mouse. */
+.entrance .entrance-glint > span {
+  transition: none;
+}
+
+/* The lower air holds the load label without moving the du'a above it
+   (Android: a weighted Box with 14dp of top padding). */
+.entrance .entrance-air--bot {
+  position: relative;
+}
+
+.entrance .entrance-air--bot > .entrance-load {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(var(--cover-copy-max), 100%);
+  gap: 9px;
+  transition: opacity 900ms ease;
+}
+
+/* Android `bodySmall`, parchment at 55%: a quiet line, not small caps. */
+.entrance .entrance-air--bot .entrance-load-label {
+  font-size: var(--cover-load-label);
+  letter-spacing: 0.01em;
+  text-transform: none;
+  font-feature-settings: 'kern' 1, 'onum' 1;
+}
+
+/* A tooled gold rule: 156 × 2, parchment track, bright gold fill. */
+.entrance .entrance-air--bot .entrance-load-track {
+  width: 156px;
+  max-width: 100%;
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(232, 226, 213, 0.14);
+}
+
+.entrance .entrance-air--bot .entrance-load-fill {
+  border-radius: 1px;
+  background: rgba(242, 214, 143, 0.78);
+}
+
+.entrance .entrance-air--bot .entrance-load-fill[data-indeterminate='true'] {
+  width: 28%;
+  background: rgba(242, 214, 143, 0.62);
+  transition: none;
+  will-change: transform;
+}
+
+.entrance .entrance-air--bot .entrance-load-retry {
+  align-self: center;
+}
