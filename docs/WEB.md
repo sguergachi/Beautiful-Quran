@@ -298,10 +298,11 @@ Renderers consume these; they do not re-derive curves.
 
 - `localStorage` (or IndexedDB) for settings and bookmarks — never write into
   `quran.db`.
-- **Ribbon tip on hover (web).** Unlike Android’s always-visible faint tip, the
-  web idle swallowtail is hidden until the verse is hovered (or the ribbon is
-  keyboard-focused). Click the tip to unfurl and bookmark. Saved verses still
-  show the full ribbon at rest.
+- **Ribbon tip (web).** On touch screens and windows narrower than 720px the
+  idle swallowtail is always drawn at 0.4 alpha, as on Android. On wide
+  windows with a hovering pointer it stays hidden until the verse is hovered
+  (or the ribbon is keyboard-focused). Click the tip to unfurl and bookmark.
+  Saved verses always show the full ribbon at rest.
 - A saved verse also uses that same ribbon component on Chapters. It is part of
   the scrollable chapter document, running from Search to the final chapter
   entry; a newly added mark replays its unfurl when Chapters returns. Tapping
