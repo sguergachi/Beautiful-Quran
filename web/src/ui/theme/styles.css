@@ -514,6 +514,101 @@ select {
   visibility: hidden;
 }
 
+/*
+ * Phone paper deck — Android `paperLayerTransform`, driven by one stack
+ * position (`--stack-pos`): the layer at rest, a fraction while a sideways
+ * stroke holds a sheet (App.tsx sets it inline then). Chapters is the top
+ * sheet and turns away to the left (−5°), revealing the reader settling up
+ * from 5.5% right and 0.985 scale; the reader turns away (−4°) over
+ * Settings; Bookmarks comes in from the left. No shadows: flat paper.
+ */
+@media (max-width: 899px) {
+  .app-shell:not([data-spread='true']) {
+    --stack-pos: 0;
+    --settings-layer: 2;
+  }
+  .app-shell:not([data-spread='true'])[data-stack='-1'] { --stack-pos: -1; }
+  .app-shell:not([data-spread='true'])[data-stack='1'] { --stack-pos: 1; }
+  .app-shell:not([data-spread='true'])[data-stack='2'] { --stack-pos: 2; }
+  .app-shell:not([data-spread='true'])[data-has-reader='false'] { --settings-layer: 1; }
+
+  .app-shell:not([data-spread='true'])[data-stack] .sheet[data-name='home'] {
+    --turn: clamp(0, var(--stack-pos), 1);
+    z-index: 3;
+    opacity: 1;
+    transform: perspective(1200px) translateX(calc((-100% - 36px) * var(--turn))) rotateY(calc(-5deg * var(--turn)));
+    transition: transform 460ms cubic-bezier(0.24, 0.02, 0.12, 1);
+  }
+  /* Turned away: stay painted while it turns, then drop out. */
+  .app-shell:not([data-spread='true'])[data-stack='1'] .sheet[data-name='home'],
+  .app-shell:not([data-spread='true'])[data-stack='2'] .sheet[data-name='home'] {
+    visibility: hidden;
+    transition:
+      transform 460ms cubic-bezier(0.24, 0.02, 0.12, 1),
+      visibility 0s linear 460ms;
+  }
+
+  .app-shell:not([data-spread='true'])[data-stack] .sheet[data-name='reader'] {
+    --reveal: clamp(0, var(--stack-pos), 1);
+    --turn: clamp(0, var(--stack-pos) - 1, 1);
+    opacity: 1;
+    transform: perspective(1200px)
+      translateX(calc(5.5% * (1 - var(--reveal)) + (-100% - 36px) * var(--turn)))
+      scale(calc(0.985 + 0.015 * var(--reveal)))
+      rotateY(calc(-4deg * var(--turn)));
+  }
+  /* Parked under Chapters: keep its words while Chapters turns back over
+     it, then drop the long surah out of layout/paint as before. */
+  .app-shell:not([data-spread='true']):not([data-skip-reader='true'])[data-stack] .sheet[data-name='reader'][data-depth='0'][data-active='false'] {
+    transition:
+      transform 460ms cubic-bezier(0.24, 0.02, 0.12, 1),
+      content-visibility 0s linear 460ms allow-discrete;
+  }
+
+  .app-shell:not([data-spread='true'])[data-stack] .sheet[data-name='bookmarks'] {
+    --reveal: clamp(0, -1 * var(--stack-pos), 1);
+    opacity: 1;
+    transform: perspective(1200px)
+      translateX(calc((-100% - 36px) * (1 - var(--reveal))))
+      rotateY(calc(-4deg * (1 - var(--reveal))));
+  }
+  .app-shell:not([data-spread='true'])[data-stack] .sheet[data-name='bookmarks'][data-active='false'] {
+    visibility: hidden;
+    transition:
+      transform 460ms cubic-bezier(0.24, 0.02, 0.12, 1),
+      visibility 0s linear 460ms,
+      content-visibility 0s linear 460ms allow-discrete;
+  }
+
+  .app-shell:not([data-spread='true'])[data-stack] .sheet[data-name='settings'] {
+    --reveal: clamp(0, var(--stack-pos) / var(--settings-layer), 1);
+    transform: scale(calc(0.985 + 0.015 * var(--reveal)));
+  }
+
+  /* A stroke holds the sheets: they follow the finger, not a transition. */
+  .app-shell[data-dragging='true'] .sheet {
+    transition: none !important;
+  }
+  .app-shell[data-dragging='true'] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .app-shell:not([data-spread='true'])[data-dragging='true'][data-stack] .sheet:is([data-name='home'], [data-name='bookmarks'], [data-name='settings']),
+  .app-shell:not([data-spread='true'])[data-dragging='true'][data-has-reader='true']:not([data-skip-reader='true']) .sheet[data-name='reader'] {
+    visibility: visible;
+    content-visibility: visible;
+  }
+
+  /* A sideways stroke anywhere on a sheet belongs to the stack: without
+     this the browser claims it as a pan (pointercancel) outside the
+     chapter scrollers — on the player bar, and on the whole Settings page,
+     which scrolls itself. */
+  .app-shell:not([data-spread='true']),
+  .app-shell:not([data-spread='true']) .sheet[data-name='settings'] .settings {
+    touch-action: pan-y pinch-zoom;
+  }
+}
+
 /* Left-edge hit target — desktop peek gutter only (phones have no peek). */
 .sheet-edge-back {
   display: none;
