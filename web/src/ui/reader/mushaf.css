@@ -304,3 +304,11 @@
 .mushaf-lines[data-opening='true'] .mushaf-line[data-widen] {
   transform-origin: center;
 }
+
+/* A word or verse mark is never squeezed into its line. A line is measured
+   with the previous setting's word spaces still in place; shrunk to fit
+   them, its words read narrower than they are, the line was set too loose,
+   and the verse mark ending it was cut at the leaf's edge (page 520). */
+.mushaf-line > * {
+  flex-shrink: 0;
+}
