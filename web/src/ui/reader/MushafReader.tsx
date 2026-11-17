@@ -323,6 +323,8 @@ export function MushafReader({
   turnRef.current = turn
   const ownsKeyboardRef = useRef(ownsKeyboard)
   ownsKeyboardRef.current = ownsKeyboard
+  const englishRef = useRef(english)
+  englishRef.current = english
 
   // Pages run right to left: the left arrow goes on, the right arrow back.
   useEffect(() => {
@@ -340,7 +342,8 @@ export function MushafReader({
         return
       }
       event.preventDefault()
-      turnRef.current(event.key === 'ArrowLeft' ? 1 : -1)
+      // An English book is bound on the left: its way on is to the right.
+      turnRef.current((event.key === 'ArrowLeft') !== englishRef.current ? 1 : -1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -1184,6 +1187,9 @@ function MushafLeaf({
     })
   }, [page, english, side, fit, fitRevision, glyphWiden, opening])
 
+  // Customize → English leaf: the translation, or the words' own gloss.
+  const gloss = useAppSelector((state) =>
+    (state.settings as { englishLeafText?: string }).englishLeafText === 'gloss')
   if (!runtimeMushafCache) return null
   const rows = runtimeMushafCache.pageWords(page) ?? []
   const { leaf, headSurah, englishAyahs, lastPositions, verseWords } = mushafLeafModel(page, rows, QuranRepository.surahContent)
@@ -1227,7 +1233,7 @@ function MushafLeaf({
     >
       <MushafHead
         page={page}
-        script={english ? 'english' : pageNumberScript}
+        script={pageNumberScript}
         chapter={headSurah?.nameTransliteration ?? ''}
       />
       <div className="mushaf-block" ref={blockRef}>
@@ -1260,7 +1266,9 @@ function MushafLeaf({
                     onPlayWord(item.surahId, item.ayah, 1)
                   }}
                 >
-                  {suppliedWords(item.translation ?? '')}
+                  {suppliedWords(gloss
+                    ? (verseWords.get(`${item.surahId}:${item.ayah}`) ?? []).map((word) => word.translation).filter(Boolean).join(' ')
+                    : item.translation ?? '')}
                 </span>
                 {/* No-break space: the number never starts a line alone. */}
                 {'\u00A0'}
