@@ -1171,7 +1171,7 @@ export function ReaderScreen({
   const nowPlaying = state.player.nowPlaying
   // Cover keeps this same bar and opens the return pill and Close into it.
   const coverChrome =
-    playbackPinned && stackLayer === COVER_LAYER && nowPlaying != null
+    playbackPinned && stackLayer === COVER_LAYER && nowPlaying != null && state.playbackSession
   const transportSurah = nowPlaying
     ? state.surahs.find((s) => s.id === nowPlaying.surahId) ?? null
     : null
@@ -1182,11 +1182,9 @@ export function ReaderScreen({
     : ''
   const openCoverVerse = () => {
     if (!nowPlaying) return
-    if (content.surah.id === nowPlaying.surahId) {
-      appStore.revealLayer(READER_LAYER)
-      return
-    }
-    appStore.openSurah(nowPlaying.surahId, Math.max(1, nowPlaying.ayah))
+    // Android: the return pill opens the reader AT the playing verse, even
+    // when its chapter is already the loaded one (openSurah only re-aims).
+    appStore.openReading(nowPlaying.surahId, Math.max(1, nowPlaying.ayah))
   }
   const keepWordInView =
     state.followEnabled && recitingActive && activeExceedsViewport
@@ -1695,8 +1693,7 @@ export function ReaderScreen({
               >
                 <span className="player-return-chapter">{coverChapter}</span>
                 <span className="player-return-sep" aria-hidden="true">
-                  {' '}
-                  ·{' '}
+                  {'  ·  '}
                 </span>
                 <span className="player-return-ayah">{coverAyahLabel}</span>
                 <svg className="player-return-arrow" viewBox="0 0 24 24" aria-hidden="true">

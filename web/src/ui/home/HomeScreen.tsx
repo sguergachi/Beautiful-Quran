@@ -62,6 +62,7 @@ export function HomeScreen({
       settings: s.settings,
       surahs: s.surahs,
       player: s.player,
+      playbackSession: s.playbackSession,
       content: s.content,
       ready: s.ready,
     }),
@@ -75,7 +76,8 @@ export function HomeScreen({
       a.player.isBuffering === b.player.isBuffering &&
       a.player.nowPlaying?.surahId === b.player.nowPlaying?.surahId &&
       a.player.nowPlaying?.ayah === b.player.nowPlaying?.ayah &&
-      a.player.error === b.player.error,
+      a.player.error === b.player.error &&
+      a.playbackSession === b.playbackSession,
   )
   const hasBookmarks = state.bookmarks.length > 0
   const bookmarkStyle = state.settings.homeBookmarkStyle
@@ -252,7 +254,7 @@ export function HomeScreen({
   }, [canCloseBook])
   const nowPlaying = state.player.nowPlaying
   // Hide the float for the whole search session (focused field or query).
-  const showFloat = nowPlaying != null && isTop && !searchFocused && !searching
+  const showFloat = nowPlaying != null && state.playbackSession && isTop && !searchFocused && !searching
   const floatAyah = nowPlaying != null ? Math.max(1, nowPlaying.ayah) : 1
   const floatSurah =
     nowPlaying != null

@@ -48,6 +48,7 @@ import {
 } from '../domain/FastForwardPolicy'
 import { getHighlightLeadMs } from '../ui/reader/InkEngine'
 import { player, type PlayerState } from '../playback/player'
+import { hasPlaybackSession, nextPlaybackSession } from './playbackSession'
 import {
   readerHighlightKey,
   readerHighlightState,
@@ -146,6 +147,9 @@ export interface AppState {
   annotations: AnnotationMap
   content: SurahContent | null
   player: PlayerState
+  /** A verse is loaded *for listening* (not just parked by a chapter open):
+   * drives the cover's transport (see [nextPlaybackSession]). */
+  playbackSession: boolean
   activeWord: ActiveWord | null
   /**
    * True from a word tap until its sought word is heard: the tap's own
@@ -255,6 +259,8 @@ class AppStore {
    * before position catches up must not re-seek midpoint (#560).
    */
   private longAyahMidpointConsumed = 0
+  /** Chapter holding the listening session; see [nextPlaybackSession]. */
+  private playbackSessionSurah: number | null = null
 
   state: AppState = {
     ready: false,
@@ -271,6 +277,7 @@ class AppStore {
     annotations: loadAnnotations(),
     content: null,
     player: player.getState(),
+    playbackSession: false,
     activeWord: null,
     wordTapAwaitingVoice: false,
     inkActivation: 0,
@@ -345,7 +352,8 @@ class AppStore {
     })
     player.subscribe((ps) => {
       const prev = this.state.player
-      this.state = { ...this.state, player: ps }
+      this.playbackSessionSurah = nextPlaybackSession(this.playbackSessionSurah, prev, ps)
+      this.state = { ...this.state, player: ps, playbackSession: hasPlaybackSession(this.playbackSessionSurah, ps) }
       this.recomputeActive(ps)
       // A word tap's wait ends the first time its landed seek is audible.
       if (this.state.wordTapAwaitingVoice && this.wordTapLanded && ps.isPlaying && !ps.isBuffering) {
