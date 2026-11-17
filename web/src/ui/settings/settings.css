@@ -49,7 +49,7 @@
   text-align: start;
 }
 
-.sheet[data-name='settings'] .settings-dev-row > .settings-caption {
+.app-shell .sheet[data-name='settings'] .settings-dev-row > .settings-caption {
   margin-top: 0;
 }
 
@@ -161,14 +161,16 @@
 
 /* ── Download manager (Android DownloadManagerPage) ──────────────────── */
 
-.sheet[data-name='settings'] .download-manager h1 {
+.app-shell .sheet[data-name='settings'] .download-manager h1 {
   margin-bottom: 2px;
 }
 
 .download-fact-row {
   display: flex;
   align-items: center;
-  min-height: 16px;
+  /* Always the verb's 44px, trimmed back to one line, so a row without a
+     verb sits exactly where a row with one does. */
+  min-height: 44px;
   /* The verb keeps a 44px target but only its own line in the layout. */
   margin-block: -14px;
   font-size: 12px;
@@ -378,7 +380,7 @@
   background: var(--accent);
 }
 
-.sheet[data-name='settings'] .component-kit h1 {
+.app-shell .sheet[data-name='settings'] .component-kit h1 {
   margin-bottom: 0;
 }
 
