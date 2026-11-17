@@ -10,6 +10,7 @@ import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.data.ReadingMode
 import com.beautifulquran.ui.settings.applyReadingMode
 import com.beautifulquran.data.ThemeMode
+import com.beautifulquran.data.withReciter
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.Surah
 import kotlin.math.abs
@@ -172,7 +173,7 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
                 else -> "Reciter name is ambiguous. Matches: ${matches.names()}"
             },
         )
-        app.settings.update { it.copy(reciterId = reciter.id) }
+        app.settings.update { it.withReciter(reciter.id) }
         app.player.state.value.nowPlaying?.let { nowPlaying ->
             val surah = app.repository.surahs().firstOrNull { it.id == nowPlaying.surahId }
                 ?: return@let

@@ -7,9 +7,20 @@ import {
   showsWordGlossChrome,
   wordSearchSources,
 } from './customizePolicy'
-import { HOME_BOOKMARK_STYLES, normalizeSettings } from './settings'
+import { HOME_BOOKMARK_STYLES, normalizeSettings, reciterChoice } from './settings'
 
 describe('favorite reciters', () => {
+  it('stars a voice when it is chosen, and leaves existing favourites alone', () => {
+    expect(reciterChoice({ favoriteReciterIds: [1, 7] }, 6)).toEqual({
+      reciterId: 6,
+      favoriteReciterIds: [1, 7, 6],
+    })
+    expect(reciterChoice({ favoriteReciterIds: [1, 7] }, 7)).toEqual({
+      reciterId: 7,
+      favoriteReciterIds: [1, 7],
+    })
+  })
+
   it('keeps page pictures across listening updates and invalidates visual changes', () => {
     const key = readingAppearanceKey(normalizeSettings())
     expect(readingAppearanceKey(normalizeSettings({ lastSurah: 2, lastAyah: 255 }))).toBe(key)

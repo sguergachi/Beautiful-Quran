@@ -14,11 +14,20 @@ import java.nio.ByteBuffer
  * [onQueueEndOfStream], and the tail would be thrown away instead of ramped.
  * The fade for the new file is built in [onFlush], after the ended file has
  * been drained.
+ *
+ * A flush straight after an end of stream is the next verse of a gapless
+ * playlist, so the new fade is handed the ended file's tail to bridge the
+ * new file's opening digital silence (see [VerseSeamFade]). Any other flush
+ * (a seek, the first file) starts without one.
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class VerseSeamAudioProcessor : BaseAudioProcessor() {
 
     private var seam: VerseSeamFade? = null
+
+    /** The ended file's tail, waiting for the next file's flush. */
+    private var bridge: ShortArray? = null
+    private var ended = false
 
     override fun onConfigure(
         inputAudioFormat: AudioProcessor.AudioFormat,
@@ -41,6 +50,8 @@ class VerseSeamAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun onQueueEndOfStream() {
+        bridge = seam?.bridgeSource()
+        ended = true
         val tail = seam?.endOfStream() ?: return
         if (tail.isEmpty()) return
         replaceOutputBuffer(tail.size).put(tail).flip()
@@ -49,13 +60,21 @@ class VerseSeamAudioProcessor : BaseAudioProcessor() {
     override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) {
         val format = inputAudioFormat
         seam = if (isActive && format.encoding == C.ENCODING_PCM_16BIT) {
-            VerseSeamFade(format.channelCount, format.sampleRate)
+            VerseSeamFade(
+                format.channelCount,
+                format.sampleRate,
+                bridge = bridge.takeIf { ended },
+            )
         } else {
             null
         }
+        bridge = null
+        ended = false
     }
 
     override fun onReset() {
         seam = null
+        bridge = null
+        ended = false
     }
 }
