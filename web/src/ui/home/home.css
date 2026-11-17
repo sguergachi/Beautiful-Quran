@@ -511,8 +511,37 @@
   font-weight: 500;
 }
 
+/* The rule under a chapter's results runs on the text's rails, not the
+   sheet's edges (Android draws it inside the header's padding). */
 .sheet[data-name='home'] .word-search-surah-header {
   align-items: center;
+  margin: 0 var(--home-end-inset) 8px var(--home-start-inset);
+  padding: 18px 0 10px;
+  border-bottom-color: var(--ink-rung-wash);
+}
+
+/* Android labelLarge: the system sans, 14 medium, for list furniture. */
+.sheet[data-name='home'] :is(.search-section-label, .search-correction, .word-search-more, .word-search-less) {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+
+.sheet[data-name='home'] :is(.search-section-label, .word-search-less) {
+  color: var(--ink-rung-quiet);
+}
+
+.sheet[data-name='home'] .search-correction {
+  font-weight: 400;
+}
+
+.sheet[data-name='home'] .search-correction span {
+  color: var(--gold-ink);
+}
+
+.sheet[data-name='home'] .word-search-more {
+  color: var(--green-ink);
 }
 
 .sheet[data-name='home'] .word-search-surah-count {
