@@ -52,6 +52,8 @@ import {
 import { OrnateSurahTitle } from './OrnateSurahTitle'
 import { useMushafGrid } from './useMushafGrid'
 import { NextChapterFooter } from './NextChapterFooter'
+import { PreviousChapterPullChrome } from './PreviousChapterPullChrome'
+import { useChapterPull } from './useChapterPull'
 import { PageBreak } from './PageBreak'
 import { QuranRepository } from '../../data/repository'
 import { MushafReader } from './MushafReader'
@@ -557,6 +559,21 @@ export function ReaderScreen({
     const scroll = scrollRef.current
     if (scroll) void onAdvanceChapter(nextId, scroll, showTopTitle)
   }, [onAdvanceChapter, showTopTitle])
+  const previousSurah = useMemo(() => {
+    const id = content?.surah.id
+    if (id == null || id <= 1) return null
+    return state.surahs.find((s) => s.id === id - 1) ?? null
+  }, [content?.surah.id, state.surahs])
+  // Pull past either end of the chapter to open its neighbour (Android).
+  const openPreviousByPull = useChapterPull({
+    scrollRef,
+    enabled: !mushaf && isTop && content != null,
+    surahId: content?.surah.id ?? 0,
+    nextSurahId: nextSurah?.id ?? null,
+    previousSurahId: previousSurah?.id ?? null,
+    advancing: chapterAdvancing,
+    onAdvanceNext: advanceToNextChapter,
+  })
 
   const activeQuery = activeSearchQuery(searchActive, searchQuery)
   // Keep the input snappy — match/highlight work trails by a frame or two.
@@ -1656,6 +1673,9 @@ export function ReaderScreen({
             />
           ) : (
           <div className="edge-fade">
+            {previousSurah != null ? (
+              <PreviousChapterPullChrome surah={previousSurah} onOpen={openPreviousByPull} />
+            ) : null}
             <div
               className="scroll"
               ref={scrollRef}

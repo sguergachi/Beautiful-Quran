@@ -1,5 +1,7 @@
 /**
  * End-of-chapter invitation — Android `NextChapterFooter` parity.
+ * The rosette is the real header's (full size, full ink). Bottom overscroll
+ * fills the Continue pill through `--next-pull` (see useChapterPull).
  *
  * Built around the same opening block as the real surah header (weave +
  * medallion + title). Invitation chrome (air, NEXT, pill) only fades/collapses
@@ -12,6 +14,7 @@ import type { Surah } from '../../data/models'
 import { fieldWeaveBackground, GeneratedRosette, useFieldCellWidth } from '../theme/GeneratedOrnament'
 import { chapterOrnamentSeed, generateChapterOrnament } from '../theme/ornamentGenerator'
 import { resolveTheme } from '../App'
+import './chapterPull.css'
 
 function chapterWeaveInk(themeMode: string): string {
   return resolveTheme(themeMode) === 'light'
@@ -58,8 +61,6 @@ export const NextChapterFooter = memo(function NextChapterFooter({
       style={
         {
           ['--invite' as string]: '1',
-          ['--rosette-scale' as string]: String(40 / 52),
-          ['--rosette-alpha' as string]: '0.88',
         } as import('react').CSSProperties
       }
     >
@@ -104,6 +105,7 @@ export const NextChapterFooter = memo(function NextChapterFooter({
           disabled={!enabled}
           aria-label={`Open ${surah.nameTransliteration}`}
         >
+          <span className="next-chapter-pill-fill" aria-hidden="true" />
           <span className="next-chapter-pill-label">Continue</span>
           <svg
             className="next-chapter-pill-arrow"
@@ -113,10 +115,10 @@ export const NextChapterFooter = memo(function NextChapterFooter({
             aria-hidden="true"
           >
             <path
-              d="M4 7 L9 11.5 L14 7"
+              d="M4 6.8 L9 11.2 L14 6.8"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2.2"
+              strokeWidth="1.6"
               strokeLinecap="round"
               strokeLinejoin="round"
             />

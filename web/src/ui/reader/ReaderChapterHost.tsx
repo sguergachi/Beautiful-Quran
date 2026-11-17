@@ -109,13 +109,10 @@ export function ReaderChapterHost({ chapterId, ...props }: {
         opening.style.opacity = '0'
       }
       scroll.style.willChange = 'transform, opacity'
+      // The footer's rosette is already the header's, so nothing rescales.
       await frames(780, signal, progress => {
         const morph = ease(Math.min(1, progress / 0.35))
         footer?.style.setProperty('--invite', String(Math.max(0, 1 - morph / 0.85)))
-        for (const node of [footer, flyer]) {
-          node?.style.setProperty('--rosette-scale', String(40 / 52 + (1 - 40 / 52) * morph))
-          node?.style.setProperty('--rosette-alpha', String(0.88 + 0.12 * morph))
-        }
         if (flyer) flyer.style.transform = `translate3d(0, ${-travel * progress}px, 0)`
         const exit = Math.min(1, progress / 0.28)
         const exited = 1 - (1 - exit) * (1 - exit)
@@ -152,7 +149,7 @@ export function ReaderChapterHost({ chapterId, ...props }: {
       scroll.style.transform = ''
       scroll.style.opacity = ''
       scroll.style.willChange = ''
-      for (const name of ['--invite', '--rosette-scale', '--rosette-alpha']) {
+      for (const name of ['--invite']) {
         footer?.style.removeProperty(name)
       }
       const current = appStore.getSnapshot()
