@@ -956,7 +956,7 @@ function MushafBasmalah({ surahId, washing, waiting, speed }: {
       className="mushaf-basmalah"
       lang="ar"
       data-state={washing ? InkState.Active : waiting ? InkState.Upcoming : InkState.Plain}
-      aria-label="Play the basmalah"
+      aria-label="Recite the basmalah"
       style={{ ['--basmalah-ms' as string]: `${Math.round(spanMs / Math.max(0.1, speed))}ms` }}
       onClick={(event) => {
         event.stopPropagation()
@@ -1267,7 +1267,7 @@ function MushafLeaf({
                 <button
                   type="button"
                   className="mushaf-mark"
-                  aria-label={`Play ayah ${item.ayah}`}
+                  aria-label={`Recite ayah ${item.ayah}`}
                   onClick={(event) => {
                     event.stopPropagation()
                     playFromMark(item.surahId, item.ayah)
@@ -1358,7 +1358,7 @@ function MushafLeaf({
                         type="button"
                         className="mushaf-mark"
                         data-state={mushafMarkWaits(token, activeSurahId, ink, isLive) ? InkState.Upcoming : InkState.Plain}
-                        aria-label={`Play ayah ${token.ayah}`}
+                        aria-label={`Recite ayah ${token.ayah}`}
                         onClick={(event) => {
                           event.stopPropagation()
                           playFromMark(token.surahId, token.ayah)
