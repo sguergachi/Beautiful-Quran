@@ -1,0 +1,89 @@
+/*
+ * Android RootViewer CollapsedWordTitle: once the opening word scrolls under
+ * the bar it reappears centred in the bar — the word (Hafs 20px) with its
+ * speaker, the gloss beneath; tapping either scrolls back to the top.
+ * Fades 350ms both ways.
+ */
+.ink-bleed-chrome {
+  position: sticky;
+}
+
+.root-collapsed-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: calc(100% - 7rem);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 350ms ease;
+}
+
+.root-collapsed-title[data-visible='true'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.root-collapsed-row {
+  display: flex;
+  align-items: center;
+  max-width: 100%;
+  /* Android: a 26px lead balances the speaker so the word sits centred. */
+  padding-inline-start: 26px;
+  gap: 8px;
+}
+
+.root-collapsed-word,
+.root-collapsed-gloss,
+.root-collapsed-speak {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.root-collapsed-word {
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-arabic);
+  font-size: 20px;
+  line-height: 1.5;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.root-collapsed-speak {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
+.root-collapsed-speak[data-playing='true'] {
+  color: color-mix(in srgb, var(--accent) 90%, transparent);
+}
+
+.root-collapsed-gloss {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 17px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.root-collapsed-word:focus-visible,
+.root-collapsed-gloss:focus-visible,
+.root-collapsed-speak:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
