@@ -15,10 +15,13 @@ internal const val SEAM_FADE_MS = 8L
 
 /**
  * How much of a verse's ending is kept to bridge the next file's opening
- * digital silence. Some packs (Ash-Shuraym, Al-Dosari) are cut from a live
- * mosque recording: every file ends on full-level room tone and the next one
- * opens with ~30-40 ms of exact zeros (encoder priming). Played back to back
- * the ambience drops out at every seam, which reads as an abrupt pause.
+ * digital silence. Most everyayah packs open every verse on ~25-45 ms of exact
+ * zeros (encoder priming) while the verse before ends on audible room tone or
+ * hiss. Back to back the ambience drops out at every seam, which reads as an
+ * abrupt pause; worst on Ash-Shuraym's and Al-Dosari's loud mosque ambience.
+ * A Nov 2026 audit of 13 reciters x 36 seams found the hole at most seams of
+ * As-Sudais, Ash-Shatri, Ar-Rifai, Al-Tablawi, Ash-Shuraym, Al-Dosari and both
+ * Minshawis; bridged, none remain.
  */
 internal const val SEAM_BRIDGE_SOURCE_MS = 60L
 
@@ -31,8 +34,9 @@ internal const val SEAM_BRIDGE_FADE_MS = 12L
  */
 internal const val SEAM_BRIDGE_MAX_FILL_MS = 80L
 
-/** Tails quieter than this (RMS, 16-bit) already end in silence: nothing to bridge. */
-internal const val SEAM_BRIDGE_MIN_RMS = 64.0
+/** Tails quieter than this (RMS, 16-bit, ~-72 dBFS) already end in silence: nothing to bridge.
+ * Studio packs (AbdulBaset Mujawwad, Husary Muallim) end on ~-57 dBFS hiss, still audible. */
+internal const val SEAM_BRIDGE_MIN_RMS = 8.0
 
 /** |sample| at or below this counts as digital silence. */
 private const val SILENT_SAMPLE = 1
