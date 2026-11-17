@@ -41,6 +41,7 @@ import {
   IconTune,
 } from '../icons/PlaybackIcons'
 import { AyahSelectorRail, type AyahSelectorRailHandle } from './AyahSelectorRail'
+import { railMarks } from './ayahRailMarks'
 import { AyahRailTip } from './AyahRailTip'
 import { BookmarkTip } from './BookmarkTip'
 import {
@@ -300,6 +301,8 @@ export function ReaderScreen({
   const initialFocusSettled = !mushaf && settledOpenRevision === state.readerOpenRevision
   const [ayahRailTipOpen, setAyahRailTipOpen] = useState(false)
   const [ayahRailTipCenterY, setAyahRailTipCenterY] = useState(Number.NaN)
+  /** Open ayah wheel: the page's verses fade back (Android obscuredBySelector). */
+  const [railOpen, setRailOpen] = useState(false)
   const [bookmarkTipOpen, setBookmarkTipOpen] = useState(false)
   const [bookmarkTipRendered, setBookmarkTipRendered] = useState(false)
   const [bookmarkTipAyah, setBookmarkTipAyah] = useState(0)
@@ -1330,6 +1333,8 @@ export function ReaderScreen({
       ? (content.surah.ayahCount - mountRange.hi) * AYAH_SPACER_EST_PX
       : 0
 
+  const railMarksForSurah = useMemo(() => (content ? railMarks(content.ayahs) : null), [content])
+
   if (!content) {
     return (
       <div
@@ -1367,10 +1372,13 @@ export function ReaderScreen({
       currentAyah={railAyah}
       currentPositionRef={focusedPositionRef}
       bookmarkedAyahs={bookmarkedAyahs}
+      placeAyah={parkedPlaceAyah}
+      marks={railMarksForSurah}
       side={side}
       receded={receded || editingNote != null}
       onJump={jumpToAyah}
       onExpandedChange={(expanded) => {
+        setRailOpen(expanded)
         if (expanded && ayahRailTipOpenRef.current) dismissAyahRailTip()
       }}
       onCollapsedCenterY={setAyahRailTipCenterY}
@@ -1652,6 +1660,7 @@ export function ReaderScreen({
               className="scroll"
               ref={scrollRef}
               data-reciting={recessingAyahs || undefined}
+              data-rail-open={(railOpen && !mushaf) || undefined}
               data-stream-wait={streamWait || undefined}
               data-search-flash={flashTarget != null || undefined}
               data-search-focus-active={flashTarget?.focusActive || undefined}
