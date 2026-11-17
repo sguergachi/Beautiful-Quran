@@ -286,7 +286,10 @@ internal fun SettingsScreen(
             Spacer(Modifier.height(48.dp))
             NavigateRow(
                 label = "Playback",
-                note = playbackSummary(autoplayNextChapter = settings.autoplayNextChapter),
+                note = playbackSummary(
+                    autoplayNextChapter = settings.autoplayNextChapter,
+                    verseGapSeconds = settings.verseGapSeconds,
+                ),
                 onClick = { onOpenPlayback() },
             )
 

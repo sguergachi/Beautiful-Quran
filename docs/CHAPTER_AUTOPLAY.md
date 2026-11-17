@@ -76,3 +76,25 @@ moving between screens.
 TalkBack gets Pin / Unpin and — while the grips are out — Move up / Move
 down actions; Shift+Enter still pins from a keyboard. Search lists chapters
 in place off the band, so rows there have no grip and are tap-only.
+
+## Pause between verses
+
+Settings → Playback → **Pause between verses** (None, 1, 2, 3 or 5 s;
+`Settings.verseGapSeconds`). After each verse the recitation holds that long
+in silence before the next begins, for repeating along or reflecting.
+
+How (`playback/VerseGap.kt`): the service's ExoPlayer is set to
+`pauseAtEndOfMediaItems`, so it stops exactly at the end of every verse file,
+and `VerseGapPlayer` (the session's player, a `ForwardingSimpleBasePlayer`)
+starts it again after the gap. No silence is spliced into the audio, so the
+files, their clocks and the word timings are untouched.
+
+- The session reports **playing** through the gap (the app's controller, the
+  ink, the notification and lock screen never see a pause), as a reciter's own
+  pause would read.
+- Pause in the gap stays paused; play, a seek or a new chapter go on at once.
+  Any other pause (audio focus, headphones unplugged) ends the gap.
+- A partial wake lock covers the gap, since the player lets its own go while
+  paused and the screen may be off.
+- No gap after the basmalah lead-in, in the Timings/Tarji labs (silence
+  skipping off), or after a chapter's last verse unless Play-on carries on.

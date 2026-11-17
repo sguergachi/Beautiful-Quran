@@ -149,7 +149,30 @@ class PlaybackService : MediaLibraryService() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        mediaSession = MediaLibrarySession.Builder(this, player, LibraryCallback())
+        // The pause between verses: the player stops at each verse's end and
+        // the session's player starts it again after the silence, reporting
+        // play throughout. See VerseGap.kt.
+        val app = application as QuranApp
+        serviceScope.launch {
+            app.settings.settings.map { it.verseGapSeconds }.distinctUntilChanged().collect { seconds ->
+                player.pauseAtEndOfMediaItems = seconds > 0
+            }
+        }
+        val sessionPlayer = VerseGapPlayer(
+            exo = player,
+            context = this,
+            gapMs = { app.settings.settings.value.verseGapSeconds * 1_000L },
+            gapFollows = { p ->
+                verseGapFollows(
+                    mediaId = p.currentMediaItem?.mediaId,
+                    hasNextItem = p.hasNextMediaItem(),
+                    repeating = p.repeatMode != Player.REPEAT_MODE_OFF,
+                    playsOnToNextChapter = app.settings.settings.value.autoplayNextChapter,
+                    listening = app.player.skipSilenceGaps,
+                )
+            },
+        )
+        mediaSession = MediaLibrarySession.Builder(this, sessionPlayer, LibraryCallback())
             .setSessionActivity(sessionActivity)
             .build()
     }

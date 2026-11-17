@@ -1711,8 +1711,13 @@ private fun PlaybackSheet(
         onToggleAutoplay = { on ->
             viewModel.settings.update { it.copy(autoplayNextChapter = on) }
         },
+        onSetVerseGap = { seconds ->
+            viewModel.settings.update { it.copy(verseGapSeconds = seconds) }
+        },
         checkParams = inkPreview.checkParams,
         checkPaintToken = inkPreview.checkPaintToken,
+        brushParams = inkPreview.brushParams,
+        paintToken = inkPreview.paintToken,
         onBack = onBack,
     )
 }

@@ -23,12 +23,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.data.Settings
 import com.beautifulquran.ui.theme.BrushCheckParams
+import com.beautifulquran.ui.theme.BrushCircleParams
+import com.beautifulquran.ui.theme.InkCircledChoiceRow
 import com.beautifulquran.ui.theme.verticalFadingEdges
 
+/** The pauses Playback offers between verses, in seconds; 0 is none. */
+internal val VERSE_GAP_CHOICES = listOf(0, 1, 2, 3, 5)
+
+internal fun verseGapLabel(seconds: Int): String = if (seconds == 0) "None" else "$seconds s"
+
 /** The Settings row's one-line account of this page: whether a finished
- * chapter hands on to the next. */
-internal fun playbackSummary(autoplayNextChapter: Boolean): String =
-    if (autoplayNextChapter) "Plays on to the next chapter" else "Stops at the chapter's end"
+ * chapter hands on to the next, and any pause between verses. */
+internal fun playbackSummary(autoplayNextChapter: Boolean, verseGapSeconds: Int = 0): String {
+    val chapters = if (autoplayNextChapter) "Plays on to the next chapter" else "Stops at the chapter's end"
+    return if (verseGapSeconds > 0) "$chapters · $verseGapSeconds s between verses" else chapters
+}
 
 /**
  * How recitation carries on, as its own sheet of paper. The voice itself is
@@ -38,8 +47,11 @@ internal fun playbackSummary(autoplayNextChapter: Boolean): String =
 internal fun PlaybackPage(
     settings: Settings,
     onToggleAutoplay: (Boolean) -> Unit,
+    onSetVerseGap: (Int) -> Unit,
     checkParams: BrushCheckParams,
     checkPaintToken: Int,
+    brushParams: BrushCircleParams,
+    paintToken: Int,
     onBack: () -> Unit,
 ) {
     Box(
@@ -71,7 +83,7 @@ internal fun PlaybackPage(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(Modifier.height(2.dp))
-            LeafIntro("What happens when a chapter ends.")
+            LeafIntro("How recitation carries on between verses and chapters.")
 
             Spacer(Modifier.height(36.dp))
             ToggleRow(
@@ -82,6 +94,19 @@ internal fun PlaybackPage(
                 checkPaintToken = checkPaintToken,
             )
             Caption("Pins play in your order, then the book carries on.")
+
+            Spacer(Modifier.height(36.dp))
+            SectionLabel("Pause between verses")
+            Spacer(Modifier.height(10.dp))
+            InkCircledChoiceRow(
+                entries = VERSE_GAP_CHOICES,
+                selected = settings.verseGapSeconds,
+                params = brushParams,
+                paintToken = paintToken,
+                label = ::verseGapLabel,
+                onSelect = onSetVerseGap,
+            )
+            Caption("Silence after each verse, to repeat it or reflect.")
 
             Spacer(Modifier.height(48.dp))
         }
