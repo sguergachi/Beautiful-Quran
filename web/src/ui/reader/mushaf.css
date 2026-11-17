@@ -292,3 +292,15 @@
 .mushaf-lines[data-search-focus-active='true'] :is(.mushaf-mark, .mushaf-basmalah, .mushaf-chapter-slot) {
   opacity: var(--search-background-alpha, 0.4);
 }
+
+/* The opening medallion (MushafReader setMedallion): each row is set to its
+   chord, centred, in the medallion's own hand; a widened row scales about
+   its middle so it stays on the circle. */
+.mushaf-lines[data-opening='true'] .mushaf-line {
+  justify-self: center;
+  font-size: calc(1em * var(--medallion-scale, 1));
+}
+
+.mushaf-lines[data-opening='true'] .mushaf-line[data-widen] {
+  transform-origin: center;
+}

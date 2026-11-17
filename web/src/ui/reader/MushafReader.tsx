@@ -51,6 +51,9 @@ import {
   mushafLeafFit,
   mushafLineGaps,
   mushafMeasure,
+  mushafMedallionChords,
+  mushafMedallionScale,
+  mushafMedallionSlot,
   naturalLineWidth,
   solveLine,
 } from './mushafFit'
@@ -1052,6 +1055,56 @@ function MushafHead({
 }
 
 /** One printed page: running head and fifteen lines (or its translation). */
+/**
+ * The two opening leaves as a medallion (Android MushafPager): each row is
+ * justified to its chord of a circle as wide as the page's measure, and the
+ * rows are spaced so the block is as tall as it is wide — never shorter than
+ * the book's leading, never taller than the well. If a row cannot be set
+ * into its chord, the whole medallion is set down by what that row needs.
+ */
+function setMedallion(
+  lines: HTMLElement,
+  block: HTMLElement,
+  leaf: HTMLElement,
+  textLines: HTMLElement[],
+  set: { ink: number; gaps: number; markJoins: boolean[] }[],
+  em: number,
+  glyphWiden: number,
+) {
+  const box = getComputedStyle(leaf)
+  const measure = Math.max(1, leaf.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight))
+  const slots = Number(lines.style.getPropertyValue('--mushaf-slots')) || MUSHAF_LINES_PER_PAGE
+  const pitch = lines.clientHeight / slots
+  const items = Array.from(lines.children) as HTMLElement[]
+  const rows = textLines.length
+  const chords = mushafMedallionChords(rows)
+  const scale = mushafMedallionScale(
+    set.map(({ ink, gaps }) => ink + Math.max(0, gaps) * MUSHAF_MIN_GAP * em), chords, measure)
+  const furniture = items.length - rows
+  const slot = mushafMedallionSlot(measure, rows, lines.clientHeight - furniture * pitch, pitch)
+  block.style.width = `${measure}px`
+  lines.style.setProperty('--medallion-scale', scale.toFixed(4))
+  lines.style.gridTemplateRows = items
+    .map((item) => `${(item.matches('.mushaf-line') ? slot : pitch).toFixed(2)}px`).join(' ')
+  const lineEm = em * scale
+  textLines.forEach((line, index) => {
+    const row = set[index]!
+    const chord = chords[index]! * measure
+    const ink = row.ink * scale
+    const solved = solveLine(ink, row.gaps, chord, lineEm, glyphWiden)
+    // A medallion row is never let stand short: it would flatten the circle.
+    const widen = solved.short ? 1 : solved.widen
+    const { wordGap, markGap } = mushafLineGaps(row.markJoins, lineEm, chord / widen - ink)
+    line.style.width = `${(chord / widen).toFixed(2)}px`
+    line.style.setProperty('--word-gap', `${wordGap.toFixed(4)}px`)
+    line.style.setProperty('--mark-gap', `${markGap.toFixed(4)}px`)
+    if (Math.abs(widen - 1) > 0.001) {
+      line.setAttribute('data-widen', '')
+      line.style.setProperty('--line-widen', widen.toFixed(4))
+    }
+  })
+}
+
 function MushafLeaf({
   page,
   fitRevision,
@@ -1193,7 +1246,10 @@ function MushafLeaf({
       line.removeAttribute('data-widen')
       line.removeAttribute('data-short')
       line.style.removeProperty('--line-widen')
+      line.style.removeProperty('width')
     }
+    lines.style.removeProperty('grid-template-rows')
+    lines.style.removeProperty('--medallion-scale')
     if (opening) block?.style.removeProperty('width')
     // Read every line before writing any, so the page is laid out once.
     const set = textLines.map((line) => ({
@@ -1207,6 +1263,10 @@ function MushafLeaf({
       const box = getComputedStyle(leaf)
       const available = leaf.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight)
       block.style.width = `${mushafMeasure(set, em, available)}px`
+    }
+    if (opening && block && leaf instanceof HTMLElement) {
+      setMedallion(lines, block, leaf, textLines, set, em, glyphWiden)
+      return
     }
     // The block's floor (min-width) may hold it wider than asked.
     const measure = lines.clientWidth
