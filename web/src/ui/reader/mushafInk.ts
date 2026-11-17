@@ -77,6 +77,24 @@ export function mushafTokenInk(
 }
 
 /**
+ * A whole verse's ink on the English leaf, which prints no Arabic word for
+ * the karaoke to land on: the voiced verse (and the lead, a moment before the
+ * hand-off) is `active`, verses still to come wait `upcoming`, and verses
+ * already read keep their ink. A leaf away from the voice stays plain.
+ */
+export function mushafVerseInk(
+  verse: { surahId: number; ayah: number },
+  surahId: number,
+  ink: MushafInk,
+  live: boolean,
+): 'active' | 'upcoming' | 'plain' {
+  if (!live || !ink.reciting) return 'plain'
+  if (verse.surahId !== surahId) return verse.surahId > surahId ? 'upcoming' : 'plain'
+  if (verse.ayah === ink.inkAyah || verse.ayah === ink.leadAyah) return 'active'
+  return verse.ayah > Math.max(ink.inkAyah ?? 0, ink.leadAyah ?? 0) ? 'upcoming' : 'plain'
+}
+
+/**
  * Whether a verse's number still waits under paper on a leaf that carries
  * the voice. Android `rememberAyahMarkAlpha`: the mark belongs to the verse,
  * not to its last word, so it lights as the voice takes the verse up (and

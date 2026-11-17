@@ -59,11 +59,11 @@ import {
 } from './mushafFit'
 import { mushafLeafModel } from './mushafLeafModel'
 import { MushafChapterBand } from './MushafChapterBand'
-import { BASMALAH_UTHMANI } from '../../domain/Basmalah'
+import { BASMALAH_UTHMANI, surahOpensWithBasmalahPreface } from '../../domain/Basmalah'
 import { pileTurnSchedule, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
 import { clearPagePictures, hasPagePicture, warmPageTurn } from '../paper/pageTurn'
 import { InkEngine, InkState, getTuning, type InkWord } from './InkEngine'
-import { MUSHAF_STILL_INK, mushafMarkWaits, mushafTokenInk, type MushafInk } from './mushafInk'
+import { MUSHAF_STILL_INK, mushafMarkWaits, mushafTokenInk, mushafVerseInk, type MushafInk } from './mushafInk'
 import { pageReadingPlace, type MushafToken } from '../../domain/mushafPage'
 import type { AyahRef } from '../../share/gather'
 import { HafsWord } from '../../render/HafsWord'
@@ -1000,11 +1000,16 @@ function playFromMark(surahId: number, ayah: number) {
  * The opening basmalah: tapped, it recites; recited, it is washed in from
  * the right like any line of scripture (Android `MushafBasmalahLine`).
  */
-function MushafBasmalah({ surahId, washing, waiting, speed }: {
+/** Android MushafEnglishSheet `ENGLISH_BASMALAH`. */
+const ENGLISH_BASMALAH = 'In the name of Allah, the Entirely Merciful, the Especially Merciful.'
+
+function MushafBasmalah({ surahId, washing, waiting, speed, english = false }: {
   surahId: number
   washing: boolean
   waiting: boolean
   speed: number
+  /** The English leaf's line: the basmalah in the book's italic. */
+  english?: boolean
 }) {
   const segments = washing ? appStore.basmalahSegments() : null
   const spanMs = segments && segments.length
@@ -1014,7 +1019,7 @@ function MushafBasmalah({ surahId, washing, waiting, speed }: {
     <button
       type="button"
       className="mushaf-basmalah"
-      lang="ar"
+      lang={english ? 'en' : 'ar'}
       data-state={washing ? InkState.Active : waiting ? InkState.Upcoming : InkState.Plain}
       aria-label="Recite the basmalah"
       style={{ ['--basmalah-ms' as string]: `${Math.round(spanMs / Math.max(0.1, speed))}ms` }}
@@ -1025,7 +1030,7 @@ function MushafBasmalah({ surahId, washing, waiting, speed }: {
         playMushafTarget({ surahId, ayah: 1 })
       }}
     >
-      <span>{BASMALAH_UTHMANI}</span>
+      <span>{english ? ENGLISH_BASMALAH : BASMALAH_UTHMANI}</span>
     </button>
   )
 }
@@ -1375,19 +1380,43 @@ function MushafLeaf({
       />
       <div className="mushaf-block" ref={blockRef}>
       {english ? (
-        <div className="mushaf-english">
+        <div
+          className="mushaf-english"
+          style={{
+            ['--recess-ms' as string]: `${tuning.recessMs}ms`,
+            ['--upcoming-alpha' as string]: String(tuning.upcomingAlpha),
+          }}
+        >
           {englishAyahs.map((item) => {
             const active = item.surahId === activeSurahId && item.ayah === activeAyah
+            // The verse's own ink (Android MushafEnglishSheet): verses still
+            // to come wait under the recess, the voiced verse washes in from
+            // the left, and verses already read keep their ink.
+            const voiced = mushafVerseInk(item, activeSurahId, ink, live)
+            // A picture never starts a wash: the verse in hand stands inked.
+            const verseInk = still && voiced === 'active' ? 'plain' : voiced
             return (
               <Fragment key={`${item.surahId}:${item.ayah}`}>
               {item.ayah === 1 ? (
-                <div className="mushaf-english-chapter">
-                  <MushafChapterBand surah={QuranRepository.surahContent(item.surahId).surah} latin />
-                </div>
+                <>
+                  <div className="mushaf-english-chapter">
+                    <MushafChapterBand surah={QuranRepository.surahContent(item.surahId).surah} latin />
+                  </div>
+                  {surahOpensWithBasmalahPreface(item.surahId) ? (
+                    <MushafBasmalah
+                      english
+                      surahId={item.surahId}
+                      washing={live && !still && item.surahId === activeSurahId && ink.inkAyah === BASMALAH_PLAYLIST_AYAH}
+                      waiting={live && item.surahId === activeSurahId && ink.inkAyah == null && ink.reciting}
+                      speed={ink.speed}
+                    />
+                  ) : null}
+                </>
               ) : null}
               <p
                 className="mushaf-english-ayah"
                 data-active={active || undefined}
+                data-ink={verseInk}
               >
                 {/* A span, not a button: a button is one box and cannot break
                     across lines, which pushed the verse number onto a line

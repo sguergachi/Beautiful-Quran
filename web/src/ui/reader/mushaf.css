@@ -305,6 +305,72 @@
   transform-origin: center;
 }
 
+/* The English leaf is a page of a book: justified prose, its basmalah in
+   the book's italic under the chapter's panel (Android MushafEnglishSheet). */
+/* Prose takes the leaf's measure. The block's max-content width (the Arabic
+   leaf's, written inline once its lines are measured) made a one-line-wide
+   grid track of the whole translation, and no verse wrapped. */
+.mushaf-block:has(> .mushaf-english) {
+  width: auto;
+  min-width: 0;
+}
+
+.mushaf-english {
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.mushaf-basmalah[lang='en'] {
+  width: 100%;
+  margin: 0 0 0.9em;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 1em;
+  line-height: 1.4;
+  white-space: normal;
+  text-align: center;
+  color: inherit;
+}
+
+.mushaf-basmalah[lang='en'][data-state='Active'] > span {
+  /* An English line reads from the left, so it washes in from the left. */
+  -webkit-mask-image: linear-gradient(to right, #000 40%, transparent 60%);
+  mask-image: linear-gradient(to right, #000 40%, transparent 60%);
+  animation-name: mushaf-basmalah-wash-ltr;
+}
+
+@keyframes mushaf-basmalah-wash-ltr {
+  from { -webkit-mask-position: 100% 0; mask-position: 100% 0; }
+  to { -webkit-mask-position: 0% 0; mask-position: 0% 0; }
+}
+
+/* A verse's ink while the voice is on the leaf: those still to come wait
+   under the recess; the voiced verse washes in from the left with a soft,
+   visible leading edge over the recess it rose from; read verses hold. */
+.mushaf-english-ayah {
+  transition: opacity var(--recess-ms, 520ms) ease;
+}
+
+.mushaf-english-ayah[data-ink='upcoming'] {
+  opacity: var(--upcoming-alpha, 0.2661);
+}
+
+.mushaf-english-ayah[data-ink='active'] {
+  -webkit-mask-image: linear-gradient(to right, #000 40%, rgb(0 0 0 / var(--upcoming-alpha, 0.2661)) 60%);
+  mask-image: linear-gradient(to right, #000 40%, rgb(0 0 0 / var(--upcoming-alpha, 0.2661)) 60%);
+  -webkit-mask-size: 250% 100%;
+  mask-size: 250% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation: mushaf-english-verse-wash 1400ms linear both;
+}
+
+@keyframes mushaf-english-verse-wash {
+  from { -webkit-mask-position: 100% 0; mask-position: 100% 0; }
+  to { -webkit-mask-position: 0% 0; mask-position: 0% 0; }
+}
+
 /* A word or verse mark is never squeezed into its line. A line is measured
    with the previous setting's word spaces still in place; shrunk to fit
    them, its words read narrower than they are, the line was set too loose,
