@@ -9,6 +9,8 @@ export type PagePresentation = 'facing' | 'single'
 export type VerseNumberScript = 'arabic' | 'english'
 export type PageNumberScript = 'both' | 'arabic' | 'english'
 export type AyahSelectorSide = 'left' | 'right'
+/** Android `EnglishLeafText`: what the English Mushaf leaf prints. */
+export type EnglishLeafText = 'translation' | 'gloss'
 export type HomeBookmarkStyle = 'top_bound' | 'saved_passages'
 /** Android `ColorSystem`. Ladder ships; legacy is the pre-ladder palette. */
 export type ColorSystem = 'ladder' | 'legacy'
@@ -59,6 +61,13 @@ export interface Settings {
   showWordGloss: boolean
   showTransliteration: boolean
   showTranslation: boolean
+  /** Android `englishLeafText`: the English Mushaf leaf's text source. */
+  englishLeafText: EnglishLeafText
+  /**
+   * Android `annotationsEnabled`: verse notes and their entry gesture.
+   * Off hides them; stored writing is never deleted.
+   */
+  annotationsEnabled: boolean
   themeMode: ThemeMode
   ayahSelectorSide: AyahSelectorSide
   /** Continue Listening — last verse actually recited (not mere open/scroll).
@@ -104,6 +113,8 @@ const DEFAULTS: Settings = {
   showWordGloss: true,
   showTransliteration: false,
   showTranslation: false,
+  englishLeafText: 'translation',
+  annotationsEnabled: true,
   themeMode: 'system',
   ayahSelectorSide: 'left',
   lastSurah: 0,
@@ -153,6 +164,8 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
     fontScale: clampFontScale(partial.fontScale ?? DEFAULTS.fontScale),
     pagePresentation: partial.pagePresentation === 'single' ? 'single' : 'facing',
     developerMode: Boolean(partial.developerMode ?? DEFAULTS.developerMode),
+    englishLeafText: partial.englishLeafText === 'gloss' ? 'gloss' : 'translation',
+    annotationsEnabled: Boolean(partial.annotationsEnabled ?? DEFAULTS.annotationsEnabled),
     colorSystem: partial.colorSystem === 'legacy' ? 'legacy' : 'ladder',
     educationGuidesEnabled: Boolean(
       partial.educationGuidesEnabled ?? DEFAULTS.educationGuidesEnabled,

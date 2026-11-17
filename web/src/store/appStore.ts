@@ -12,6 +12,13 @@ import type { ActiveWord, Reciter, Surah, SurahContent, Segment, Word } from '..
 import { dictionaryEntry, type DictionaryEntry } from '../data/dictionary'
 import { lexiconEntry, type LexiconEntry } from '../data/lexicon'
 import { QuranRepository } from '../data/repository'
+import {
+  annotationKey,
+  loadAnnotations,
+  saveAnnotations,
+  withAnnotation,
+  type AnnotationMap,
+} from '../data/annotations'
 import { runtimeMushafCache } from '../data/runtimeMushaf'
 import { QF_TIMING_RECITERS, runtimeTimingsCache } from '../data/runtimeTimings'
 import {
@@ -135,6 +142,8 @@ export interface AppState {
   reciters: Reciter[]
   settings: Settings
   bookmarks: Bookmark[]
+  /** Reader-written verse notes by `annotationKey` (Android `AnnotationRepository`). */
+  annotations: AnnotationMap
   content: SurahContent | null
   player: PlayerState
   activeWord: ActiveWord | null
@@ -259,6 +268,7 @@ class AppStore {
     reciters: [],
     settings: loadSettings(),
     bookmarks: loadBookmarks(),
+    annotations: loadAnnotations(),
     content: null,
     player: player.getState(),
     activeWord: null,
@@ -1136,6 +1146,19 @@ class AppStore {
         : {}),
     })
     return bookmarks.some((b) => b.surahId === surahId && b.ayah === ayah)
+  }
+
+  /**
+   * Writes (or, when blank, deletes) the reader's note on one verse. Notes
+   * survive un-bookmarking and the Settings toggle; only an explicit clear
+   * removes them (docs/ANNOTATIONS.md).
+   */
+  setAnnotation(surahId: number, ayah: number, text: string) {
+    const key = annotationKey(surahId, ayah)
+    if ((this.state.annotations[key] ?? '') === (text.trim() ? text : '')) return
+    const annotations = withAnnotation(this.state.annotations, surahId, ayah, text)
+    saveAnnotations(annotations)
+    this.set({ annotations })
   }
 
   isBookmarked(ayah: number): boolean {
