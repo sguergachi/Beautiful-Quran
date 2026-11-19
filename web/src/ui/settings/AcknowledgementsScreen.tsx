@@ -37,7 +37,7 @@ export const ACKNOWLEDGEMENTS: Acknowledgement[] = [
   },
   {
     title: 'English typeface',
-    body: 'Junicode by Peter S. Baker (SIL OFL 1.1), with EB Garamond (SIL OFL 1.1) supplying the letters it lacks. Font licenses accompany the reader.',
+    body: 'Junicode by Peter S. Baker (SIL OFL 1.1), with EB Garamond (SIL OFL 1.1) supplying the letters it lacks. Font licenses accompany the app.',
   },
   {
     title: 'Arabic typeface',

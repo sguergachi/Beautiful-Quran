@@ -197,6 +197,13 @@ internal fun decodeFavoriteReciterIds(stored: Set<String>?): Set<Int> =
  */
 private const val LEAF_METRICS_VERSION = 7
 
+/**
+ * Choose [reciterId] as the voice. A chosen voice is always a favourite, so
+ * Settings' short list never hides the reciter that is actually playing.
+ */
+fun Settings.withReciter(reciterId: Int): Settings =
+    copy(reciterId = reciterId, favoriteReciterIds = favoriteReciterIds + reciterId)
+
 class SettingsRepository(context: Context) {
 
     private val prefs: SharedPreferences =

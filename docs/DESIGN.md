@@ -1629,8 +1629,8 @@ to the top or bottom.
   idle verse shows only the short, opaque playback-ink outlined swallowtail
   **tip** beside the first line — the same monochrome ink as the play button,
   but empty so
-  ruby fill remains exclusive to saved verses. (On web, that tip stays hidden until the verse is hovered,
-  then click to unfurl.) Bookmark it and that tip grows nearly the **full
+  ruby fill remains exclusive to saved verses. (On wide web windows with a hovering pointer, that tip stays hidden until
+  the verse is hovered, then click to unfurl; touch and phone widths match Android.) Bookmark it and that tip grows nearly the **full
   vertical length** of the block at full ink, stopping **48 dp** above the next
   verse's tip so consecutive ribbons never touch.
 - **Marking is where you tap.** A tap on the verse's ribbon margin marks (or

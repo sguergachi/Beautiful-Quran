@@ -28,7 +28,7 @@ export function AyahRailTip({
     <ContextualFeatureTip
       visible={visible}
       title="Find any ayah"
-      body="Press and drag this rail."
+      body="Tap, or drag up and down on this rail."
       onDismiss={onDismiss}
       onRenderedChange={onRenderedChange}
       spotlightSide={railSide}

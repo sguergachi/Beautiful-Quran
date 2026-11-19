@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
   type Ref,
 } from 'react'
 import { createPortal } from 'react-dom'
@@ -50,21 +51,41 @@ import {
   mushafLeafFit,
   mushafLineGaps,
   mushafMeasure,
+  mushafMedallionChords,
+  mushafMedallionScale,
+  mushafMedallionSlot,
   naturalLineWidth,
   solveLine,
 } from './mushafFit'
 import { mushafLeafModel } from './mushafLeafModel'
 import { MushafChapterBand } from './MushafChapterBand'
-import { BASMALAH_UTHMANI } from '../../domain/Basmalah'
+import { BASMALAH_UTHMANI, surahOpensWithBasmalahPreface } from '../../domain/Basmalah'
 import { pileTurnSchedule, playFlip, warmPageTurnSounds } from '../paper/pageTurnSounds'
 import { clearPagePictures, hasPagePicture, warmPageTurn } from '../paper/pageTurn'
 import { InkEngine, InkState, getTuning, type InkWord } from './InkEngine'
-import { MUSHAF_STILL_INK, mushafMarkWaits, mushafTokenInk, type MushafInk } from './mushafInk'
+import { MUSHAF_STILL_INK, mushafMarkWaits, mushafTokenInk, mushafVerseInk, type MushafInk } from './mushafInk'
 import { pageReadingPlace, type MushafToken } from '../../domain/mushafPage'
 import type { AyahRef } from '../../share/gather'
 import { HafsWord } from '../../render/HafsWord'
 import { BASMALAH_PLAYLIST_AYAH } from '../../domain/Basmalah'
 import { createWheelTurn, isSidewaysWheel } from './wheelTurn'
+import { LEAF_TURN_MS } from '../paper/bookSpread'
+import type { TurnDrive } from '../paper/pageTurn'
+import { ReturnToAyahButton } from './ReturnToAyahButton'
+import { mushafLeaf, playMushafTarget, type MushafPlayTarget } from './mushafLeafState'
+import type { DialLabel } from './mushafDial'
+import { mushafReturnWay } from './mushafDial'
+import {
+  MUSHAF_FOLLOW_TURN_MS,
+  juzOf,
+  mushafLeadsTurn,
+  mushafTurnLeadDelayMs,
+  mushafVoicePage,
+  type PageMap,
+} from './mushafFollow'
+import './mushaf.css'
+import { SearchHitFlash, searchHitFlashTotalMs } from './SearchHitFlash'
+import { mushafFlashPositions, mushafFlashRole, type MushafSearchFlash } from './mushafSearchFlash'
 
 /** The share of the block between two pages: the pile a turn between them carries. */
 function pileBetween(from: number, to: number): number {
@@ -148,14 +169,17 @@ export function MushafReader({
   onHoldWord: (surahId: number, ayah: number, position: number, side?: 'recto' | 'verso') => void
 }) {
   const targetAyah = followedAyah(activeAyah, openAyah)
-  // Swipes stick until the opened ayah or the recited ayah changes.
-  const followKey = `${activeSurahId}:${openRevision}:${targetAyah}`
+  // A chapter or verse just opened starts at its own leaf. After that the
+  // leaf is the hand's, or the voice's while follow is on (Android
+  // `MushafPager`): a hand-turned leaf stays where it was turned.
+  const openKey = `${activeSurahId}:${openRevision}`
   const [manualPage, setManualPage] = useState<number | null>(null)
-  const [manualFor, setManualFor] = useState(followKey)
-  if (manualFor !== followKey) {
-    setManualFor(followKey)
+  const [manualFor, setManualFor] = useState(openKey)
+  if (manualFor !== openKey) {
+    setManualFor(openKey)
     setManualPage(null)
   }
+  const followEnabled = useAppSelector((state) => state.followEnabled)
   const [ready, setReady] = useState(() => runtimeMushafCache?.layoutReady() ?? false)
   const settings = useAppSelector((state) => state.settings)
   const spread = useBookSpread(settings.pagePresentation)
@@ -200,14 +224,49 @@ export function MushafReader({
   if (look.current.appearance !== appearance) look.current = { appearance, revision: look.current.revision + 1 }
   const [reader] = useState(() => ++readers)
 
-  const derived = ready && runtimeMushafCache
-    ? runtimeMushafCache.pageOfAyah(activeSurahId, targetAyah)
+  const map: PageMap | null = ready && runtimeMushafCache ? runtimeMushafCache : null
+  const opened = map ? map.pageOfAyah(activeSurahId, Math.max(1, openAyah)) : null
+  // Where the voice is, by word: a verse the book carried over turns the
+  // leaf mid-verse rather than at the next verse.
+  const voicePage = map
+    ? mushafVoicePage(map, activeSurahId, {
+        reciting: ink.reciting,
+        inkAyah: ink.inkAyah,
+        activeWord: ink.activeWord,
+        activeAyah,
+      })
     : null
-  const page = manualPage ?? derived ?? 1
+  // The turn is begun inside the leaf's last word, 500 ms before it ends.
+  const [lead, setLead] = useState<{ from: number; to: number } | null>(null)
+  const voiceWord = ink.activeWord
+  useEffect(() => {
+    if (!map || !followEnabled || voicePage == null || !voiceWord) return
+    if (!mushafLeadsTurn(map, voicePage, MUSHAF_PAGE_COUNT, activeSurahId, voiceWord)) return
+    const timer = window.setTimeout(
+      () => setLead({ from: voicePage, to: voicePage + 1 }),
+      mushafTurnLeadDelayMs(voiceWord.durationMs, ink.speed),
+    )
+    return () => window.clearTimeout(timer)
+    // The same activation of the same word; anything newer re-aims.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, followEnabled, voicePage, voiceWord?.ayah, voiceWord?.wordPosition, voiceWord?.activation, ink.speed, activeSurahId])
+  const followPage = voicePage == null ? null : lead && lead.from === voicePage ? lead.to : voicePage
+  const following = followEnabled && followPage != null
+  // Following keeps the hand's page with it, so a pause leaves the leaf where
+  // the voice stopped rather than where the chapter was opened.
+  if (following && manualPage !== followPage) setManualPage(followPage)
+  const page = following ? followPage : manualPage ?? opened ?? 1
+  // A hand on the leaf takes it from the voice; the return pill gives it back.
+  const handTurn = (next: number) => {
+    setManualPage(next)
+    if (voicePage != null && appStore.getSnapshot().followEnabled) appStore.setFollowEnabled(false)
+  }
+  const handTurnRef = useRef(handTurn)
+  handTurnRef.current = handTurn
   useEffect(() => {
     if (!ready || !searchTarget) return
     const target = runtimeMushafCache?.pageOfAyah(searchTarget.surahId, searchTarget.ayah)
-    if (target != null) setManualPage(target)
+    if (target != null) handTurnRef.current(target)
   }, [ready, searchTarget])
 
   const stackLayer = useAppSelector((state) => state.stackLayer)
@@ -217,12 +276,10 @@ export function MushafReader({
   const turn = (delta: number) => {
     // The leaves under Chapters are not being read.
     if (spread && stackLayer <= COVER_LAYER) return
-    setManualPage((current) => {
-      const base = current ?? derived ?? 1
-      // A spread turns both of its leaves at once.
-      const from = facing ? mushafFacingPages(base).right : base
-      return Math.min(MUSHAF_PAGE_COUNT, Math.max(1, from + delta * (facing ? 2 : 1)))
-    })
+    // A spread turns both of its leaves at once.
+    const from = facing ? mushafFacingPages(page).right : page
+    const next = Math.min(MUSHAF_PAGE_COUNT, Math.max(1, from + delta * (facing ? 2 : 1)))
+    if (next !== from) handTurn(next)
   }
 
   // The facing leaf hangs under the verso sheets, outside this one. Give it
@@ -261,7 +318,21 @@ export function MushafReader({
         setFitRevision((revision) => revision + 1)
       }
     })
-    return () => { disposed = true; observer.disconnect() }
+    // A face can arrive after `ready` has settled: it loads when a leaf
+    // first asks for its glyphs (the verse marks' ornate brackets among
+    // them). Lines set before it came were set to the fallback's narrower
+    // widths, and the mark ending a full line ran past the leaf's edge.
+    const fontArrived = () => {
+      if (disposed) return
+      setFits({})
+      setFitRevision((revision) => revision + 1)
+    }
+    document.fonts?.addEventListener('loadingdone', fontArrived)
+    return () => {
+      disposed = true
+      observer.disconnect()
+      document.fonts?.removeEventListener('loadingdone', fontArrived)
+    }
   }, [facing, ready, english])
 
   // The listeners below are bound once and read what they need through
@@ -271,6 +342,8 @@ export function MushafReader({
   turnRef.current = turn
   const ownsKeyboardRef = useRef(ownsKeyboard)
   ownsKeyboardRef.current = ownsKeyboard
+  const englishRef = useRef(english)
+  englishRef.current = english
 
   // Pages run right to left: the left arrow goes on, the right arrow back.
   useEffect(() => {
@@ -288,7 +361,8 @@ export function MushafReader({
         return
       }
       event.preventDefault()
-      turnRef.current(event.key === 'ArrowLeft' ? 1 : -1)
+      // An English book is bound on the left: its way on is to the right.
+      turnRef.current((event.key === 'ArrowLeft') !== englishRef.current ? 1 : -1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -346,6 +420,8 @@ export function MushafReader({
     box: CSSProperties
     /** The side of the pile that is Chapters: it lifts with it, or lands as it. */
     chapters: 'face' | 'back' | null
+    /** A leaf under a finger: the hand sets how far it has turned. */
+    drive?: TurnDrive
   } | null>(null)
   // Both open pages wait for the voice together, or neither does: verses to
   // come on the verso must not stand in full ink beside a dimmed recto.
@@ -355,7 +431,7 @@ export function MushafReader({
     return pageHoldsVoice(pair.right, activeSurahId, voice) ||
       pageHoldsVoice(pair.left, activeSurahId, voice)
   }
-  const leafProps = { fitRevision, facing, activeSurahId, activeAyah, english, pageNumberScript, glyphWiden, ink, onPlayWord, onHoldWord, onTurn: turn, onFit: reportFit }
+  const leafProps = { fitRevision, facing, activeSurahId, activeAyah, english, pageNumberScript, glyphWiden, ink, onPlayWord, onHoldWord, onTurn: facing ? turn : undefined, onFit: reportFit }
   // Nothing turns under a sheet laid over the leaves (Settings, the word
   // viewer): a leaf in the air would cross it. Under Chapters the leaves do
   // turn, since that is how the book gets there. A phone has one sheet, and
@@ -391,7 +467,8 @@ export function MushafReader({
     setMotion({
       flight: queue.flight,
       wad,
-      ms: turnMs(wad),
+      // The voice's own turn is paced, not flung (Android MushafFollowTurnSpec).
+      ms: !facing && following ? MUSHAF_FOLLOW_TURN_MS : turnMs(wad),
       fit: preparedFit!,
       fromFit: mushafFit(queue.flight.from, facing, fits) ?? 1,
       initiatedAt: performance.now(),
@@ -411,19 +488,32 @@ export function MushafReader({
   useEffect(() => () => cancelSoundRef.current?.(), [])
   const endTurn = useCallback(() => {
     landedFlight.current = motion?.flight ?? null
-    setQueue((current) => finishPageTurn(current, motion?.flight ?? null))
+    if (motion?.drive?.release === 'cancel') {
+      // Put back: the leaf lies where it was lifted from.
+      const flight = motion.flight
+      setQueue((current) => current.flight === flight
+        ? { settled: flight.from, flight: null, queued: null } : current)
+    } else {
+      setQueue((current) => finishPageTurn(current, motion?.flight ?? null))
+    }
     setMotion((current) => current === motion ? null : current)
   }, [motion])
   useEffect(() => {
     if (!motion || reset) return
-    cancelSoundRef.current?.()
-    const cancelSound = playFlip(pileTurnSchedule(motion.ms), motion.initiatedAt)
-    cancelSoundRef.current = cancelSound
-    const timer = window.setTimeout(endTurn, motion.ms + 250)
+    // Leaves turn silently, as on Android; only the pile that lands as
+    // Chapters (or lifts with it) is a turn of the paper stack.
+    let cancelSound: (() => void) | null = null
+    if (motion.chapters) {
+      cancelSoundRef.current?.()
+      cancelSound = playFlip(pileTurnSchedule(motion.ms), motion.initiatedAt)
+      cancelSoundRef.current = cancelSound
+    }
+    // A leaf under a finger ends when the hand lets it go.
+    const timer = motion.drive ? 0 : window.setTimeout(endTurn, motion.ms + 250)
     return () => {
       window.clearTimeout(timer)
       // A normal landing lets the drop ring out; cancellation cuts its stems.
-      if (landedFlight.current !== motion.flight) cancelSound()
+      if (cancelSound && landedFlight.current !== motion.flight) cancelSound()
     }
   }, [motion, reset, endTurn])
 
@@ -437,6 +527,44 @@ export function MushafReader({
     const reading = pageReadingPlace(verses, searchTarget ?? { surahId: activeSurahId, ayah: targetAyah })
     if (reading) onReadingPlace(reading)
   }, [ready, turning, covered, atChapters, facing, settled, activeSurahId, targetAyah, searchTarget, onReadingPlace])
+  // Home search hit: once the leaf carrying it has settled, the found words
+  // breathe orange on the scroll reader's clock while the page recedes.
+  const pendingFlash = useAppSelector((state) => state.pendingSearchFlash)
+  const [flash, setFlash] = useState<MushafSearchFlash | null>(null)
+  const flashPage = pendingFlash && ready
+    ? runtimeMushafCache?.pageOfAyah(activeSurahId, pendingFlash.ayah) ?? null : null
+  const flashShown = flashPage != null && !turning && !covered && !atChapters &&
+    (facing ? [mushafFacingPages(settled).right, mushafFacingPages(settled).left].includes(flashPage) : settled === flashPage)
+  useEffect(() => {
+    if (!pendingFlash || !flashShown) {
+      setFlash(null)
+      return
+    }
+    const verse = QuranRepository.surahContent(activeSurahId).ayahs.find((item) => item.number === pendingFlash.ayah)
+    if (!verse) {
+      appStore.clearSearchFlash()
+      return
+    }
+    const positions = new Set(mushafFlashPositions(pendingFlash, verse.words.map((word) => word.position)))
+    let fadeTimer = 0
+    let clearTimer = 0
+    const startTimer = window.setTimeout(() => {
+      setFlash({ surahId: activeSurahId, ayah: pendingFlash.ayah, positions, focusActive: true })
+      clearTimer = window.setTimeout(() => {
+        setFlash((current) => current ? { ...current, focusActive: false } : null)
+        fadeTimer = window.setTimeout(() => {
+          setFlash(null)
+          appStore.clearSearchFlash()
+        }, SearchHitFlash.FOCUS_FADE_MS)
+      }, searchHitFlashTotalMs())
+    }, SearchHitFlash.START_DELAY_MS)
+    return () => {
+      window.clearTimeout(startTimer)
+      window.clearTimeout(clearTimer)
+      window.clearTimeout(fadeTimer)
+    }
+  }, [pendingFlash, flashShown, activeSurahId])
+
   const landing = turning ? motion.flight.to : settled
   const forward = landing > settled
   const fit = turning ? motion.fit : (mushafFit(settled, facing, fits) ?? 1)
@@ -585,38 +713,206 @@ export function MushafReader({
     </div>
   ) : null
 
+  // What the dial and the transport read of this leaf, and ask of it.
+  const chapterPages = useMemo(
+    () => map ? Array.from({ length: 114 }, (_, index) => map.pageOfAyah(index + 1, 1) ?? 1) : [],
+    // The page map is one object; [ready] says when its pages arrived.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [map, ready],
+  )
+  const leafPage = facing ? mushafFacingPages(page).right : page
+  useEffect(() => {
+    mushafLeaf.publish({
+      ready: map != null,
+      page: leafPage,
+      pageCount: MUSHAF_PAGE_COUNT,
+      rightToLeft: !english,
+      chapterPages,
+      reciting: voicePage != null,
+    })
+  })
+  // A scrub names a chapter; Play on its leaf then starts that chapter.
+  const seekSurah = useRef<number | null>(null)
+  const leafApi = {
+    seek(target: number, surahId?: number) {
+      seekSurah.current = surahId ?? null
+      handTurn(Math.min(MUSHAF_PAGE_COUNT, Math.max(1, target)))
+    },
+    label(target: number, surahId?: number): DialLabel | null {
+      const rows = map?.pageWords(target) ?? []
+      if (rows.length === 0) return null
+      const id = surahId != null && rows.some((row) => row.surah_id === surahId) ? surahId : rows[0]!.surah_id
+      const ayahs = rows.filter((row) => row.surah_id === id).map((row) => row.ayah_number)
+      const chapter = appStore.getSnapshot().surahs.find((surah) => surah.id === id)?.nameTransliteration ?? ''
+      return { number: id, chapter, fromAyah: Math.min(...ayahs), toAyah: Math.max(...ayahs) }
+    },
+    playTarget(): MushafPlayTarget | null {
+      const rows = map?.pageWords(leafPage) ?? []
+      const scrubbed = seekSurah.current
+      seekSurah.current = null
+      if (rows.length === 0) return null
+      const player = appStore.getSnapshot().player
+      const held = player.nowPlaying?.surahId === activeSurahId ? Math.max(1, player.nowPlaying.ayah) : null
+      const heldHere = held != null && rows.some((row) => row.surah_id === activeSurahId && row.ayah_number === held)
+      if (scrubbed != null && !(heldHere && scrubbed === activeSurahId)) {
+        const first = rows.find((row) => row.surah_id === scrubbed)
+        if (first) return { surahId: first.surah_id, ayah: first.ayah_number, position: first.position }
+      }
+      // The leaf a chapter was opened on is that request's: its verse.
+      if (manualPage == null && opened === page && openAyah > 0 &&
+        rows.some((row) => row.surah_id === activeSurahId && row.ayah_number === openAyah)) {
+        return heldHere ? null : { surahId: activeSurahId, ayah: openAyah }
+      }
+      if (heldHere) return null
+      const first = rows[0]!
+      return { surahId: first.surah_id, ayah: first.ayah_number, position: first.position }
+    },
+  }
+  const leafApiRef = useRef(leafApi)
+  leafApiRef.current = leafApi
+  useEffect(() => mushafLeaf.register({
+    seek: (target, surahId) => leafApiRef.current.seek(target, surahId),
+    label: (target, surahId) => leafApiRef.current.label(target, surahId),
+    playTarget: () => leafApiRef.current.playTarget(),
+  }), [])
+
+  // A single leaf follows the finger (Android's HorizontalPager): it lifts
+  // with the hand, and is turned or put back when the hand lets it go.
+  const drag = useRef<{
+    id: number
+    x0: number
+    y0: number
+    axis: 'x' | 'y' | null
+    to: number
+    sign: number
+    drive: TurnDrive | null
+    width: number
+    lastX: number
+    lastT: number
+    vx: number
+  } | null>(null)
+  const swallowClick = useRef(false)
+  const dragState = { page, turning, flight: queue.flight, fit, fits, reduced, leafProps, versoBox, english }
+  const dragNow = useRef(dragState)
+  dragNow.current = dragState
+  const leafDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (facing || (event.pointerType === 'mouse' && event.button !== 0)) return
+    drag.current = {
+      id: event.pointerId, x0: event.clientX, y0: event.clientY, axis: null, to: 0, sign: 1, drive: null,
+      width: event.currentTarget.clientWidth || window.innerWidth,
+      lastX: event.clientX, lastT: event.timeStamp, vx: 0,
+    }
+  }
+  const leafMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const held = drag.current
+    if (!held || held.id !== event.pointerId) return
+    const dx = event.clientX - held.x0
+    const dy = event.clientY - held.y0
+    const dt = event.timeStamp - held.lastT
+    if (dt > 0) held.vx = (event.clientX - held.lastX) / dt
+    held.lastX = event.clientX
+    held.lastT = event.timeStamp
+    if (!held.axis) {
+      if (Math.hypot(dx, dy) < 8) return
+      held.axis = Math.abs(dx) > Math.abs(dy) * 1.1 ? 'x' : 'y'
+      if (held.axis === 'y') return
+      const now = dragNow.current
+      // Bound at the right (Arabic), a finger moving right lifts the leaf
+      // on; bound at the left (English), a finger moving left does.
+      const forward = now.english ? dx < 0 : dx > 0
+      const to = now.page + (forward ? 1 : -1)
+      if (to < 1 || to > MUSHAF_PAGE_COUNT || now.turning || now.flight) {
+        held.axis = 'y'
+        return
+      }
+      held.to = to
+      held.sign = Math.sign(dx)
+      event.currentTarget.setPointerCapture(event.pointerId)
+      if (now.reduced) return
+      const drive: TurnDrive = { t: 0, release: null }
+      held.drive = drive
+      const flight = { from: now.page, to }
+      setQueue({ settled: now.page, flight, queued: null })
+      setMotion({
+        flight, wad: 0, ms: LEAF_TURN_MS,
+        fit: mushafFit(to, false, now.fits) ?? now.fit, fromFit: now.fit,
+        initiatedAt: performance.now(), props: now.leafProps, box: now.versoBox, chapters: null, drive,
+      })
+    }
+    if (held.axis !== 'x' || !held.drive) return
+    // A short pull of resistance first: paper has weight.
+    const resist = Math.min(14, held.width * 0.04)
+    const travel = Math.max(0, dx * held.sign - resist)
+    held.drive.t = Math.min(1, travel / (held.width * 0.9))
+  }
+  const leafUp = (event: ReactPointerEvent<HTMLDivElement>, cancelled = false) => {
+    const held = drag.current
+    if (!held || held.id !== event.pointerId) return
+    drag.current = null
+    if (held.axis !== 'x') return
+    swallowClick.current = true
+    window.setTimeout(() => { swallowClick.current = false }, 0)
+    const dx = (event.clientX - held.x0) * held.sign
+    const fling = (held.vx * held.sign * 1000) / held.width
+    // Past 15% of the leaf, or flung at 0.30 leaf-widths a second.
+    const commit = !cancelled && fling > -0.3 && (dx >= held.width * 0.15 || fling >= 0.3)
+    if (held.drive) held.drive.release = commit ? 'commit' : 'cancel'
+    if (commit) handTurnRef.current(held.to)
+  }
+
+  const returnWay = followPage != null && !followEnabled
+    ? mushafReturnWay(facing ? mushafFacingPages(page).right : page, facing ? mushafFacingPages(followPage).right : followPage, !english)
+    : null
+  const returnPill = returnWay ? (
+    <div className="mushaf-return" data-way={returnWay}>
+      <ReturnToAyahButton pointUp={false} onClick={() => appStore.setFollowEnabled(true)} />
+    </div>
+  ) : null
+
   if (!ready || !runtimeMushafCache) {
-    return (
-      <div className="mushaf-wait">
-        <p>The printed page is still arriving.</p>
-        <p>It uses the same page map as the book, and fills in on its own.</p>
-      </div>
-    )
+    // Blank paper while the page map arrives, as Android's leaf waits.
+    return <div className="mushaf-wait" aria-busy="true" />
   }
 
   if (!facing) {
-    // One leaf, bound at its right edge. Going on, the old leaf lifts away
-    // to the right over the new one; going back, the earlier leaf comes
-    // down from the right onto the one being left.
+    // One leaf, bound at its right edge (an English book's at its left).
+    // Going on, the old leaf lifts away over the new one; going back, the
+    // earlier leaf comes down onto the one being left.
     const under = turning ? Math.max(settled, landing) : settled
     return (
-      <>
+      <div
+        className="mushaf-host"
+        onPointerDown={leafDown}
+        onPointerMove={leafMove}
+        onPointerUp={(event) => leafUp(event)}
+        onPointerCancel={(event) => leafUp(event, true)}
+        onClickCapture={(event) => {
+          if (!swallowClick.current) return
+          swallowClick.current = false
+          event.stopPropagation()
+          event.preventDefault()
+        }}
+      >
         <MushafLeaf page={under} fit={turning && !forward ? motion.fromFit : fit} leafRef={rectoRef} {...leafProps}
-          live={leafLive(under)} onFit={turning ? noFit : reportFit} />
+          live={leafLive(under)} onFit={turning ? noFit : reportFit} flash={turning ? null : flash} />
+        <span className="mushaf-feather mushaf-feather--left" aria-hidden="true" />
+        <span className="mushaf-feather mushaf-feather--right" aria-hidden="true" />
         {probes}
         {warming}
         {turning ? (
           <TurningLeaf
             key={`${settled}:${landing}`}
             single
-            hinge="right"
+            hinge={english ? 'left' : 'right'}
             dir={forward ? 'on' : 'back'}
             face={air?.face}
             faceKey={air?.faceKey}
+            drive={motion.drive}
             onEnd={endTurn}
           />
         ) : null}
-      </>
+        {returnPill}
+      </div>
     )
   }
 
@@ -631,7 +927,7 @@ export function MushafReader({
   return (
     <WordMotionProvider>
       <MushafLeaf page={rectoPage} side="recto" fit={turning && forward ? motion.fromFit : fit} leafRef={rectoRef} {...leafProps}
-        live={live} onFit={turning ? noFit : reportFit} />
+        live={live} onFit={turning ? noFit : reportFit} flash={turning ? null : flash} />
       {probes}
       <button
         type="button"
@@ -646,7 +942,7 @@ export function MushafReader({
         ? createPortal(
             <>
               <MushafLeaf page={versoPage} side="verso" fit={turning && !forward ? motion.fromFit : fit} style={versoBox} {...leafProps}
-                live={live} onFit={turning ? noFit : reportFit} />
+                live={live} onFit={turning ? noFit : reportFit} flash={turning ? null : flash} />
               <button
                 type="button"
                 className="mushaf-turn mushaf-turn--forward"
@@ -680,11 +976,71 @@ export function MushafReader({
             turnSlot,
           )
         : null}
+      {returnPill}
     </WordMotionProvider>
   )
 }
 
 function noFit() {}
+
+/**
+ * A verse mark plays from its verse (Android `onMushafAyahClick`): another
+ * chapter's mark loads that chapter. Gathering keeps its own meaning.
+ */
+function playFromMark(surahId: number, ayah: number) {
+  if (appStore.getSnapshot().gathering) {
+    appStore.onMarkTap(surahId, ayah)
+    return
+  }
+  appStore.setFollowEnabled(true)
+  playMushafTarget({ surahId, ayah })
+}
+
+/**
+ * The opening basmalah: tapped, it recites; recited, it is washed in from
+ * the right like any line of scripture (Android `MushafBasmalahLine`).
+ */
+/** Android MushafEnglishSheet `ENGLISH_BASMALAH`. */
+const ENGLISH_BASMALAH = 'In the name of Allah, the Entirely Merciful, the Especially Merciful.'
+
+function MushafBasmalah({ surahId, washing, waiting, speed, english = false }: {
+  surahId: number
+  washing: boolean
+  waiting: boolean
+  speed: number
+  /** The English leaf's line: the basmalah in the book's italic. */
+  english?: boolean
+}) {
+  const segments = washing ? appStore.basmalahSegments() : null
+  const spanMs = segments && segments.length
+    ? Math.max(400, segments[segments.length - 1]!.endMs - segments[0]!.startMs)
+    : 2_400
+  return (
+    <button
+      type="button"
+      className="mushaf-basmalah"
+      lang={english ? 'en' : 'ar'}
+      data-state={washing ? InkState.Active : waiting ? InkState.Upcoming : InkState.Plain}
+      aria-label="Recite the basmalah"
+      style={{ ['--basmalah-ms' as string]: `${Math.round(spanMs / Math.max(0.1, speed))}ms` }}
+      onClick={(event) => {
+        event.stopPropagation()
+        if (appStore.getSnapshot().gathering) return
+        appStore.setFollowEnabled(true)
+        playMushafTarget({ surahId, ayah: 1 })
+      }}
+    >
+      <span>{english ? ENGLISH_BASMALAH : BASMALAH_UTHMANI}</span>
+    </button>
+  )
+}
+
+/** Android `leafDescription`: page, chapter and juzʾ of the leaf. */
+function leafDescription(page: number, chapter: string | null, rows: readonly { surah_id: number; ayah_number: number }[]) {
+  const first = rows[0]
+  const juz = first ? `, Juz ${juzOf(first.surah_id, first.ayah_number)}` : ''
+  return `Mushaf page ${page}${chapter ? `, ${chapter}` : ''}${juz}`
+}
 
 /** Running head with the folio in-head: Western figure at the left, the chapter
     centred, the Arabic-Indic figure at the right; one script puts its figure
@@ -717,7 +1073,73 @@ function MushafHead({
   )
 }
 
-/** One printed page: running head and fifteen lines (or its translation). */
+/** Properties whose transition moves a line's geometry. */
+const LINE_GEOMETRY = new Set(['font-size', 'transform', 'width', 'margin-inline-start', 'margin-left', 'margin-right'])
+
+/**
+ * Lines are measured as they are set. Reduced motion gives every property a
+ * 0.01ms transition (styles.css), so a hand or a line setting just changed
+ * still read as the old one in the same frame: the measure saw the words at
+ * the old size, set the type larger, and chased itself up to the height
+ * limit (page 520 at 1.6x, every long line cut at the leaf's edge). Land any
+ * geometry transition before reading widths. Ink fades are left alone.
+ */
+function settleTypeSize(lines: HTMLElement) {
+  for (const animation of (lines.closest('.mushaf') ?? lines).getAnimations?.({ subtree: true }) ?? []) {
+    if (animation instanceof CSSTransition && LINE_GEOMETRY.has(animation.transitionProperty)) animation.finish()
+  }
+}
+
+/**
+ * The two opening leaves as a medallion (Android MushafPager): each row is
+ * justified to its chord of a circle as wide as the page's measure, and the
+ * rows are spaced so the block is as tall as it is wide — never shorter than
+ * the book's leading, never taller than the well. If a row cannot be set
+ * into its chord, the whole medallion is set down by what that row needs.
+ */
+function setMedallion(
+  lines: HTMLElement,
+  block: HTMLElement,
+  leaf: HTMLElement,
+  textLines: HTMLElement[],
+  set: { ink: number; gaps: number; markJoins: boolean[] }[],
+  em: number,
+  glyphWiden: number,
+) {
+  const box = getComputedStyle(leaf)
+  const measure = Math.max(1, leaf.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight))
+  const slots = Number(lines.style.getPropertyValue('--mushaf-slots')) || MUSHAF_LINES_PER_PAGE
+  const pitch = lines.clientHeight / slots
+  const items = Array.from(lines.children) as HTMLElement[]
+  const rows = textLines.length
+  const chords = mushafMedallionChords(rows)
+  const scale = mushafMedallionScale(
+    set.map(({ ink, gaps }) => ink + Math.max(0, gaps) * MUSHAF_MIN_GAP * em), chords, measure)
+  const furniture = items.length - rows
+  const slot = mushafMedallionSlot(measure, rows, lines.clientHeight - furniture * pitch, pitch)
+  block.style.width = `${measure}px`
+  lines.style.setProperty('--medallion-scale', scale.toFixed(4))
+  lines.style.gridTemplateRows = items
+    .map((item) => `${(item.matches('.mushaf-line') ? slot : pitch).toFixed(2)}px`).join(' ')
+  const lineEm = em * scale
+  textLines.forEach((line, index) => {
+    const row = set[index]!
+    const chord = chords[index]! * measure
+    const ink = row.ink * scale
+    const solved = solveLine(ink, row.gaps, chord, lineEm, glyphWiden)
+    // A medallion row is never let stand short: it would flatten the circle.
+    const widen = solved.short ? 1 : solved.widen
+    const { wordGap, markGap } = mushafLineGaps(row.markJoins, lineEm, chord / widen - ink)
+    line.style.width = `${(chord / widen).toFixed(2)}px`
+    line.style.setProperty('--word-gap', `${wordGap.toFixed(4)}px`)
+    line.style.setProperty('--mark-gap', `${markGap.toFixed(4)}px`)
+    if (Math.abs(widen - 1) > 0.001) {
+      line.setAttribute('data-widen', '')
+      line.style.setProperty('--line-widen', widen.toFixed(4))
+    }
+  })
+}
+
 function MushafLeaf({
   page,
   fitRevision,
@@ -738,7 +1160,10 @@ function MushafLeaf({
   onTurn,
   fit,
   onFit,
+  flash = null,
 }: {
+  /** The search hit breathing on this settled leaf, if any. */
+  flash?: MushafSearchFlash | null
   page: number
   fitRevision: number
   /** Extra chapter furniture sets the same row pitch on both leaves. */
@@ -765,7 +1190,8 @@ function MushafLeaf({
   still?: boolean
   onPlayWord: (surahId: number, ayah: number, position: number) => void
   onHoldWord: (surahId: number, ayah: number, position: number, side?: 'recto' | 'verso') => void
-  onTurn: (delta: number) => void
+  /** Facing leaves turn on a swipe; a single leaf follows the finger instead. */
+  onTurn?: (delta: number) => void
 }) {
   const drag = useRef<{ x: number; y: number } | null>(null)
   const linesRef = useRef<HTMLDivElement>(null)
@@ -795,6 +1221,7 @@ function MushafLeaf({
       if (disposed) return
       const leaf = lines.closest('.mushaf')
       if (!(leaf instanceof HTMLElement)) return
+      settleTypeSize(lines)
       // Widths are read at the scale already applied and divided back out:
       // every length in a line is in em, so they scale with the type exactly.
       // Rewriting the scale to measure at full size re-laid the block and
@@ -849,14 +1276,19 @@ function MushafLeaf({
       block?.style.removeProperty('width')
       return
     }
+    settleTypeSize(lines)
     const em = parseFloat(getComputedStyle(lines).fontSize)
     const textLines = Array.from(lines.querySelectorAll<HTMLElement>('.mushaf-line'))
     for (const line of textLines) {
       line.removeAttribute('data-widen')
       line.removeAttribute('data-short')
       line.style.removeProperty('--line-widen')
+      line.style.removeProperty('width')
     }
+    lines.style.removeProperty('grid-template-rows')
+    lines.style.removeProperty('--medallion-scale')
     if (opening) block?.style.removeProperty('width')
+    settleTypeSize(lines)
     // Read every line before writing any, so the page is laid out once.
     const set = textLines.map((line) => ({
       ink: Array.from(line.children).reduce((sum, item) => sum + item.getBoundingClientRect().width, 0),
@@ -870,7 +1302,12 @@ function MushafLeaf({
       const available = leaf.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight)
       block.style.width = `${mushafMeasure(set, em, available)}px`
     }
+    if (opening && block && leaf instanceof HTMLElement) {
+      setMedallion(lines, block, leaf, textLines, set, em, glyphWiden)
+      return
+    }
     // The block's floor (min-width) may hold it wider than asked.
+    settleTypeSize(lines)
     const measure = lines.clientWidth
     const settings = set.map(({ ink, gaps }) => opening
       ? { widen: 1, short: true } : solveLine(ink, gaps, measure, em, glyphWiden))
@@ -892,6 +1329,9 @@ function MushafLeaf({
     })
   }, [page, english, side, fit, fitRevision, glyphWiden, opening])
 
+  // Customize → English leaf: the translation, or the words' own gloss.
+  const gloss = useAppSelector((state) =>
+    (state.settings as { englishLeafText?: string }).englishLeafText === 'gloss')
   if (!runtimeMushafCache) return null
   const rows = runtimeMushafCache.pageWords(page) ?? []
   const { leaf, headSurah, englishAyahs, lastPositions, verseWords } = mushafLeafModel(page, rows, QuranRepository.surahContent)
@@ -908,6 +1348,9 @@ function MushafLeaf({
   return (
     <div
       className="mushaf"
+      role="group"
+      aria-roledescription="page"
+      aria-label={leafDescription(page, headSurah?.nameTransliteration ?? null, rows)}
       dir={english ? 'ltr' : 'rtl'}
       data-side={side}
       data-word-group=""
@@ -924,7 +1367,7 @@ function MushafLeaf({
         const dy = event.clientY - start.y
         if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return
         // The next leaf is to the left, so a finger moving right turns forward.
-        onTurn(dx > 0 ? 1 : -1)
+        onTurn?.(dx > 0 ? 1 : -1)
       }}
       onPointerCancel={() => {
         drag.current = null
@@ -932,24 +1375,48 @@ function MushafLeaf({
     >
       <MushafHead
         page={page}
-        script={english ? 'english' : pageNumberScript}
+        script={pageNumberScript}
         chapter={headSurah?.nameTransliteration ?? ''}
       />
       <div className="mushaf-block" ref={blockRef}>
       {english ? (
-        <div className="mushaf-english">
+        <div
+          className="mushaf-english"
+          style={{
+            ['--recess-ms' as string]: `${tuning.recessMs}ms`,
+            ['--upcoming-alpha' as string]: String(tuning.upcomingAlpha),
+          }}
+        >
           {englishAyahs.map((item) => {
             const active = item.surahId === activeSurahId && item.ayah === activeAyah
+            // The verse's own ink (Android MushafEnglishSheet): verses still
+            // to come wait under the recess, the voiced verse washes in from
+            // the left, and verses already read keep their ink.
+            const voiced = mushafVerseInk(item, activeSurahId, ink, live)
+            // A picture never starts a wash: the verse in hand stands inked.
+            const verseInk = still && voiced === 'active' ? 'plain' : voiced
             return (
               <Fragment key={`${item.surahId}:${item.ayah}`}>
               {item.ayah === 1 ? (
-                <div className="mushaf-english-chapter">
-                  <MushafChapterBand surah={QuranRepository.surahContent(item.surahId).surah} latin />
-                </div>
+                <>
+                  <div className="mushaf-english-chapter">
+                    <MushafChapterBand surah={QuranRepository.surahContent(item.surahId).surah} latin />
+                  </div>
+                  {surahOpensWithBasmalahPreface(item.surahId) ? (
+                    <MushafBasmalah
+                      english
+                      surahId={item.surahId}
+                      washing={live && !still && item.surahId === activeSurahId && ink.inkAyah === BASMALAH_PLAYLIST_AYAH}
+                      waiting={live && item.surahId === activeSurahId && ink.inkAyah == null && ink.reciting}
+                      speed={ink.speed}
+                    />
+                  ) : null}
+                </>
               ) : null}
               <p
                 className="mushaf-english-ayah"
                 data-active={active || undefined}
+                data-ink={verseInk}
               >
                 {/* A span, not a button: a button is one box and cannot break
                     across lines, which pushed the verse number onto a line
@@ -965,17 +1432,19 @@ function MushafLeaf({
                     onPlayWord(item.surahId, item.ayah, 1)
                   }}
                 >
-                  {suppliedWords(item.translation ?? '')}
+                  {suppliedWords(gloss
+                    ? (verseWords.get(`${item.surahId}:${item.ayah}`) ?? []).map((word) => word.translation).filter(Boolean).join(' ')
+                    : item.translation ?? '')}
                 </span>
                 {/* No-break space: the number never starts a line alone. */}
                 {'\u00A0'}
                 <button
                   type="button"
                   className="mushaf-mark"
-                  aria-label={`Gather ayah ${item.ayah}`}
+                  aria-label={`Recite ayah ${item.ayah}`}
                   onClick={(event) => {
                     event.stopPropagation()
-                    appStore.onMarkTap(item.surahId, item.ayah)
+                    playFromMark(item.surahId, item.ayah)
                   }}
                 >
                   {formatAyahNumberMark(item.ayah, false)}
@@ -990,8 +1459,12 @@ function MushafLeaf({
         <div
           className="mushaf-lines"
           data-opening={opening || undefined}
+          data-search-flash={flash != null && !still ? true : undefined}
+          data-search-focus-active={flash?.focusActive && !still ? true : undefined}
           ref={linesRef}
           style={{
+            ['--search-background-alpha' as string]: String(SearchHitFlash.BACKGROUND_ALPHA),
+            ['--search-focus-fade-ms' as string]: `${SearchHitFlash.FOCUS_FADE_MS}ms`,
             ['--mushaf-fit' as string]: String(fit),
             ['--mushaf-slots' as string]: String(Math.max(MUSHAF_LINES_PER_PAGE, leaf.lines.length, peerSlots)),
             ['--recess-ms' as string]: `${tuning.recessMs}ms`,
@@ -1004,7 +1477,13 @@ function MushafLeaf({
               <MushafChapterBand surah={QuranRepository.surahContent(line.chapter).surah} fit={fit} />
             </div>
           ) : line.basmalah ? (
-            <div className="mushaf-basmalah" key={line.number} lang="ar">{BASMALAH_UTHMANI}</div>
+            <MushafBasmalah
+              key={line.number}
+              surahId={line.basmalah}
+              washing={isLive && !still && line.basmalah === activeSurahId && ink.inkAyah === BASMALAH_PLAYLIST_AYAH}
+              waiting={isLive && line.basmalah === activeSurahId && ink.inkAyah == null}
+              speed={ink.speed}
+            />
           ) : (
             <p key={line.number} className="mushaf-line" lang="ar">
               {line.tokens.map((token) => {
@@ -1050,6 +1529,7 @@ function MushafLeaf({
                         activation={owner ? (ink.activeWord?.activation ?? 0) : 0}
                         onPlay={() => playRef.current(surahId, ayah, position)}
                         onHold={() => holdRef.current(surahId, ayah, position, side)}
+                        flashRole={mushafFlashRole(flash, surahId, ayah, position)}
                       />
                     )}
                     {endsAyah ? (
@@ -1057,10 +1537,10 @@ function MushafLeaf({
                         type="button"
                         className="mushaf-mark"
                         data-state={mushafMarkWaits(token, activeSurahId, ink, isLive) ? InkState.Upcoming : InkState.Plain}
-                        aria-label={`Gather ayah ${token.ayah}`}
+                        aria-label={`Recite ayah ${token.ayah}`}
                         onClick={(event) => {
                           event.stopPropagation()
-                          appStore.onMarkTap(token.surahId, token.ayah)
+                          playFromMark(token.surahId, token.ayah)
                         }}
                       >
                         {formatAyahNumberMark(token.ayah, true)}
@@ -1094,7 +1574,9 @@ const MushafWord = memo(function MushafWord({
   onPlay,
   onHold,
   tabIndex,
+  flashRole = null,
 }: {
+  flashRole?: 'hit' | 'recessed' | null
   token: MushafToken
   motion: WordMotion
   ink: InkWord
@@ -1116,6 +1598,8 @@ const MushafWord = memo(function MushafWord({
       motion={motion}
       activation={activation}
       tabIndex={tabIndex}
+      searchFlash={flashRole === 'hit'}
+      searchRecessed={flashRole === 'recessed'}
       onPlay={onPlay}
       onHold={onHold}
       onContextMenu={(event) => {
@@ -1127,6 +1611,7 @@ const MushafWord = memo(function MushafWord({
 }, (prev, next) =>
   prev.token === next.token &&
   prev.tabIndex === next.tabIndex &&
+  prev.flashRole === next.flashRole &&
   prev.ink.state === next.ink.state &&
   prev.ink.repeat === next.ink.repeat &&
   prev.sweepMs === next.sweepMs &&

@@ -1,0 +1,34 @@
+/*
+ * Ayah rail overflow + open-wheel behaviour (Android AyahSelectorRail).
+ * The canvas reaches past the 88px rail toward the page so the trailing
+ * page / ۞ / JUZ / ۩ marks and the clean-paper wash are not clipped.
+ */
+.ayah-rail .ayah-rail-canvas {
+  position: absolute;
+  top: 0;
+  max-width: none;
+}
+
+.ayah-rail[data-side='left'] .ayah-rail-canvas {
+  left: 0;
+}
+
+.ayah-rail[data-side='right'] .ayah-rail-canvas {
+  right: 0;
+}
+
+/* Tap-away catcher while the wheel is open: draws nothing (no scrim). */
+.ayah-rail-dismiss {
+  position: fixed;
+  inset: 0;
+  pointer-events: auto;
+  touch-action: none;
+  background: transparent;
+}
+
+/* Android: verses fade to 0.07 under the open wheel (600ms), content alpha
+   only — never a dark veil. */
+.scroll[data-rail-open='true'] .ayah-block {
+  opacity: 0.07;
+  transition: opacity 600ms var(--recede-ease, ease);
+}

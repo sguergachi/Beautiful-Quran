@@ -14,15 +14,29 @@ import java.nio.ByteBuffer
  * [onQueueEndOfStream], and the tail would be thrown away instead of ramped.
  * The fade for the new file is built in [onFlush], after the ended file has
  * been drained.
+ *
+ * A gapless next verse arrives as configure (next file), end of stream
+ * (this file), flush. Only an end of stream that follows a configure keeps
+ * the ended file's tail, and the next flush hands it to the new fade to
+ * bridge the new file's opening digital silence (see [VerseSeamFade]). The
+ * end of playback drains with no configure first, so a seek after it, like
+ * any other seek or the first file, starts without one.
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class VerseSeamAudioProcessor : BaseAudioProcessor() {
 
     private var seam: VerseSeamFade? = null
 
+    /** A next file was configured since the last flush: an end of stream now is a gapless seam. */
+    private var nextFileConfigured = false
+
+    /** The ended file's tail, waiting for the next file's flush. */
+    private var bridge: SeamBridge? = null
+
     override fun onConfigure(
         inputAudioFormat: AudioProcessor.AudioFormat,
     ): AudioProcessor.AudioFormat {
+        nextFileConfigured = true
         if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) {
             return AudioProcessor.AudioFormat.NOT_SET
         }
@@ -41,6 +55,7 @@ class VerseSeamAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun onQueueEndOfStream() {
+        bridge = if (nextFileConfigured) seam?.bridgeSource() else null
         val tail = seam?.endOfStream() ?: return
         if (tail.isEmpty()) return
         replaceOutputBuffer(tail.size).put(tail).flip()
@@ -49,13 +64,21 @@ class VerseSeamAudioProcessor : BaseAudioProcessor() {
     override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) {
         val format = inputAudioFormat
         seam = if (isActive && format.encoding == C.ENCODING_PCM_16BIT) {
-            VerseSeamFade(format.channelCount, format.sampleRate)
+            VerseSeamFade(
+                format.channelCount,
+                format.sampleRate,
+                bridge = bridge,
+            )
         } else {
             null
         }
+        bridge = null
+        nextFileConfigured = false
     }
 
     override fun onReset() {
         seam = null
+        bridge = null
+        nextFileConfigured = false
     }
 }

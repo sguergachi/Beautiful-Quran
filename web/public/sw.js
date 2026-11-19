@@ -11,12 +11,24 @@
  *   - sw.js itself is never cached through this worker
  *
  * Bump CACHE (and OFFLINE_SHELL) whenever quran.db data or this contract
- * changes. Activate deletes every other cache name and reloads open clients
- * so stale scripture data or a poisoned shell cannot stick.
+ * changes. Activate deletes every other shell cache name and reloads open
+ * clients so stale scripture data or a poisoned shell cannot stick.
+ *
+ * Recitation audio (`beautiful-quran-audio-*`, written by the page's
+ * AudioPrefetcher and the Download manager) is not the shell: it holds
+ * cross-origin everyayah MP3s that never go stale with a deploy, and wiping
+ * it on every update silently deleted the reader's downloads and forced a
+ * reload of every open tab. It is kept, and never counts as stale.
  */
 const CACHE = 'beautiful-quran-web-v15'
 const OFFLINE_SHELL = 'beautiful-quran-offline-shell-v15'
 const BASE = self.registration.scope
+/** Caches this worker never deletes: reader audio, not app shell. */
+const AUDIO_CACHE_PREFIX = 'beautiful-quran-audio-'
+
+function isKeptCache(name) {
+  return name === CACHE || name === OFFLINE_SHELL || name.startsWith(AUDIO_CACHE_PREFIX)
+}
 
 function isNavigationRequest(req, url) {
   if (req.mode === 'navigate') return true
@@ -67,11 +79,10 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       const keys = await caches.keys()
-      const keep = new Set([CACHE, OFFLINE_SHELL])
-      const hadStale = keys.some((k) => !keep.has(k))
+      const hadStale = keys.some((k) => !isKeptCache(k))
       const deletes = []
       for (const k of keys) {
-        if (!keep.has(k)) deletes.push(caches.delete(k))
+        if (!isKeptCache(k)) deletes.push(caches.delete(k))
       }
       await Promise.all(deletes)
 

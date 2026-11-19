@@ -1,0 +1,92 @@
+/*
+ * Chapter pull gestures (Android chapterPullConnection). Variables are
+ * painted on the scroll's parent (.edge-fade) by useChapterPull:
+ *   --prev-reveal / --prev-pull / --prev-ink / --prev-exit
+ *   --next-rubber / --next-pull / --next-ink / --next-invite
+ */
+
+/* While pulling, the page itself moves: down under the PREVIOUS band, or up
+   in an elastic stretch at the footer. `translate` composes with the next-
+   chapter ceremony's inline transform, so it continues from the held pose. */
+.edge-fade[data-chapter-pull] > .scroll {
+  translate: 0 calc(var(--prev-reveal, 0px) - var(--next-rubber, 0px));
+}
+
+/* PREVIOUS band: a layout slot above the page, paper behind it, growing with
+   the pull. Hidden entirely when not pulling. */
+.prev-chapter-pull {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  height: var(--prev-reveal, 0px);
+  overflow: hidden;
+  background: var(--reading-paper, var(--paper));
+  pointer-events: none;
+}
+
+.edge-fade:not([data-chapter-pull]) > .prev-chapter-pull {
+  display: none;
+}
+
+.prev-chapter-pull-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: var(--reader-max, 680px);
+  margin: 0 auto;
+  padding: 12px var(--scroll-margin, 38px) 16px;
+  opacity: var(--prev-exit, 1);
+  box-sizing: border-box;
+}
+
+.prev-chapter-pull-inner .next-chapter-label {
+  margin-bottom: 8px;
+}
+
+.prev-chapter-pull-name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 23px;
+  font-weight: 500;
+  letter-spacing: 0.15px;
+  color: var(--ink-rung-tertiary, var(--ink-muted));
+  margin-bottom: 12px;
+}
+
+.prev-chapter-pull .chapter-pull-pill {
+  pointer-events: auto;
+}
+
+/* Pill fill: a clipped stadium growing left → right (Android clipRect),
+   ink flipping to the paper colour once the wash covers the label. */
+.prev-chapter-pull .chapter-pull-pill .next-chapter-pill-fill {
+  transform: none;
+  clip-path: inset(0 calc((1 - var(--prev-pull, 0)) * 100%) 0 0);
+}
+
+.prev-chapter-pull .chapter-pull-pill {
+  color: color-mix(in srgb, var(--accent) calc((1 - var(--prev-ink, 0)) * 100%), var(--on-accent, #fff));
+}
+
+.next-chapter .next-chapter-pill .next-chapter-pill-fill {
+  transform: none;
+  clip-path: inset(0 calc((1 - var(--next-pull, 0)) * 100%) 0 0);
+}
+
+.next-chapter .next-chapter-pill {
+  color: color-mix(in srgb, var(--accent) calc((1 - var(--next-ink, 0)) * 100%), var(--on-accent, #fff));
+}
+
+/* Pulling fades only the invitation chrome (Android footerMorph = pull ×
+   0.4) — alpha only, heights fixed, so the stretch never reflows the page. */
+.next-chapter > .next-chapter-invite-top,
+.next-chapter > .next-chapter-invite-pill {
+  opacity: calc(var(--invite, 1) * var(--next-invite, 1));
+}
+
+.next-chapter .next-chapter-pill:not(:disabled) {
+  opacity: var(--next-pill-alpha, 1);
+}

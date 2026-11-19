@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.SettingsRepository
+import com.beautifulquran.data.withReciter
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.tarjilab.ReciterTarjiProfiles
@@ -30,7 +31,7 @@ class SettingsViewModel(
     }
 
     fun selectReciter(reciter: Reciter) {
-        settings.update { it.copy(reciterId = reciter.id) }
+        settings.update { it.withReciter(reciter.id) }
         tarjiProfiles?.applyToEngine(reciter.id)
     }
 

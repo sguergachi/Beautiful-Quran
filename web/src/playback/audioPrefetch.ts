@@ -12,7 +12,18 @@
  * failures never block playback.
  */
 
-const AUDIO_CACHE = 'beautiful-quran-audio-v1'
+/**
+ * Listening cache (Android RecitationCache "listen"): playback and read-ahead
+ * write here, and it may be evicted.
+ */
+export const AUDIO_CACHE = 'beautiful-quran-audio-v1'
+
+/**
+ * Downloads (Android RecitationCache "keep"): chapters the reader chose to keep
+ * from the Download manager. Never evicted by playback; read before
+ * [AUDIO_CACHE]. The service worker keeps every `beautiful-quran-audio-*` cache.
+ */
+export const AUDIO_KEEP_CACHE = 'beautiful-quran-audio-keep-v1'
 
 /**
  * Upcoming ayahs to keep warm beyond the one currently playing.
@@ -42,6 +53,8 @@ export interface AudioPrefetcherOptions {
   fetch?: PrefetchFetch
   /** Override Cache API open (tests). */
   openCache?: () => Promise<Cache>
+  /** Override the downloads (keep) cache open; null when there is none. */
+  openKeepCache?: () => Promise<Cache | null>
   /** Override connection probe (tests). */
   connection?: () => ConnectionLike | undefined
   readAheadCount?: number
@@ -58,6 +71,7 @@ export interface AudioPrefetcherOptions {
 export class AudioPrefetcher {
   private readonly fetchImpl: PrefetchFetch
   private readonly openCache: () => Promise<Cache>
+  private readonly openKeepCache: () => Promise<Cache | null>
   private readonly connection: () => ConnectionLike | undefined
   private readonly readAheadCount: number
   private readonly memoryCap: number
@@ -89,6 +103,11 @@ export class AudioPrefetcher {
         }
         return caches.open(AUDIO_CACHE)
       })
+    this.openKeepCache =
+      options.openKeepCache ??
+      (options.openCache
+        ? async () => null
+        : async () => (typeof caches === 'undefined' ? null : caches.open(AUDIO_KEEP_CACHE)))
     this.connection =
       options.connection ??
       (() => {
@@ -237,7 +256,9 @@ export class AudioPrefetcher {
       let response: Response | undefined
       try {
         const cache = await this.openCache()
-        response = await cache.match(url)
+        // A downloaded chapter is read from the keep cache, never re-fetched.
+        response = (await (await this.openKeepCache().catch(() => null))?.match(url)) ?? undefined
+        response ??= await cache.match(url)
         if (!response) {
           const fetched = await this.fetchImpl(url, { mode: 'cors', credentials: 'omit' })
           if (!fetched.ok) return null

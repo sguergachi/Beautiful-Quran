@@ -4,6 +4,7 @@ import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 
@@ -51,6 +52,35 @@ class VerseSeamAudioProcessorTest {
         processor.flush(AudioProcessor.StreamMetadata.DEFAULT)
         processor.queueEndOfStream()
         assertFalse(processor.getOutput().hasRemaining())
+    }
+
+    @Test
+    fun `a gapless next verse gets the ended file's tail over its opening silence`() {
+        val out = playThenSilence(gapless = true)
+        assertTrue((10 until 30).any { sampleAt(out, it) != 0 })
+    }
+
+    @Test
+    fun `a seek after playback ended starts on the file as recorded`() {
+        // Last verse plays out (end of stream, no next file configured), then
+        // the listener taps a verse: that flush must not bridge the old tail.
+        val out = playThenSilence(gapless = false)
+        assertTrue(out.all { it.toInt() == 0 })
+    }
+
+    private fun playThenSilence(gapless: Boolean): ByteArray {
+        val processor = VerseSeamAudioProcessor()
+        val format = AudioProcessor.AudioFormat(1_000, 1, C.ENCODING_PCM_16BIT)
+        processor.configure(format)
+        processor.flush(AudioProcessor.StreamMetadata.DEFAULT)
+        processor.queueInput(ByteBuffer.wrap(noise(200, 1_200)))
+        copy(processor.getOutput())
+        if (gapless) processor.configure(format)
+        processor.queueEndOfStream()
+        copy(processor.getOutput())
+        processor.flush(AudioProcessor.StreamMetadata.DEFAULT)
+        processor.queueInput(ByteBuffer.wrap(pcm16(100, 0)))
+        return copy(processor.getOutput())
     }
 }
 

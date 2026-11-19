@@ -13,6 +13,8 @@ import {
 type Props = {
   params: NuqtaParams
   onChange: (next: NuqtaParams) => void
+  /** False when a page already names the component (Component kit). */
+  showTitle?: boolean
 }
 
 /**
@@ -20,7 +22,7 @@ type Props = {
  * session-only and reach every choice list on the Settings and Customize
  * sheets live; the two rows here give a place to flick back and forth.
  */
-export function NuqtaLab({ params, onChange }: Props) {
+export function NuqtaLab({ params, onChange, showTitle = true }: Props) {
   const [demo, setDemo] = useState<'first' | 'second'>('first')
   /** Bumps on paste/reset so Base UI sliders remount with exact values. */
   const [epoch, setEpoch] = useState(0)
@@ -79,10 +81,14 @@ export function NuqtaLab({ params, onChange }: Props) {
 
   return (
     <div className="settings-dev-block">
-      <p className="settings-body-label">Nuqta radio dot</p>
-      <p className="settings-caption">
-        Every single-choice list on these sheets follows these knobs live.
-      </p>
+      {showTitle ? (
+        <>
+          <p className="settings-body-label">Nuqta radio dot</p>
+          <p className="settings-caption">
+            Every single-choice list on these sheets follows these knobs live.
+          </p>
+        </>
+      ) : null}
       <PaperChoiceList
         aria-label="Nuqta preview"
         value={demo}
