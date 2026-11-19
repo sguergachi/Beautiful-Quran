@@ -18,7 +18,7 @@ class RepeatedBasmalahTest {
     fun aHeardBasmalahLeavesAsTheRepeatWraps() = assertTrue(drops())
 
     @Test
-    fun theSettingIsOptIn() = assertFalse(drops(enabled = false))
+    fun switchingTheSettingOffKeepsTheBasmalah() = assertFalse(drops(enabled = false))
 
     @Test
     fun aBasmalahNotYetHeardPlaysOnce() = assertFalse(drops(heardInSurah = null))

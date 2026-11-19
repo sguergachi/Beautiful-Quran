@@ -120,7 +120,7 @@ data class Settings(
     /** Silence after each verse before the next begins, in seconds; 0 is none. */
     val verseGapSeconds: Int = 0,
     /** Repeating a whole chapter opens with the basmalah only the first time round. */
-    val skipRepeatedBasmalah: Boolean = false,
+    val skipRepeatedBasmalah: Boolean = true,
     val fontScale: Float = 1f,
     val readingMode: ReadingMode = ReadingMode.ARABIC_ENGLISH,
     val readingLayout: ReadingLayout = ReadingLayout.SCROLL,
@@ -225,7 +225,7 @@ class SettingsRepository(context: Context) {
         ),
         autoplayNextChapter = prefs.getBoolean("autoplayNextChapter", false),
         verseGapSeconds = prefs.getInt("verseGapSeconds", 0).coerceIn(0, MAX_VERSE_GAP_SECONDS),
-        skipRepeatedBasmalah = prefs.getBoolean("skipRepeatedBasmalah", false),
+        skipRepeatedBasmalah = prefs.getBoolean("skipRepeatedBasmalah", true),
         fontScale = prefs.getFloat("fontScale", 1f),
         readingMode = prefs.enum("readingMode", ReadingMode.ARABIC_ENGLISH),
         readingLayout = prefs.enum("readingLayout", ReadingLayout.SCROLL),

@@ -146,7 +146,7 @@ export class PlayerController {
   /** Silence after each verse (Settings → Playback), in milliseconds. */
   private verseGapMs = 0
   /** Setting: a repeating chapter drops its basmalah once it has been heard. */
-  private skipRepeatedBasmalah = false
+  private skipRepeatedBasmalah = true
   private basmalahHeard = false
   /**
    * The silence after a verse, while it holds. Play intent stays on and the
