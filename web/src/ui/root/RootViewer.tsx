@@ -1,5 +1,8 @@
+import { concordanceReturnTarget } from './backToPlace'
+import { backToPlace } from './backToPlaceStore'
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import './rootCollapsedTitle.css'
 import { useBookSpread, useLooseSheetSlot } from '../paper/bookSpread'
 import { SHEET_LAY_SCHEDULE, playFlip } from '../paper/pageTurnSounds'
 import { appStore, useAppSelector, type RootViewerState } from '../../store/appStore'
@@ -239,6 +242,30 @@ function RootViewerBleed({
     setShowAllDictionarySenses(false)
   }, [rv.root, rv.surahId, rv.lemma])
 
+  // Android showTopTitle: once the opening word scrolls under the bar, the
+  // word collapses into the bar with its speaker and "Scroll to top".
+  const openingRef = useRef<HTMLElement>(null)
+  const [showTopTitle, setShowTopTitle] = useState(false)
+  useEffect(() => {
+    const root = rootRef.current
+    const opening = openingRef.current
+    if (!root || !opening || typeof IntersectionObserver === 'undefined') return
+    const chrome = root.querySelector<HTMLElement>('.ink-bleed-chrome')
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        const above = entry.boundingClientRect.bottom <= (entry.rootBounds?.top ?? 0) + 1
+        setShowTopTitle(!entry.isIntersecting && above)
+      },
+      { root, rootMargin: `-${chrome?.offsetHeight ?? 60}px 0px 0px 0px`, threshold: 0 },
+    )
+    io.observe(opening)
+    return () => io.disconnect()
+  }, [])
+  const scrollToTop = () => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    rootRef.current?.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
+  }
+
   const visibleSections = showAllChapters
     ? sections
     : initialRootSections(sections, rv.surahId)
@@ -301,12 +328,33 @@ function RootViewerBleed({
     >
       <div className="ink-bleed-inner">
         <div className="ink-bleed-chrome">
+          <div className="root-collapsed-title" data-visible={showTopTitle && rv.arabic ? 'true' : undefined} inert={!showTopTitle}>
+            <div className="root-collapsed-row">
+              <button type="button" className="root-collapsed-word" lang="ar" dir="rtl" aria-label="Scroll to top" onClick={scrollToTop}>
+                {rv.arabic}
+              </button>
+              <button
+                type="button"
+                className="root-collapsed-speak"
+                aria-label="Play word"
+                data-playing={rv.isPlayingWord ? 'true' : undefined}
+                onClick={() => void appStore.playRootViewerWord()}
+              >
+                <IconVolumeUp width="18" height="18" />
+              </button>
+            </div>
+            {rv.translation ? (
+              <button type="button" className="root-collapsed-gloss" aria-label="Scroll to top" onClick={scrollToTop}>
+                {rv.translation}
+              </button>
+            ) : null}
+          </div>
           <button type="button" className="close" aria-label="Close" onClick={() => appStore.closeRootViewer()}>
             <IconClose width="1.35em" height="1.35em" />
           </button>
         </div>
 
-        <header className="root-opening root-prose-measure">
+        <header ref={openingRef} className="root-opening root-prose-measure">
           <div className="root-word-title">
             <p className="root-word-arabic" lang="ar" dir="rtl">{rv.arabic}</p>
             <button
@@ -492,6 +540,13 @@ function RootViewerBleed({
                                 data-current={current ? 'true' : undefined}
                                 key={`${entry.surahId}:${entry.ayahNumber}:${entry.position}`}
                                 onClick={() => {
+                                  // Remember where the hold began so the reader can offer a way back.
+                                  const origin = concordanceReturnTarget(
+                                    { surahId: rv.surahId, ayah: rv.ayah },
+                                    { surahId: entry.surahId, ayah: entry.ayahNumber },
+                                    appStore.getSnapshot().surahs.find((surah) => surah.id === rv.surahId)?.nameTransliteration ?? '',
+                                  )
+                                  if (origin) backToPlace.remember(origin)
                                   // Concordance jump: do not resume the pre-open session.
                                   appStore.closeRootViewer(false)
                                   appStore.openSurah(entry.surahId, entry.ayahNumber)

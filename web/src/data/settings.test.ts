@@ -7,7 +7,7 @@ import {
   showsWordGlossChrome,
   wordSearchSources,
 } from './customizePolicy'
-import { HOME_BOOKMARK_STYLES, normalizeSettings, reciterChoice } from './settings'
+import { normalizeSettings, reciterChoice, type Settings } from './settings'
 
 describe('favorite reciters', () => {
   it('stars a voice when it is chosen, and leaves existing favourites alone', () => {
@@ -70,21 +70,9 @@ describe('favorite reciters', () => {
 })
 
 describe('home bookmark settings', () => {
-  it('defaults removed or absent values to the top-bound ribbon', () => {
-    expect(normalizeSettings().homeBookmarkStyle).toBe('top_bound')
-    expect(
-      normalizeSettings({ homeBookmarkStyle: 'removed_style' as never })
-        .homeBookmarkStyle,
-    ).toBe('top_bound')
-  })
-
-  it('preserves every experiment and keeps it independent of developer mode', () => {
-    for (const homeBookmarkStyle of HOME_BOOKMARK_STYLES) {
-      expect(
-        normalizeSettings({ homeBookmarkStyle, developerMode: false })
-          .homeBookmarkStyle,
-      ).toBe(homeBookmarkStyle)
-    }
+  it('drops the retired Chapters bookmark experiment on load', () => {
+    const legacy = normalizeSettings({ homeBookmarkStyle: 'saved_passages' } as Parameters<typeof normalizeSettings>[0])
+    expect(legacy).not.toHaveProperty('homeBookmarkStyle')
   })
 })
 
@@ -99,25 +87,38 @@ describe('gapless5Playback setting', () => {
   })
 })
 
-describe('colorSystem setting', () => {
-  it('ships the ink ladder and only accepts the legacy palette by name', () => {
-    expect(normalizeSettings().colorSystem).toBe('ladder')
-    expect(normalizeSettings({ colorSystem: 'legacy' }).colorSystem).toBe('legacy')
-    expect(normalizeSettings({ colorSystem: 'nope' as never }).colorSystem).toBe('ladder')
+describe('retired colorSystem setting', () => {
+  it('is stripped from stored settings', () => {
+    const stored = { colorSystem: 'legacy' } as unknown as Partial<Settings>
+    expect('colorSystem' in normalizeSettings(stored)).toBe(false)
   })
 })
 
 describe('educationGuidesEnabled setting', () => {
-  it('defaults on and preserves explicit opt-outs', () => {
-    expect(normalizeSettings().educationGuidesEnabled).toBe(true)
-    expect(normalizeSettings({ educationGuidesEnabled: false }).educationGuidesEnabled).toBe(false)
+  it('is off by default, as on Android', () => {
+    expect(normalizeSettings().educationGuidesEnabled).toBe(false)
+  })
+
+  it('is a developer toggle: a stored true only counts in developer mode', () => {
+    expect(normalizeSettings({ educationGuidesEnabled: true }).educationGuidesEnabled).toBe(false)
     expect(
-      normalizeSettings({ educationGuidesEnabled: true }).educationGuidesEnabled,
+      normalizeSettings({ developerMode: true, educationGuidesEnabled: true }).educationGuidesEnabled,
     ).toBe(true)
     expect(
-      normalizeSettings({ educationGuidesEnabled: 1 as unknown as boolean })
+      normalizeSettings({ developerMode: true, educationGuidesEnabled: false }).educationGuidesEnabled,
+    ).toBe(false)
+    expect(
+      normalizeSettings({ developerMode: true, educationGuidesEnabled: 1 as unknown as boolean })
         .educationGuidesEnabled,
     ).toBe(true)
+  })
+})
+
+describe('fontScale setting', () => {
+  it('defaults to the 1.0 stop and lifts the retired 0.95 default onto it', () => {
+    expect(normalizeSettings().fontScale).toBe(1)
+    expect(normalizeSettings({ fontScale: 0.95 }).fontScale).toBe(1)
+    expect(normalizeSettings({ fontScale: 0.9 }).fontScale).toBe(0.9)
   })
 })
 
@@ -151,6 +152,12 @@ describe('customize reading settings', () => {
       wordGloss: true,
       transliteration: false,
       verseTranslation: false,
+    })
+    expect(wordSearchSources('mushaf')).toEqual({
+      arabic: false,
+      wordGloss: false,
+      transliteration: false,
+      verseTranslation: true,
     })
   })
 

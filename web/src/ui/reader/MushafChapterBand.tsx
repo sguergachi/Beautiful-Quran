@@ -73,18 +73,22 @@ function cartoucheDrawing(ornament: ReturnType<typeof generateChapterOrnament>, 
   const window = `M ${x0} ${-h} L ${x0} 0 Q ${x0 - 0.2 * tip} ${0.275 * h} ${x0 - tip} ${h / 2} Q ${x0 - 0.2 * tip} ${0.725 * h} ${x0} ${h}
     L ${x0} ${2 * h} L ${x1} ${2 * h} L ${x1} ${h} Q ${x1 + 0.2 * tip} ${0.725 * h} ${x1 + tip} ${h / 2} Q ${x1 + 0.2 * tip} ${0.275 * h} ${x1} 0 L ${x1} ${-h} Z`
   const weave = ornament.field.strokes.map(stroke => pathD(stroke, 1)).join(' ')
+  // The ground is laid once from the fold outward and mirrored there, so
+  // the panel is symmetrical about its own centre (Android MushafSurahBand) —
+  // a tiling cut by the two ends at whatever phase it reached is not.
   const cells = []
   if (h > 0) {
     const unit = h * 0.8 / ornament.field.cellH
     const step = ornament.field.cellW * unit
-    for (let x = -step; x < w + step; x += step) {
+    for (let x = w / 2 - step; x > -step; x -= step) {
       cells.push(`<path d="${weave}" transform="translate(${x} 0) scale(${unit})" stroke-width="${0.4 / unit}"/>`)
     }
   }
+  const groundHalf = cells.join('')
   const rosette = ornament.rosette.strokes.map(stroke => `<path d="${pathD(stroke, 1)}"/>`).join('')
   const shamsas = [h * 0.14, w - h * 0.74].map(x =>
     `<g transform="translate(${x} ${h * 0.2}) scale(${h * 0.6})" fill="none" stroke="currentColor" stroke-width="${h > 0 ? 0.7 / (h * 0.6) : 0}" opacity="0.48">${rosette}</g>`).join('')
-  return `<g class="mushaf-chapter-ground" fill="none" stroke="currentColor">${cells.join('')}</g>
+  return `<g class="mushaf-chapter-ground" fill="none" stroke="currentColor"><g>${groundHalf}</g><g transform="translate(${w} 0) scale(-1 1)">${groundHalf}</g></g>
     <rect x="0.6" y="0.6" width="${Math.max(0, w - 1.2)}" height="${Math.max(0, h - 1.2)}" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.5"/>
     <rect x="3" y="3" width="${Math.max(0, w - 6)}" height="${Math.max(0, h - 6)}" rx="3" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.28"/>
     <path d="${window}" fill="var(--paper)"/>

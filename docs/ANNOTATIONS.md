@@ -8,7 +8,7 @@ A reader's own writing on the page: a short note attached to one verse, kept
 in the margin of the sheet it belongs to. This is the app's third piece of
 user data, after settings and bookmarks.
 
-**Status: built on Android (reader-written annotations only); web port pending.** Sections marked *Not yet built*
+**Status: built on Android and web (reader-written annotations only).** Sections marked *Not yet built*
 are spec, not description — everything else describes shipped behaviour.
 
 ## Why it exists, and what it is not

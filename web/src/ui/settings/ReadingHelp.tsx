@@ -1,10 +1,9 @@
-import { appStore } from '../../store/appStore'
 import { BackChevron } from '../kit/BackChevron'
-import { PaperSwitch } from '../kit/PaperSwitch'
-import { rearmEducation } from '../../data/education'
 
 /** Instructions for the gestures the browser reader supports. */
-export function ReadingHelp({ hintsEnabled, onBack }: { hintsEnabled: boolean; onBack: () => void }) {
+/** Web-only leaf: the gestures and keyboard shortcuts of the browser reader.
+ * The one-shot lessons are a developer toggle on Settings, as on Android. */
+export function ReadingHelp({ onBack }: { onBack: () => void }) {
   return (
     <>
       <button type="button" className="back settings-back" aria-label="Back" onClick={onBack}><BackChevron /></button>
@@ -30,13 +29,6 @@ export function ReadingHelp({ hintsEnabled, onBack }: { hintsEnabled: boolean; o
           <dt>B</dt><dd>Bookmark the reading verse</dd>
           <dt>Escape</dt><dd>Close the current view or return to Chapters</dd>
         </dl>
-      </section>
-      <section className="settings-section">
-        <PaperSwitch id="reading-hints" label="Reading hints" checked={hintsEnabled} onChange={(enabled) => {
-          if (enabled) rearmEducation()
-          appStore.updateSettings({ educationGuidesEnabled: enabled })
-        }} />
-        <p className="settings-caption">Brief lessons appear once. Turn this on again to replay them.</p>
       </section>
     </>
   )

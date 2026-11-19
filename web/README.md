@@ -15,11 +15,13 @@ to the staging script and re-pointing `build:pages` (its base is still the old
 
 ## Repeat in the book
 
-The playback repeat button opens a paper modal sheet, matching Settings: a
-left-page sheet on desktop and a full sheet on phones. It offers Android’s
-Off, This ayah, Whole surah, A range of ayahs, and From this ayah modes.
+The playback repeat button spreads Android’s repeat sheet out of the play
+bar as ink on the page (no scrim): a muted Repeat label, scroll wheels for
+the range, and Done; a tap in the margin dismisses it. On the wide book
+spread it covers the reader page. It
+offers Android’s Off, This ayah, Whole surah, A range of ayahs, and From this ayah modes.
 From this ayah counts the opening ayah in the requested number. Done applies
-the choice; Cancel or Escape discards edits and returns focus to the button.
+the choice; a margin tap or Escape discards edits and returns focus to the button.
 An active ayah inside a new range continues uninterrupted; a range selected
 while paused or outside its bounds starts at its first ayah. Whole-surah
 repeat includes the chapter’s beginning even when playback began later.

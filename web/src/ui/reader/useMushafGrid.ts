@@ -9,14 +9,16 @@ export function useMushafGrid(sheet: RefObject<HTMLElement | null>, enabled: boo
   const [foot, footRef] = useState<HTMLElement | null>(null)
   useLayoutEffect(() => {
     const book = sheet.current?.closest<HTMLElement>('.app-shell')
-    if (!enabled || !book || !top || !foot) return
+    // A single leaf carries no top bar (Android's book window): only the
+    // transport is reserved.
+    if (!enabled || !book || !foot) return
     const measure = () => {
-      book.style.setProperty('--mushaf-toolbar-h', `${top.offsetHeight}px`)
+      book.style.setProperty('--mushaf-toolbar-h', `${top?.offsetHeight ?? 0}px`)
       book.style.setProperty('--mushaf-transport-h', `${foot.offsetHeight}px`)
     }
     measure()
     const observer = new ResizeObserver(measure)
-    observer.observe(top, { box: 'border-box' })
+    if (top) observer.observe(top, { box: 'border-box' })
     observer.observe(foot, { box: 'border-box' })
     return () => {
       observer.disconnect()

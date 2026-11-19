@@ -17,6 +17,18 @@ export interface TurnRequest {
   /** A page already lying on the book, pictured from there instead of from its stage. */
   frontSource?: Element
   backSource?: Element
+  /** A leaf under a finger: [TurnDrive.t] is how far it has turned until it is let go. */
+  drive?: TurnDrive
+}
+
+/**
+ * A turn the hand is making. The leaf follows [t] (0 lying where it lifted
+ * from, 1 turned) until [release]; then it finishes the way it was sent, or
+ * is put back, over the rest of the turn's time.
+ */
+export interface TurnDrive {
+  t: number
+  release: null | 'commit' | 'cancel'
 }
 
 /** Where on the book a staged page lies: a page of the spread, or a phone's one leaf. */
@@ -195,7 +207,13 @@ export function startPageTurn(root: HTMLElement, request: TurnRequest, onEnd: ()
   let frame = 0
   let stopped = false
   const skip = () => {
-    frame = requestAnimationFrame(() => { if (!stopped) onEnd() })
+    // A leaf under a finger cannot end before the hand lets it go.
+    const wait = () => {
+      if (stopped) return
+      if (request.drive && !request.drive.release) frame = requestAnimationFrame(wait)
+      else onEnd()
+    }
+    frame = requestAnimationFrame(wait)
     return () => { stopped = true; cancelAnimationFrame(frame) }
   }
 
@@ -226,7 +244,10 @@ export function startPageTurn(root: HTMLElement, request: TurnRequest, onEnd: ()
   probe.remove()
 
   const width = request.single ? rootBox.width : rootBox.width / 2
-  const hingeX = request.single ? rootBox.left + rootBox.width : rootBox.left + rootBox.width / 2
+  // A single leaf is bound at its right edge — an English book's at its left.
+  const hingeX = request.single
+    ? request.hinge === 'right' ? rootBox.left + rootBox.width : rootBox.left
+    : rootBox.left + rootBox.width / 2
   const originX = rootBox.left + rootBox.width / 2
   const originY = rootBox.top + rootBox.height / 2
   const perspective = request.single ? SINGLE_PERSPECTIVE : SPREAD_PERSPECTIVE
@@ -263,10 +284,32 @@ export function startPageTurn(root: HTMLElement, request: TurnRequest, onEnd: ()
   }
   // Drawn before the browser paints: the leaf lies on the page it lifts
   // from in the same frame that page changes beneath it.
-  gl.draw(leafPose(0, kind))
+  const drive = request.drive
+  gl.draw(leafPose(drive ? Math.min(1, Math.max(0, drive.t)) : 0, kind))
   let began: number | null = null
+  let settle: { from: number; to: number; began: number; ms: number } | null = null
   const step = (now: number) => {
     if (stopped) return
+    if (drive) {
+      if (!drive.release) {
+        gl.draw(leafPose(Math.min(1, Math.max(0, drive.t)), kind))
+        frame = requestAnimationFrame(step)
+        return
+      }
+      const from = Math.min(1, Math.max(0, drive.t))
+      settle ??= {
+        from,
+        to: drive.release === 'commit' ? 1 : 0,
+        began: now,
+        ms: Math.max(140, request.ms * Math.abs((drive.release === 'commit' ? 1 : 0) - from)),
+      }
+      const u = Math.min(1, (now - settle.began) / settle.ms)
+      const eased = 1 - (1 - u) ** 3
+      gl.draw(leafPose(settle.from + (settle.to - settle.from) * eased, kind))
+      if (u < 1) frame = requestAnimationFrame(step)
+      else onEnd()
+      return
+    }
     // The clock starts on the first frame after this one, so the work of
     // lifting the leaf is not taken out of its turn.
     began ??= now

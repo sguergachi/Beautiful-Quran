@@ -303,3 +303,23 @@ export function railCollapsedBarRect(
   }
   return { x: railWidth - barW + slip, width: fullW }
 }
+
+/**
+ * Android anchor for the open wheel's focal tick: it rides the rail like a
+ * scrollbar thumb between 72px margins, and a short surah (whose ticks span
+ * less than the rail) travels only its own ladder, centred.
+ */
+export function railAnchorY(
+  dial: number,
+  height: number,
+  ayahCount: number,
+  tickSpacingPx: number,
+  marginPx = 72,
+): number {
+  const maxTravel = Math.max(0, height - 2 * marginPx)
+  const travel = Math.min(maxTravel, Math.max(0, ayahCount - 1) * tickSpacingPx)
+  const margin = (height - travel) / 2
+  const fraction = ayahCount > 1 ? Math.min(1, Math.max(0, (dial - 1) / (ayahCount - 1))) : 0.5
+  return margin + fraction * travel
+}
+

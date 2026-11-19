@@ -1,5 +1,5 @@
 /**
- * First-bookmark confirmation around the reader's real ruby ribbon.
+ * First-bookmark lesson around the live ruby ribbon: holding it writes a note (Android BookmarkNoteTip).
  */
 import { ContextualFeatureTip } from '../theme/ContextualFeatureTip'
 import type { AyahSelectorSide } from '../../data/settings'
@@ -27,8 +27,8 @@ export function BookmarkTip({
   return (
     <ContextualFeatureTip
       visible={visible}
-      title="Bookmark saved"
-      body="Your ruby ribbon keeps this verse. The ribbon on Chapters opens your saved passages."
+      title="Add a note"
+      body="Press and hold this ribbon."
       onDismiss={onDismiss}
       onRenderedChange={onRenderedChange}
       spotlightSide={ribbonSide}

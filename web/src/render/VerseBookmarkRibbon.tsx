@@ -1,8 +1,8 @@
 /**
  * Verse bookmark ribbon — port of Android `VerseBookmarkRibbon.kt`.
  *
- * Idle: opaque playback-ink outlined tip hidden until the verse is hovered (or the ribbon is
- * keyboard-focused). Saved: the same ruby strip grown nearly the full
+ * Idle: a playback-ink outlined tip at 0.4 — always on touch / phone widths
+ * (Android), revealed by hover on a desktop pointer. Saved: the same ruby strip grown nearly the full
  * verse height. Click unfurls with a cloth wave + overshoot; unmark
  * gathers back into the tip.
  */
@@ -15,16 +15,36 @@ import {
 } from 'react'
 import { animate, type AnimationPlaybackControls } from 'motion'
 import { RETRACT, UNFURL } from '../ui/motion/easing'
+import { paperSelectHaptic } from '../ui/kit/paperHaptics'
 
-const EDGE_INSET = 9
-const RIBBON_WIDTH = 13
-const NUB_LENGTH = 16
+// Android VerseBookmarkRibbon.kt geometry (dp = px).
+const EDGE_INSET = 8
+const RIBBON_WIDTH = 11
+const NUB_LENGTH = 14
 const BOTTOM_GAP = 48
-const NOTCH = 6.5
+const NOTCH = 5.5
 const WAVE_AMP = 4.5
 const SETTLE_AMP = 3.2
 const OVERSHOOT = 0.06
-const SOLID_ALPHA = 0.94
+const SOLID_ALPHA = 0.92
+/** Quiet affordance when just the tail is showing. */
+const IDLE_NUB_ALPHA = 0.4
+/** Two physical ribbons, never one overpainted strip. */
+const RIBBON_GAP = 3
+const VERSE_PLACE_EDGE_SHIFT = 4
+/** Passive marker, quieter than the tappable ruby. */
+const PLACE_RIBBON_WIDTH_RATIO = 0.72
+/** Hold on a saved ribbon opens its note. */
+const LONG_PRESS_MS = 450
+
+/** Reader reserves green's screen-edge lane; Home keeps its original inset. */
+export function bookmarkRibbonInset(reservePlaceLane: boolean, edgeInset: number, ribbonWidth: number): number {
+  return edgeInset + (reservePlaceLane ? ribbonWidth * PLACE_RIBBON_WIDTH_RATIO + RIBBON_GAP : 0)
+}
+
+export function placeRibbonInset(reservePlaceLane: boolean, edgeInset: number): number {
+  return Math.max(0, edgeInset - (reservePlaceLane ? VERSE_PLACE_EDGE_SHIFT : 0))
+}
 const TOP_INSET = 24
 const TOP_FOLD = 3.5
 
@@ -47,6 +67,14 @@ type Props = {
   onToggle: () => boolean
   /** Replays the existing physical unfurl when this value changes above zero. */
   unfurlSignal?: number
+  /** Replays the green place cloth's unfurl when this changes above zero. */
+  placeUnfurlSignal?: number
+  /** Reader-only paired lanes: green beside ruby, not overpainted by it. */
+  reservePlaceLane?: boolean
+  /** Draw the empty tip at rest, as Android does (touch / phone). */
+  idleTipAlways?: boolean
+  /** Press and hold (saved ribbons open their note). */
+  onLongPress?: () => void
   /** Geometry overrides for the same ribbon on taller non-verse sheets. */
   edgeInset?: number
   topInset?: number
@@ -102,6 +130,10 @@ export function VerseBookmarkRibbon({
   animateOnTap = true,
   onToggle,
   unfurlSignal = 0,
+  placeUnfurlSignal = 0,
+  reservePlaceLane = false,
+  idleTipAlways = false,
+  onLongPress,
   edgeInset = EDGE_INSET,
   topInset = TOP_INSET,
   bottomGap = BOTTOM_GAP,
@@ -111,8 +143,12 @@ export function VerseBookmarkRibbon({
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLElement>(null)
-  const marked = bookmarked || placeMarked
+  // With paired lanes the ruby is the bookmark alone; green has its own cloth.
+  const marked = reservePlaceLane ? bookmarked : bookmarked || placeMarked
   const unfurl = useRef(marked ? 1 : 0)
+  const placeUnfurl = useRef(placeMarked ? 1 : 0)
+  const greenInkRef = useRef({ r: 31, g: 107, b: 74, a: 1 })
+  const longPressed = useRef(false)
   const sway = useRef(0)
   const animating = useRef(false)
   const controlsRef = useRef<AnimationPlaybackControls[]>([])
@@ -154,9 +190,10 @@ export function VerseBookmarkRibbon({
     const mirrored = side === 'right'
     const ax = (logicalX: number) => (mirrored ? cssW - logicalX : logicalX)
 
-    const outer = edgeInset
-    const inner = edgeInset + RIBBON_WIDTH
-    const center = edgeInset + RIBBON_WIDTH / 2
+    const bookmarkInset = bookmarkRibbonInset(reservePlaceLane, edgeInset, RIBBON_WIDTH)
+    const outer = bookmarkInset
+    const inner = bookmarkInset + RIBBON_WIDTH
+    const center = bookmarkInset + RIBBON_WIDTH / 2
     const retractedTipY = topInset + NUB_LENGTH
     const fullLen = Math.max(retractedTipY, h - bottomGap)
 
@@ -170,17 +207,18 @@ export function VerseBookmarkRibbon({
           )
 
     const showingRibbon = progress > 0.02 || marked
-    // Tip only while the verse is hovered (or the ribbon button is focused).
-    const revealTip = hovered || ribbonFocused
+    // Tip at rest on touch; on a desktop pointer only while hovered/focused.
+    const revealTip = idleTipAlways || hovered || ribbonFocused
     let alpha: number
     if (showingRibbon && progress > 0.5) alpha = SOLID_ALPHA
     else if (showingRibbon)
       alpha = SOLID_ALPHA * (0.55 + 0.45 * Math.min(1, progress))
     else if (!revealTip) alpha = 0
-    else alpha = 1
+    else alpha = IDLE_NUB_ALPHA
 
+    const placeProgress = reservePlaceLane && placeMarked ? Math.max(0, placeUnfurl.current) : 0
     // Nothing to paint — skip path work so idle verses stay blank.
-    if (alpha <= 0.001) return
+    if (alpha <= 0.001 && placeProgress <= 0.001) return
 
     const wavePhase = progress * Math.PI * 2.4
     const liveWave =
@@ -208,9 +246,38 @@ export function VerseBookmarkRibbon({
     const top = topInset + TOP_FOLD
     const bot = Math.max(topInset + NUB_LENGTH * 0.6, tipY)
     const span = Math.max(1, bot - top)
-    const notchDepth = Math.min(NOTCH, span * 0.42)
+    const notchDepth = Math.min(NOTCH, span * 0.45)
     const steps = Math.min(72, Math.max(8, Math.floor(span / 2.5)))
     const { r, g, b, a } = ribbonInkRef.current
+
+    // The passive green place cloth, in its own lane at the screen edge.
+    if (placeProgress > 0.001) {
+      const pInset = placeRibbonInset(reservePlaceLane, edgeInset)
+      const pWidth = RIBBON_WIDTH * PLACE_RIBBON_WIDTH_RATIO
+      const pTip = Math.min(fullLen * 1.08, retractedTipY + (fullLen - retractedTipY) * placeProgress)
+      const pBot = Math.max(topInset + NUB_LENGTH * 0.6, pTip)
+      const pSpan = Math.max(1, pBot - top)
+      const pNotch = Math.min(NOTCH, pSpan * 0.45)
+      const po = ax(pInset)
+      const pi = ax(pInset + pWidth)
+      const pc = ax(pInset + pWidth / 2)
+      ctx.beginPath()
+      ctx.moveTo(po, top)
+      ctx.quadraticCurveTo(po, top - TOP_FOLD, pc, top - TOP_FOLD)
+      ctx.quadraticCurveTo(pi, top - TOP_FOLD, pi, top)
+      ctx.lineTo(pi, pBot)
+      ctx.lineTo(pc, pBot - pNotch)
+      ctx.lineTo(po, pBot)
+      ctx.closePath()
+      const gk = greenInkRef.current
+      const wash = ctx.createLinearGradient(0, topInset, 0, Math.max(1, fullLen))
+      wash.addColorStop(0, `rgba(${gk.r},${gk.g},${gk.b},${SOLID_ALPHA})`)
+      wash.addColorStop(0.55, `rgba(${gk.r},${gk.g},${gk.b},${SOLID_ALPHA})`)
+      wash.addColorStop(1, `rgba(${gk.r},${gk.g},${gk.b},${SOLID_ALPHA * 0.82})`)
+      ctx.fillStyle = wash
+      ctx.fill()
+    }
+    if (alpha <= 0.001) return
 
     const buildBodyPath = () => {
       ctx.beginPath()
@@ -259,7 +326,7 @@ export function VerseBookmarkRibbon({
       ctx.fill()
     } else {
       const ink = playbackInkRef.current
-      ctx.strokeStyle = `rgb(${ink.r},${ink.g},${ink.b})`
+      ctx.strokeStyle = `rgba(${ink.r},${ink.g},${ink.b},${alpha})`
       ctx.lineWidth = 1.25
       ctx.lineJoin = 'round'
       ctx.lineCap = 'round'
@@ -281,7 +348,7 @@ export function VerseBookmarkRibbon({
       }
       ctx.restore()
     }
-  }, [marked, hovered, ribbonFocused, side, edgeInset, topInset, bottomGap])
+  }, [marked, hovered, ribbonFocused, side, edgeInset, topInset, bottomGap, idleTipAlways, reservePlaceLane, placeMarked])
 
   // Keep bookmark and playback-ink colors in sync with theme tokens.
   useEffect(() => {
@@ -289,9 +356,11 @@ export function VerseBookmarkRibbon({
       const raw = getComputedStyle(document.documentElement)
       const ribbonInk = raw
         .getPropertyValue(
-          placeMarked && !bookmarked ? '--green-ink' : '--bookmark',
+          placeMarked && !bookmarked && !reservePlaceLane ? '--green-ink' : '--bookmark',
         )
         .trim()
+      const green = raw.getPropertyValue('--green-ink').trim()
+      if (green) greenInkRef.current = parseRibbonColor(green)
       const inkMuted = raw.getPropertyValue('--ink-muted').trim()
       if (ribbonInk) ribbonInkRef.current = parseRibbonColor(ribbonInk)
       if (inkMuted) playbackInkRef.current = parseRibbonColor(inkMuted)
@@ -304,7 +373,7 @@ export function VerseBookmarkRibbon({
       attributeFilter: ['data-theme', 'data-colors', 'style', 'class'],
     })
     return () => obs.disconnect()
-  }, [draw, bookmarked, placeMarked])
+  }, [draw, bookmarked, placeMarked, reservePlaceLane])
 
   // External bookmark changes snap (list reload); tap path animates.
   useEffect(() => {
@@ -318,6 +387,49 @@ export function VerseBookmarkRibbon({
   useEffect(() => {
     draw()
   }, [hovered, ribbonFocused, chromeAlpha, draw])
+
+  // Green place cloth: snaps on external changes, unfurls on a real pause.
+  useEffect(() => {
+    if (!reservePlaceLane) return
+    if (!placeMarked) {
+      placeUnfurl.current = 0
+      draw()
+      return
+    }
+    if (placeUnfurlSignal <= 0) {
+      placeUnfurl.current = 1
+      draw()
+      return
+    }
+    placeUnfurl.current = 0
+    draw()
+    const h = wrapRef.current?.clientHeight ?? 120
+    const durationMs = Math.min(1400, Math.max(420, 280 + h * 0.55))
+    let settle: AnimationPlaybackControls | null = null
+    const travel = animate(0, 1 + OVERSHOOT, {
+      duration: durationMs / 1000,
+      ease: [...UNFURL] as [number, number, number, number],
+      onUpdate: (v) => {
+        placeUnfurl.current = v
+        draw()
+      },
+      onComplete: () => {
+        settle = animate(1 + OVERSHOOT, 1, {
+          type: 'spring',
+          stiffness: 180,
+          damping: 14,
+          onUpdate: (v) => {
+            placeUnfurl.current = v
+            draw()
+          },
+        })
+      },
+    })
+    return () => {
+      travel.stop()
+      settle?.stop()
+    }
+  }, [placeMarked, placeUnfurlSignal, reservePlaceLane, draw])
 
   // Resize observer — ribbon height tracks the ayah block.
   useEffect(() => {
@@ -411,15 +523,20 @@ export function VerseBookmarkRibbon({
     [draw, stopControls],
   )
 
+  // The place cloth replays its unfurl too (Android `placeUnfurlSignal`).
   useEffect(() => {
-    if (unfurlSignal <= 0 || !bookmarked) return
+    if (unfurlSignal <= 0 || !marked) return
     const frame = window.requestAnimationFrame(() => runAnimation(true))
     return () => window.cancelAnimationFrame(frame)
-  }, [bookmarked, runAnimation, unfurlSignal])
+  }, [marked, runAnimation, unfurlSignal])
 
   useEffect(() => () => stopControls(), [stopControls])
 
   const onClick = () => {
+    if (longPressed.current) {
+      longPressed.current = false
+      return
+    }
     if (!interactive || chromeAlpha < 0.1) return
     if (!animateOnTap) {
       stopControls()
@@ -453,6 +570,7 @@ export function VerseBookmarkRibbon({
       data-on={marked || unfurl.current > 0.5 ? 'true' : 'false'}
       data-focused={focused ? 'true' : 'false'}
       data-hovered={hovered || ribbonFocused ? 'true' : 'false'}
+      data-idle-tip={idleTipAlways ? 'always' : undefined}
       aria-label={
         decorative
           ? undefined
@@ -462,6 +580,36 @@ export function VerseBookmarkRibbon({
       aria-pressed={decorative ? undefined : bookmarked}
       tabIndex={decorative ? -1 : tabIndex}
       onClick={onClick}
+      onPointerDown={onLongPress ? (event) => {
+        longPressed.current = false
+        if (event.pointerType === 'mouse' && event.button !== 0) return
+        const id = event.pointerId
+        const sx = event.clientX
+        const sy = event.clientY
+        const timer = window.setTimeout(() => {
+          cleanup()
+          if (!interactive || chromeAlpha < 0.1) return
+          longPressed.current = true
+          paperSelectHaptic()
+          onLongPress()
+        }, LONG_PRESS_MS)
+        const move = (e: PointerEvent) => {
+          if (e.pointerId === id && Math.hypot(e.clientX - sx, e.clientY - sy) > 8) cleanup()
+        }
+        const end = (e: PointerEvent) => {
+          if (e.pointerId === id) cleanup()
+        }
+        function cleanup() {
+          window.clearTimeout(timer)
+          window.removeEventListener('pointermove', move, true)
+          window.removeEventListener('pointerup', end, true)
+          window.removeEventListener('pointercancel', end, true)
+        }
+        window.addEventListener('pointermove', move, true)
+        window.addEventListener('pointerup', end, true)
+        window.addEventListener('pointercancel', end, true)
+      } : undefined}
+      onContextMenu={onLongPress ? (event) => event.preventDefault() : undefined}
       onFocus={() => setRibbonFocused(true)}
       onBlur={() => setRibbonFocused(false)}
       style={style}
