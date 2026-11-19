@@ -25,6 +25,7 @@ import {
   loadBookmarks,
   loadSettings,
   normalizeSettings,
+  reciterChoice,
   saveBookmarks,
   saveSettings,
   toggleBookmark,
@@ -683,6 +684,11 @@ class AppStore {
       this.openReading(surahId, ayah)
       this.setStackLayer(layer, origin)
     }
+  }
+
+  /** Choose the voice; choosing one also keeps it among the favourites. */
+  selectReciter(id: number) {
+    this.updateSettings(reciterChoice(this.state.settings, id))
   }
 
   /** Keep a voice on Settings without changing playback. */

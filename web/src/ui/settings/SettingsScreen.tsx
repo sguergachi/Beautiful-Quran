@@ -193,7 +193,7 @@ export function SettingsScreen({
             reciters={reciters}
             selectedId={s.reciterId}
             favorites={s.favoriteReciterIds}
-            onSelect={(reciterId) => appStore.updateSettings({ reciterId })}
+            onSelect={(reciterId) => appStore.selectReciter(reciterId)}
             onToggleFavorite={(id) => appStore.toggleFavoriteReciter(id)}
             onBack={back}
           />
@@ -230,7 +230,7 @@ export function SettingsScreen({
           <ReciterChoices
             reciters={favoriteReciters}
             selectedId={s.reciterId}
-            onSelect={(reciterId) => appStore.updateSettings({ reciterId })}
+            onSelect={(reciterId) => appStore.selectReciter(reciterId)}
           />
           {favoriteReciters.length === 0 ? (
             <p className="settings-caption">No favorites yet — keep them from the full list.</p>

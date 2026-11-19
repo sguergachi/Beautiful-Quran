@@ -144,6 +144,21 @@ function cleanIds(value: unknown, fallback: number[]): number[] {
     : [...fallback]
 }
 
+/**
+ * Choose a voice. A chosen voice is always a favourite, so Settings' short
+ * list never hides the reciter that is actually playing (Android parity).
+ */
+export function reciterChoice(
+  settings: Pick<Settings, 'favoriteReciterIds'>,
+  reciterId: number,
+): Pick<Settings, 'reciterId' | 'favoriteReciterIds'> {
+  const favorites = settings.favoriteReciterIds
+  return {
+    reciterId,
+    favoriteReciterIds: favorites.includes(reciterId) ? favorites : [...favorites, reciterId],
+  }
+}
+
 export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
   // Drop the retired separate reading place: Android persists only the
   // last-heard verse, so a stored lastRead* must not survive a load.
