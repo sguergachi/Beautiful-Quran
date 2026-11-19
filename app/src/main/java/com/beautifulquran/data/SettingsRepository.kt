@@ -107,11 +107,18 @@ enum class BrushCircleStyle {
     DRY_BRUSH,
 }
 
+/** The longest pause between verses Playback offers. */
+const val MAX_VERSE_GAP_SECONDS = 5
+
 data class Settings(
     val reciterId: Int = 1,
     val favoriteReciterIds: Set<Int> = DEFAULT_FAVORITE_RECITER_IDS,
-    /** Chapters pinned atop Chapters, on the green band. */
-    val pinnedSurahIds: Set<Int> = emptySet(),
+    /** Chapters pinned atop Chapters, on the green band, in the order they were pinned. */
+    val pinnedSurahIds: List<Int> = emptyList(),
+    /** When a chapter ends, carry on to the next one down the Chapters page. */
+    val autoplayNextChapter: Boolean = false,
+    /** Silence after each verse before the next begins, in seconds; 0 is none. */
+    val verseGapSeconds: Int = 0,
     val fontScale: Float = 1f,
     val readingMode: ReadingMode = ReadingMode.ARABIC_ENGLISH,
     val readingLayout: ReadingLayout = ReadingLayout.SCROLL,
@@ -210,8 +217,12 @@ class SettingsRepository(context: Context) {
         favoriteReciterIds = decodeFavoriteReciterIds(
             prefs.getStringSet("favoriteReciterIds", null),
         ),
-        pinnedSurahIds = prefs.getStringSet("pinnedSurahIds", null)
-            .orEmpty().mapNotNull(String::toIntOrNull).toSet(),
+        pinnedSurahIds = readPinnedSurahIds(
+            prefs.getString("pinnedSurahOrder", null),
+            prefs.getStringSet("pinnedSurahIds", null),
+        ),
+        autoplayNextChapter = prefs.getBoolean("autoplayNextChapter", false),
+        verseGapSeconds = prefs.getInt("verseGapSeconds", 0).coerceIn(0, MAX_VERSE_GAP_SECONDS),
         fontScale = prefs.getFloat("fontScale", 1f),
         readingMode = prefs.enum("readingMode", ReadingMode.ARABIC_ENGLISH),
         readingLayout = prefs.enum("readingLayout", ReadingLayout.SCROLL),
@@ -353,7 +364,9 @@ class SettingsRepository(context: Context) {
                 "favoriteReciterIds",
                 next.favoriteReciterIds.map(Int::toString).toSet(),
             )
-            putStringSet("pinnedSurahIds", next.pinnedSurahIds.map(Int::toString).toSet())
+            putString("pinnedSurahOrder", next.pinnedSurahIds.joinToString(","))
+            putBoolean("autoplayNextChapter", next.autoplayNextChapter)
+            putInt("verseGapSeconds", next.verseGapSeconds)
             putFloat("fontScale", next.fontScale)
             putInt("readingMode", next.readingMode.ordinal)
             putInt("readingLayout", next.readingLayout.ordinal)
@@ -386,3 +399,14 @@ class SettingsRepository(context: Context) {
         }
     }
 }
+
+/**
+ * Pins in the order they were made. Installs from before pins had an order
+ * stored an unordered set; those come back in book order, as the band showed.
+ */
+internal fun readPinnedSurahIds(ordered: String?, legacy: Set<String>?): List<Int> =
+    if (ordered != null) {
+        ordered.split(',').mapNotNull(String::toIntOrNull).distinct()
+    } else {
+        legacy.orEmpty().mapNotNull(String::toIntOrNull).sorted()
+    }

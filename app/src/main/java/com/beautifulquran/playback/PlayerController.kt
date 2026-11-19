@@ -55,6 +55,8 @@ data class PlayerUiState(
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
     val nowPlaying: NowPlaying? = null,
+    /** The chapter whose last ayah has just played out; null while anything is loaded to play. */
+    val finishedSurahId: Int? = null,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
     /** Ayah numbers (inclusive) playback is confined to, or null. */
     val repeatRange: IntRange? = null,
@@ -307,6 +309,11 @@ class PlayerController(private val context: Context) {
                 null
             } else {
                 player.currentMediaItem?.mediaId?.let(::parseMediaId)
+            },
+            finishedSurahId = if (ended && !forcePlaying) {
+                player.currentMediaItem?.mediaId?.let(::parseMediaId)?.surahId
+            } else {
+                null
             },
             repeatMode = player.repeatMode,
             repeatRange = repeatRange,

@@ -19,6 +19,8 @@ import { ComponentKitScreen, type InkLabState } from './ComponentKitScreen'
 import { DownloadManagerScreen, useRecitationUsage } from './DownloadManagerScreen'
 import { ReadingHelp } from './ReadingHelp'
 import { ReciterChoices, RecitersScreen } from './RecitersScreen'
+import { PlaybackScreen } from './PlaybackScreen'
+import { playbackSummary } from '../../data/playbackPolicy'
 import { settingsLayerFor, type StackLayer } from '../paper/stack'
 import {
   SHIPPED_CHECK_PARAMS,
@@ -43,7 +45,7 @@ import './settings.css'
 /** Triple-tap window for developer unlock — matches Android SettingsScreen. */
 const DEVELOPER_TAP_RESET_MS = 1500
 
-type SettingsPage = 'main' | 'reciters' | 'customize' | 'downloads' | 'acknowledgements' | 'help' | 'kit'
+type SettingsPage = 'main' | 'reciters' | 'playback' | 'customize' | 'downloads' | 'acknowledgements' | 'help' | 'kit'
 
 export function SettingsScreen({
   stackLayer,
@@ -197,6 +199,13 @@ export function SettingsScreen({
             onToggleFavorite={(id) => appStore.toggleFavoriteReciter(id)}
             onBack={back}
           />
+        ) : page === 'playback' ? (
+          <PlaybackScreen
+            settings={s}
+            brushParams={brushParams}
+            paintToken={paintToken}
+            onBack={back}
+          />
         ) : page === 'customize' ? (
           <CustomizeScreen
             settings={s}
@@ -242,10 +251,11 @@ export function SettingsScreen({
           </button>
         </section>
 
-        {/* Android: Customize follows reciter selection, without another
-            heading; then Download manager and Acknowledgements, 20px apart.
+        {/* Android: Playback, then Customize, follow reciter selection without
+            another heading; then Download manager and Acknowledgements, 20px apart.
             Reading help (keyboard shortcuts) is the web's own, so it follows. */}
         <section className="settings-section settings-section-nav">
+          <NavRow label="Playback" note={playbackSummary(s.verseGapSeconds)} onClick={() => setPage('playback')} />
           <NavRow label="Customize" note={customizeSummary(s)} onClick={() => setPage('customize')} />
           <NavRow
             label="Download manager"

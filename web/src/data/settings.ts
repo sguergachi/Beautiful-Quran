@@ -16,6 +16,9 @@ export type EnglishLeafText = 'translation' | 'gloss'
 export type MushafGlyphWiden = 0 | 4 | 6 | 8
 export const MUSHAF_GLYPH_WIDENS: MushafGlyphWiden[] = [0, 4, 6, 8]
 
+/** Seconds of silence after each verse (Settings → Playback). Android parity. */
+export const VERSE_GAP_CHOICES = [0, 1, 2, 3, 5]
+export const MAX_VERSE_GAP_SECONDS = 5
 export const VERSE_NUMBER_SCRIPTS: VerseNumberScript[] = ['arabic', 'english']
 export const PAGE_NUMBER_SCRIPTS: PageNumberScript[] = ['both', 'arabic', 'english']
 export const READING_MODES: ReadingMode[] = [
@@ -68,6 +71,8 @@ export interface Settings {
   lastSurah: number
   lastAyah: number
   playbackSpeed: number
+  /** Silence after each verse before the next begins, in seconds. 0 is none. */
+  verseGapSeconds: number
   /** Reveals developer tools (e.g. the Ornaments Lab). Off by default. */
   developerMode: boolean
   /**
@@ -110,6 +115,7 @@ const DEFAULTS: Settings = {
   lastSurah: 0,
   lastAyah: 1,
   playbackSpeed: 1,
+  verseGapSeconds: 0,
   developerMode: false,
   educationGuidesEnabled: false,
   gapless5Playback: true,
@@ -135,6 +141,12 @@ function clampFontScale(value: unknown): number {
   // the dial; it is not a stop, so it lands on Android's 1.0 default.
   const n = Math.abs(raw - RETIRED_DEFAULT_FONT_SCALE) < 1e-6 ? DEFAULTS.fontScale : raw
   return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, n))
+}
+
+/** Whole seconds, 0..[MAX_VERSE_GAP_SECONDS]; anything else is no gap. */
+function clampVerseGap(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULTS.verseGapSeconds
+  return Math.min(MAX_VERSE_GAP_SECONDS, Math.max(0, Math.round(value)))
 }
 
 /** A stored id list, unique positive integers only; a broken list falls back. */
@@ -177,6 +189,7 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
     favoriteReciterIds: cleanIds(partial.favoriteReciterIds, DEFAULTS.favoriteReciterIds),
     pinnedSurahIds: cleanIds(partial.pinnedSurahIds, DEFAULTS.pinnedSurahIds),
     fontScale: clampFontScale(partial.fontScale ?? DEFAULTS.fontScale),
+    verseGapSeconds: clampVerseGap(partial.verseGapSeconds),
     pagePresentation: partial.pagePresentation === 'single' ? 'single' : 'facing',
     developerMode,
     englishLeafText: partial.englishLeafText === 'gloss' ? 'gloss' : 'translation',

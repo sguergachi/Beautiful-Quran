@@ -94,6 +94,7 @@ import com.beautifulquran.ui.home.FloatingPlaybackListClearance
 import com.beautifulquran.ui.home.HomeScreen
 import com.beautifulquran.ui.home.HomeViewModel
 import com.beautifulquran.ui.reader.BackToOriginPill
+import com.beautifulquran.playback.chapterAfter
 import com.beautifulquran.ui.reader.PinnedChapterPlayback
 import com.beautifulquran.ui.reader.PinnedPlaybackHost
 import com.beautifulquran.ui.reader.ReaderPlaybackSnapshot
@@ -125,6 +126,7 @@ import com.beautifulquran.ui.settings.AcknowledgementsPage
 import com.beautifulquran.ui.settings.CustomizeScreen
 import com.beautifulquran.ui.settings.DownloadManagerPage
 import com.beautifulquran.ui.settings.ComponentKitScreen
+import com.beautifulquran.ui.settings.PlaybackPage
 import com.beautifulquran.ui.settings.RecitersPage
 import com.beautifulquran.ui.settings.SettingsDetail
 import com.beautifulquran.ui.settings.SettingsInkPreviewState
@@ -152,6 +154,7 @@ import com.beautifulquran.ui.theme.contrastingOverlayColorScheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -958,6 +961,28 @@ private fun PaperStackApp(
         onAssistantActionConsumed()
     }
 
+    // Autoplay: a chapter that has played out hands on to the next pin in
+    // pin order, then to the book where the finished chapter sits.
+    LaunchedEffect(Unit) {
+        app.player.state.map { it.finishedSurahId }.distinctUntilChanged().filterNotNull()
+            .collect { finished ->
+                val prefs = app.settings.settings.value
+                if (!prefs.autoplayNextChapter) return@collect
+                val next = chapterAfter(
+                    finished, app.repository.surahs().map { it.id }, prefs.pinnedSurahIds,
+                ) ?: return@collect
+                readerViewModel.load(next, startPlaybackAtAyah = 1, keepContent = true)
+                if (selectedSurahId != 0) {
+                    selectedSurahId = next
+                    selectedStartAyah = 0
+                    selectedStartPlayback = false
+                    selectedStartWord = -1
+                    selectedStartWords = emptyList()
+                    selectedSearchText = null
+                }
+            }
+    }
+
     fun onWordLongPress(surahId: Int, ayah: Int, wordPosition: Int) {
         if (developerModeEnabled) {
             pendingWord = Triple(surahId, ayah, wordPosition)
@@ -1162,6 +1187,10 @@ private fun PaperStackApp(
                         settingsDetail = SettingsDetail.RECITERS
                         animateTo(settingsLayer + 1)
                     },
+                    onOpenPlayback = {
+                        settingsDetail = SettingsDetail.PLAYBACK
+                        animateTo(settingsLayer + 1)
+                    },
                     onOpenCustomize = {
                         settingsDetail = SettingsDetail.CUSTOMIZE
                         animateTo(settingsLayer + 1)
@@ -1198,6 +1227,11 @@ private fun PaperStackApp(
             ) {
                 SettingsPaper {
                     when (settingsDetail) {
+                        SettingsDetail.PLAYBACK -> PlaybackSheet(
+                            viewModel = settingsViewModel,
+                            inkPreview = settingsInkPreview,
+                            onBack = { animateTo(settingsLayer) },
+                        )
                         SettingsDetail.RECITERS -> RecitersSheet(
                             viewModel = settingsViewModel,
                             onBack = { animateTo(settingsLayer) },
@@ -1663,6 +1697,29 @@ private fun PaperStackApp(
         }
     }
 
+}
+
+@Composable
+private fun PlaybackSheet(
+    viewModel: com.beautifulquran.ui.settings.SettingsViewModel,
+    inkPreview: SettingsInkPreviewState,
+    onBack: () -> Unit,
+) {
+    val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
+    PlaybackPage(
+        settings = settings,
+        onToggleAutoplay = { on ->
+            viewModel.settings.update { it.copy(autoplayNextChapter = on) }
+        },
+        onSetVerseGap = { seconds ->
+            viewModel.settings.update { it.copy(verseGapSeconds = seconds) }
+        },
+        checkParams = inkPreview.checkParams,
+        checkPaintToken = inkPreview.checkPaintToken,
+        brushParams = inkPreview.brushParams,
+        paintToken = inkPreview.paintToken,
+        onBack = onBack,
+    )
 }
 
 @Composable

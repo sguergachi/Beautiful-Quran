@@ -11,7 +11,8 @@ export interface MediaSessionTrack {
   album: string
 }
 
-type SessionPort = Pick<MediaSession, 'metadata' | 'setActionHandler'>
+type SessionPort = Pick<MediaSession, 'metadata' | 'setActionHandler'> &
+  Partial<Pick<MediaSession, 'playbackState'>>
 type MetadataFactory = (track: MediaSessionTrack) => MediaMetadata
 
 export function browserMediaSession(): MediaSession | null {
@@ -31,6 +32,16 @@ export class MediaSessionBridge {
     session.setActionHandler('pause', actions.pause)
     session.setActionHandler('previoustrack', actions.previous)
     session.setActionHandler('nexttrack', actions.next)
+  }
+
+  /**
+   * Declare playing while the element is paused on purpose (the pause between
+   * verses), so the lock screen keeps its Pause control; null hands the state
+   * back to the browser's own reading of the media element.
+   */
+  setPlaying(playing: true | null): void {
+    if (!this.session || !('playbackState' in this.session)) return
+    this.session.playbackState = playing ? 'playing' : 'none'
   }
 
   update(track: MediaSessionTrack): void {

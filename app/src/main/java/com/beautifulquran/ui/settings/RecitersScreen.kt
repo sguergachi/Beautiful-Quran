@@ -92,7 +92,7 @@ internal fun RecitersPage(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.height(2.dp))
-                LeafIntro("Choose a voice. Star favorites for Settings.")
+                LeafIntro("Choose a voice. Star favorites to keep them in Settings.")
                 // No "All reciters" label: the title already says it.
                 Spacer(Modifier.height(24.dp))
             }

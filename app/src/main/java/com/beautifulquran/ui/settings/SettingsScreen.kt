@@ -116,7 +116,7 @@ private const val FONT_SCALE_STOPS = 8 // intervals; nine tappable stops
 private val FONT_SCALE_STEP = (FONT_SCALE_MAX - FONT_SCALE_MIN) / FONT_SCALE_STOPS
 private val PINCH_SCALE_THRESHOLD = FONT_SCALE_STEP * 0.6f
 
-internal enum class SettingsDetail { RECITERS, CUSTOMIZE, DOWNLOADS, COMPONENT_KIT, ACKNOWLEDGEMENTS }
+internal enum class SettingsDetail { PLAYBACK, RECITERS, CUSTOMIZE, DOWNLOADS, COMPONENT_KIT, ACKNOWLEDGEMENTS }
 
 /** Session-only brush lab state shared by Settings and its Customize leaf. */
 internal class SettingsInkPreviewState(initialStyle: BrushCircleStyle) {
@@ -161,6 +161,7 @@ internal fun SettingsScreen(
     inkPreview: SettingsInkPreviewState,
     onBack: () -> Unit,
     onOpenReciters: () -> Unit = {},
+    onOpenPlayback: () -> Unit = {},
     onOpenCustomize: () -> Unit = {},
     onOpenDownloads: () -> Unit = {},
     onOpenAcknowledgements: () -> Unit = {},
@@ -283,6 +284,16 @@ internal fun SettingsScreen(
             // visible air as the colophon below Acknowledgements (76 dp ink to
             // ink on screen), so the sheet has one large break, used twice.
             Spacer(Modifier.height(48.dp))
+            NavigateRow(
+                label = "Playback",
+                note = playbackSummary(
+                    autoplayNextChapter = settings.autoplayNextChapter,
+                    verseGapSeconds = settings.verseGapSeconds,
+                ),
+                onClick = { onOpenPlayback() },
+            )
+
+            Spacer(Modifier.height(20.dp))
             NavigateRow(
                 label = "Customize",
                 note = customizeSummary(settings),
@@ -624,7 +635,7 @@ private fun Colophon(
  * chevron right after the words: green text would compete with the selected
  * voice's nuqta, the one thing in this section that should hold the eye. */
 @Composable
-private fun ShowAllRecitersLink(total: Int, onClick: () -> Unit) {
+internal fun ShowAllRecitersLink(total: Int, onClick: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier

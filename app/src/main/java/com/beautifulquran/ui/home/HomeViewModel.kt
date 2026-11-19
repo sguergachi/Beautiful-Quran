@@ -217,7 +217,7 @@ class HomeViewModel(
                 surahs = filtered,
                 allSurahs = base.surahs,
                 continueTarget = continueTarget,
-                pinned = base.surahs.filter { it.id in base.pinnedOrder },
+                pinned = base.pinnedOrder.mapNotNull { id -> base.surahs.firstOrNull { it.id == id } },
                 ayahTarget = ayahTarget,
                 floatingPlayback = floating,
                 playerState = base.playerState,
@@ -291,10 +291,15 @@ class HomeViewModel(
         }
     }
 
-    /** Pins or unpins a chapter at the top of Chapters. */
+    /** Pins a chapter at the foot of the band, or unpins it. */
     fun togglePinned(surahId: Int) = settings.update {
         val ids = it.pinnedSurahIds
         it.copy(pinnedSurahIds = if (surahId in ids) ids - surahId else ids + surahId)
+    }
+
+    /** Keeps the band in the order a reader carried it to. */
+    fun setPinnedOrder(ids: List<Int>) = settings.update {
+        it.copy(pinnedSurahIds = acceptPinOrder(it.pinnedSurahIds, ids))
     }
 
     /** The pinning lesson runs behind the developer guide gate, once. */
@@ -374,7 +379,7 @@ private data class HomeCombineBase(
     val surahs: List<Surah>,
     val lastSurah: Int,
     val lastAyah: Int,
-    val pinnedOrder: Set<Int>,
+    val pinnedOrder: List<Int>,
     val reciterId: Int,
     val playerState: PlayerUiState,
     val names: Map<Int, String>,
