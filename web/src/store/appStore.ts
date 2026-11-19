@@ -528,6 +528,7 @@ class AppStore {
       })
       // Before the transport is chosen: a pause between verses keeps it off Gapless-5.
       void player.setVerseGap(this.state.settings.verseGapSeconds * 1000)
+      player.setSkipRepeatedBasmalah(this.state.settings.skipRepeatedBasmalah)
       player.setSpeed(this.state.settings.playbackSpeed)
       if (this.state.settings.gapless5Playback) {
         // Prefetch the Gapless-5 chunk at boot so the first Play can construct
@@ -673,6 +674,7 @@ class AppStore {
     this.set({ settings })
     if (patch.playbackSpeed != null) player.setSpeed(patch.playbackSpeed)
     if (patch.verseGapSeconds != null) void player.setVerseGap(settings.verseGapSeconds * 1000)
+    if (patch.skipRepeatedBasmalah != null) player.setSkipRepeatedBasmalah(settings.skipRepeatedBasmalah)
     if (patch.gapless5Playback != null) {
       void player.setGapless5Enabled(settings.gapless5Playback)
     }

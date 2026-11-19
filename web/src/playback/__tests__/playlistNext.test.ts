@@ -22,6 +22,14 @@ describe('peekPlaylistNextIndex', () => {
     ).toBe(0)
   })
 
+  it('wraps past the heard basmalah when told to', () => {
+    const withLeadIn = [0, 1, 2, 3]
+    const repeat = { repeatMode: 'surah', repeatRange: null } as const
+    expect(peekPlaylistNextIndex(withLeadIn, 3, repeat)).toBe(0)
+    expect(peekPlaylistNextIndex(withLeadIn, 3, { ...repeat, skipLeadIn: true })).toBe(1)
+    expect(peekPlaylistNextIndex(ayahs, 4, { ...repeat, skipLeadIn: true })).toBe(0)
+  })
+
   it('wraps range repeat to the first ayah', () => {
     expect(
       peekPlaylistNextIndex(ayahs, 2, {

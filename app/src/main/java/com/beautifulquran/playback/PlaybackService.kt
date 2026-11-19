@@ -133,6 +133,11 @@ class PlaybackService : MediaLibraryService() {
             }
         }
         player.addListener(BasmalahSkipListener(player))
+        player.addListener(
+            RepeatedBasmalahListener(player) {
+                (application as QuranApp).settings.settings.value.skipRepeatedBasmalah
+            },
+        )
         assistantAudioResume = AssistantAudioResume(
             player,
             getSystemService(AudioManager::class.java),
@@ -256,6 +261,39 @@ class PlaybackService : MediaLibraryService() {
             player.seekToNextMediaItem()
             player.prepare()
             player.play()
+        }
+    }
+
+    /**
+     * Repeating a whole chapter heard its basmalah once already: on reaching
+     * the last ayah, drop the lead-in from the queue so the wrap goes straight
+     * to ayah 1, gapless. The queue is rebuilt by the next [playSurah], so any
+     * other chapter (or this one, replayed) opens with it again.
+     */
+    private class RepeatedBasmalahListener(
+        private val player: Player,
+        private val enabled: () -> Boolean,
+    ) : Player.Listener {
+        private var heardInSurah: Int? = null
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = settle()
+
+        override fun onRepeatModeChanged(repeatMode: Int) = settle()
+
+        private fun settle() {
+            val now = player.currentMediaItem?.mediaId?.let(PlayerController::parseMediaId) ?: return
+            if (now.ayah == BASMALAH_PLAYLIST_AYAH) heardInSurah = now.surahId
+            val opening = player.mediaItemCount > 1 &&
+                PlayerController.parseMediaId(player.getMediaItemAt(0).mediaId)?.ayah == BASMALAH_PLAYLIST_AYAH
+            if (dropsRepeatedBasmalah(
+                    enabled = enabled(),
+                    hasLeadIn = opening,
+                    heardInSurah = heardInSurah,
+                    surahId = now.surahId,
+                    repeatsWholeChapter = player.repeatMode == Player.REPEAT_MODE_ALL,
+                    onLastItem = player.currentMediaItemIndex == player.mediaItemCount - 1,
+                )
+            ) player.removeMediaItem(0)
         }
     }
 
@@ -501,3 +539,15 @@ class PlaybackService : MediaLibraryService() {
         private const val PLAYLIST_PRELOAD_US = 5_000_000L
     }
 }
+
+/** Whether the basmalah lead-in leaves the queue now: the setting is on, this
+ * chapter's basmalah has been heard, and a whole-chapter repeat is about to
+ * wrap from the last ayah. */
+internal fun dropsRepeatedBasmalah(
+    enabled: Boolean,
+    hasLeadIn: Boolean,
+    heardInSurah: Int?,
+    surahId: Int,
+    repeatsWholeChapter: Boolean,
+    onLastItem: Boolean,
+): Boolean = enabled && hasLeadIn && heardInSurah == surahId && repeatsWholeChapter && onLastItem

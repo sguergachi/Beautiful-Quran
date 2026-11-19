@@ -2,6 +2,7 @@ import { appStore } from '../../store/appStore'
 import { VERSE_GAP_CHOICES, type Settings } from '../../data/settings'
 import { verseGapLabel } from '../../data/playbackPolicy'
 import { BackChevron } from '../kit/BackChevron'
+import { PaperSwitch } from '../kit/PaperSwitch'
 import { PaperSegmented } from '../kit/PaperSegmented'
 import type { BrushCircleParams } from '../kit/brushMark'
 
@@ -26,6 +27,17 @@ export function PlaybackScreen({
       <p className="settings-caption reciters-caption">
         How recitation carries on between verses.
       </p>
+
+      <section className="settings-section">
+        <PaperSwitch
+          label="Bismillah once when repeating"
+          checked={settings.skipRepeatedBasmalah}
+          onChange={(on) => appStore.updateSettings({ skipRepeatedBasmalah: on })}
+        />
+        <p className="settings-caption">
+          Repeating a chapter opens with it the first time only. Another chapter starts afresh.
+        </p>
+      </section>
 
       <section className="settings-section">
         <h2>Pause between verses</h2>

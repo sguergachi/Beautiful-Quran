@@ -1,3 +1,5 @@
+import { BASMALAH_PLAYLIST_AYAH } from '../domain/Basmalah'
+
 /**
  * Pure playlist advance — shared by PlayerController and unit tests.
  * Keeps verse-join / wrap behaviour free of DOM Audio.
@@ -22,6 +24,8 @@ export function peekPlaylistNextIndex(
     repeatMode: RepeatMode
     repeatRange: RepeatRange | null
     forStandby?: boolean
+    /** Surah repeat wraps past the basmalah lead-in, already heard. */
+    skipLeadIn?: boolean
   },
 ): number | null {
   if (opts.repeatMode === 'ayah' && opts.forStandby) return null
@@ -35,7 +39,9 @@ export function peekPlaylistNextIndex(
 
   const next = index + 1
   if (next >= playlistAyahs.length) {
-    if (opts.repeatMode === 'surah') return 0
+    if (opts.repeatMode === 'surah') {
+      return opts.skipLeadIn && playlistAyahs[0] === BASMALAH_PLAYLIST_AYAH && playlistAyahs.length > 1 ? 1 : 0
+    }
     return null
   }
   return next

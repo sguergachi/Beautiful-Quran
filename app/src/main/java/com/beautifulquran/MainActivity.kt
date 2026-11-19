@@ -1711,6 +1711,9 @@ private fun PlaybackSheet(
         onToggleAutoplay = { on ->
             viewModel.settings.update { it.copy(autoplayNextChapter = on) }
         },
+        onToggleSkipRepeatedBasmalah = { on ->
+            viewModel.settings.update { it.copy(skipRepeatedBasmalah = on) }
+        },
         onSetVerseGap = { seconds ->
             viewModel.settings.update { it.copy(verseGapSeconds = seconds) }
         },
