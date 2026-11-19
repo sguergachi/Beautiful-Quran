@@ -34,12 +34,26 @@ internal const val SEAM_BRIDGE_FADE_MS = 12L
  */
 internal const val SEAM_BRIDGE_MAX_FILL_MS = 80L
 
-/** Tails quieter than this (RMS, 16-bit, ~-72 dBFS) already end in silence: nothing to bridge.
- * Studio packs (AbdulBaset Mujawwad, Husary Muallim) end on ~-57 dBFS hiss, still audible. */
+/**
+ * Endings quieter than this (RMS, 16-bit, ~-72 dBFS) already end in silence:
+ * nothing to bridge. Measured over the last [SEAM_FADE_MS] only, so a file
+ * that went silent before its end is not filled with the sound before that.
+ * Studio packs (AbdulBaset Mujawwad, Husary Muallim) end on ~-57 dBFS hiss, still audible.
+ */
 internal const val SEAM_BRIDGE_MIN_RMS = 8.0
 
 /** |sample| at or below this counts as digital silence. */
 private const val SILENT_SAMPLE = 1
+
+/**
+ * A verse's unfaded ending, interleaved, in the format it was decoded in.
+ * Only a next file in that same format can use it.
+ */
+internal class SeamBridge(
+    val channelCount: Int,
+    val sampleRate: Int,
+    val samples: ShortArray,
+)
 
 /**
  * Holds the last [SEAM_FADE_MS] of PCM and releases it unchanged while the
@@ -53,8 +67,8 @@ private const val SILENT_SAMPLE = 1
  */
 internal class VerseSeamFade(
     private val channelCount: Int,
-    sampleRate: Int,
-    bridge: ShortArray? = null,
+    private val sampleRate: Int,
+    bridge: SeamBridge? = null,
 ) {
     init {
         require(channelCount > 0)
@@ -74,7 +88,10 @@ internal class VerseSeamFade(
     private var historySize = 0
 
     // Bridging into this file's opening (null once done or not wanted).
-    private var bridgeSource: ShortArray? = bridge?.takeIf { it.size >= channelCount }
+    private var bridgeSource: ShortArray? = bridge
+        ?.takeIf { it.channelCount == channelCount && it.sampleRate == sampleRate }
+        ?.samples
+        ?.takeIf { it.size >= channelCount }
     private val bridgeRiseFrames = fadeFrames
     private val bridgeFallFrames = framesFor(sampleRate, SEAM_BRIDGE_FADE_MS)
     private val bridgeMaxFill = framesFor(sampleRate, SEAM_BRIDGE_MAX_FILL_MS)
@@ -121,20 +138,21 @@ internal class VerseSeamFade(
     }
 
     /**
-     * This file's unfaded ending, interleaved, if it is loud enough that
-     * dropping straight into the next file's silence would be heard.
+     * This file's unfaded ending, if its last few milliseconds are loud
+     * enough that dropping straight into the next file's silence would be heard.
      */
-    fun bridgeSource(): ShortArray? {
+    fun bridgeSource(): SeamBridge? {
         val frames = historySize / frameBytes
         if (frames == 0) return null
         val samples = ShortArray(frames * channelCount)
+        for (i in samples.indices) samples[i] = readSample(history, i * 2).toShort()
+        val endSamples = minOf(frames, fadeFrames) * channelCount
         var sumSquares = 0.0
-        for (i in samples.indices) {
-            val s = readSample(history, i * 2)
-            samples[i] = s.toShort()
-            sumSquares += s.toDouble() * s
+        for (i in samples.size - endSamples until samples.size) {
+            sumSquares += samples[i].toDouble() * samples[i]
         }
-        return samples.takeIf { sqrt(sumSquares / samples.size) >= SEAM_BRIDGE_MIN_RMS }
+        if (sqrt(sumSquares / endSamples) < SEAM_BRIDGE_MIN_RMS) return null
+        return SeamBridge(channelCount, sampleRate, samples)
     }
 
     private fun remember(pcm: ByteArray) {

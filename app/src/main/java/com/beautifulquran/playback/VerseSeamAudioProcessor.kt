@@ -15,23 +15,28 @@ import java.nio.ByteBuffer
  * The fade for the new file is built in [onFlush], after the ended file has
  * been drained.
  *
- * A flush straight after an end of stream is the next verse of a gapless
- * playlist, so the new fade is handed the ended file's tail to bridge the
- * new file's opening digital silence (see [VerseSeamFade]). Any other flush
- * (a seek, the first file) starts without one.
+ * A gapless next verse arrives as configure (next file), end of stream
+ * (this file), flush. Only an end of stream that follows a configure keeps
+ * the ended file's tail, and the next flush hands it to the new fade to
+ * bridge the new file's opening digital silence (see [VerseSeamFade]). The
+ * end of playback drains with no configure first, so a seek after it, like
+ * any other seek or the first file, starts without one.
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class VerseSeamAudioProcessor : BaseAudioProcessor() {
 
     private var seam: VerseSeamFade? = null
 
+    /** A next file was configured since the last flush: an end of stream now is a gapless seam. */
+    private var nextFileConfigured = false
+
     /** The ended file's tail, waiting for the next file's flush. */
-    private var bridge: ShortArray? = null
-    private var ended = false
+    private var bridge: SeamBridge? = null
 
     override fun onConfigure(
         inputAudioFormat: AudioProcessor.AudioFormat,
     ): AudioProcessor.AudioFormat {
+        nextFileConfigured = true
         if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) {
             return AudioProcessor.AudioFormat.NOT_SET
         }
@@ -50,8 +55,7 @@ class VerseSeamAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun onQueueEndOfStream() {
-        bridge = seam?.bridgeSource()
-        ended = true
+        bridge = if (nextFileConfigured) seam?.bridgeSource() else null
         val tail = seam?.endOfStream() ?: return
         if (tail.isEmpty()) return
         replaceOutputBuffer(tail.size).put(tail).flip()
@@ -63,18 +67,18 @@ class VerseSeamAudioProcessor : BaseAudioProcessor() {
             VerseSeamFade(
                 format.channelCount,
                 format.sampleRate,
-                bridge = bridge.takeIf { ended },
+                bridge = bridge,
             )
         } else {
             null
         }
         bridge = null
-        ended = false
+        nextFileConfigured = false
     }
 
     override fun onReset() {
         seam = null
         bridge = null
-        ended = false
+        nextFileConfigured = false
     }
 }

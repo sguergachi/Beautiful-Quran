@@ -6,6 +6,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.abs
 
 class VerseSeamFadeTest {
 
@@ -90,6 +91,29 @@ class VerseSeamFadeTest {
     }
 
     @Test
+    fun `an ending that went silent before the file ended leaves nothing to bridge`() {
+        // Loud earlier in the window, but the last frames are already digital
+        // silence: mirroring would play silence, then that sound, then silence.
+        val ended = VerseSeamFade(channelCount = 1, sampleRate = 1_000)
+        ended.push(noise(200, 1_200) + pcm16(SEAM_BRIDGE_SOURCE_MS.toInt() / 2, 0))
+        assertNull(ended.bridgeSource())
+    }
+
+    @Test
+    fun `a bridge from another format is not used`() {
+        val ended = VerseSeamFade(channelCount = 1, sampleRate = 1_000)
+        ended.push(noise(200, 1_200))
+        val bridge = assertNotNullAndGet(ended.bridgeSource())
+        for (next in listOf(
+            VerseSeamFade(channelCount = 2, sampleRate = 1_000, bridge = bridge),
+            VerseSeamFade(channelCount = 1, sampleRate = 2_000, bridge = bridge),
+        )) {
+            val out = next.push(pcm16(100, 0, channels = 2))
+            assertTrue(out.all { it.toInt() == 0 })
+        }
+    }
+
+    @Test
     fun `a recorded pause is bridged only briefly, then left silent`() {
         val rate = 1_000
         val ended = VerseSeamFade(channelCount = 1, sampleRate = rate)
@@ -113,14 +137,14 @@ class VerseSeamFadeTest {
 
     private fun fadeFramesAt(rate: Int) = ((rate * SEAM_FADE_MS) / 1_000L).toInt()
 
-    private fun assertNotNullAndGet(bridge: ShortArray?): ShortArray {
+    private fun assertNotNullAndGet(bridge: SeamBridge?): SeamBridge {
         assertNotNull(bridge)
         return bridge!!
     }
 }
 
 /** Deterministic room-tone-like noise, never digitally silent. */
-private fun noise(frames: Int, amplitude: Int, seed: Int = 1): ByteArray {
+internal fun noise(frames: Int, amplitude: Int, seed: Int = 1): ByteArray {
     val random = java.util.Random(seed.toLong())
     val out = ByteArray(frames * 2)
     for (frame in 0 until frames) {
@@ -142,8 +166,6 @@ private fun stereo(frames: Int, left: Int, right: Int): ByteArray {
     }
     return out
 }
-
-private fun abs(value: Int) = kotlin.math.abs(value)
 
 internal fun pcm16(frames: Int, value: Int, channels: Int = 1): ByteArray {
     val out = ByteArray(frames * channels * 2)
