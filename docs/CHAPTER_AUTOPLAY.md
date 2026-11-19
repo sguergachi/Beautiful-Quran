@@ -98,3 +98,28 @@ files, their clocks and the word timings are untouched.
   paused and the screen may be off.
 - No gap after the basmalah lead-in, in the Timings/Tarji labs (silence
   skipping off), or after a chapter's last verse unless Play-on carries on.
+
+### Web
+
+The web app has the same setting (Settings → Playback; `verseGapSeconds` in
+`web/src/data/settings.ts`), and only that row: it has no Play-on.
+
+How (`web/src/playback/player.ts`, `verseGap.ts`): at a verse's audible end,
+or at its clip's natural `ended` when the end was never measured, the
+controller pauses the element and starts what follows after the gap. Play
+intent stays on, so the Pause control and the ink hold through the silence, and
+Media Session `playbackState` is declared `playing` for the lock screen.
+
+- The finished verse stays current during the silence, and the next verse
+  becomes current when it starts.
+- Any gap above zero keeps playback on the media-element path. Gapless-5 walks
+  into the next clip by itself and has no join left to protect.
+- On ayah repeat, the element's native `loop` is turned off, so each pass ends
+  and takes the gap.
+- Pause in the gap stays paused, and Play goes on to the next verse. A seek in
+  the finished verse plays on from there. Next, previous or a new chapter end
+  the gap.
+- No gap after the basmalah, or after the last verse unless a repeat carries
+  on.
+- iOS Safari may suspend a backgrounded page while its audio is paused, so a
+  gap held with the screen locked can wait until the page is opened again.

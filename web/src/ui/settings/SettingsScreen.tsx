@@ -17,6 +17,8 @@ import { CustomizeScreen } from './CustomizeScreen'
 import { AcknowledgementsScreen } from './AcknowledgementsScreen'
 import { ReadingHelp } from './ReadingHelp'
 import { ReciterChoices, RecitersScreen } from './RecitersScreen'
+import { PlaybackScreen } from './PlaybackScreen'
+import { playbackSummary } from '../../data/playbackPolicy'
 import { NuqtaLab } from './NuqtaLab'
 import { settingsLayerFor, type StackLayer } from '../paper/stack'
 import {
@@ -77,7 +79,7 @@ export function SettingsScreen({
   const [laid, setLaid] = useState(false)
   if (isTop && !laid) setLaid(true)
   const depth = Math.max(0, stackLayer - layer)
-  const [page, setPage] = useState<'main' | 'reciters' | 'customize' | 'acknowledgements' | 'help'>('main')
+  const [page, setPage] = useState<'main' | 'reciters' | 'playback' | 'customize' | 'acknowledgements' | 'help'>('main')
   const scrollRef = useRef<HTMLDivElement>(null)
   const favoriteReciters = reciters.filter((reciter) => s.favoriteReciterIds.includes(reciter.id))
 
@@ -372,6 +374,13 @@ export function SettingsScreen({
             onToggleFavorite={(id) => appStore.toggleFavoriteReciter(id)}
             onBack={() => setPage('main')}
           />
+        ) : page === 'playback' ? (
+          <PlaybackScreen
+            settings={s}
+            brushParams={brushParams}
+            paintToken={paintToken}
+            onBack={() => setPage('main')}
+          />
         ) : page === 'customize' ? (
           <CustomizeScreen
             settings={s}
@@ -413,7 +422,17 @@ export function SettingsScreen({
           </button>
         </section>
 
-        {/* Android: Customize follows reciter selection, without another heading. */}
+        {/* Android: Playback, then Customize, follow reciter selection without another heading. */}
+        <section className="settings-section">
+          <button type="button" className="settings-nav" onClick={() => setPage('playback')}>
+            <span className="settings-nav-copy">
+              <span className="settings-nav-label">Playback</span>
+              <span className="settings-nav-note">{playbackSummary(s.verseGapSeconds)}</span>
+            </span>
+            <DisclosureChevron expanded={false} />
+          </button>
+        </section>
+
         <section className="settings-section">
           <button
             type="button"

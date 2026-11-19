@@ -4183,7 +4183,8 @@ button.ayah-mark {
   color: var(--ink-rung-quiet);
 }
 
-.settings .reciters h1 {
+.settings .reciters h1,
+.settings .playback-settings h1 {
   margin-bottom: 2px;
 }
 

@@ -17,6 +17,10 @@ export type ColorSystem = 'ladder' | 'legacy'
 export type MushafGlyphWiden = 0 | 4 | 6 | 8
 export const MUSHAF_GLYPH_WIDENS: MushafGlyphWiden[] = [0, 4, 6, 8]
 
+/** Seconds of silence after each verse (Settings → Playback). Android parity. */
+export const VERSE_GAP_CHOICES = [0, 1, 2, 3, 5]
+export const MAX_VERSE_GAP_SECONDS = 5
+
 export const HOME_BOOKMARK_STYLES: HomeBookmarkStyle[] = [
   'top_bound',
   'saved_passages',
@@ -66,6 +70,8 @@ export interface Settings {
   lastSurah: number
   lastAyah: number
   playbackSpeed: number
+  /** Silence after each verse before the next begins, in seconds. 0 is none. */
+  verseGapSeconds: number
   /** Reveals developer tools (e.g. the Ornaments Lab). Off by default. */
   developerMode: boolean
   /** Developer A/B: the ink ladder, or the palette that preceded it. */
@@ -109,6 +115,7 @@ const DEFAULTS: Settings = {
   lastSurah: 0,
   lastAyah: 1,
   playbackSpeed: 1,
+  verseGapSeconds: 0,
   developerMode: false,
   colorSystem: 'ladder',
   educationGuidesEnabled: true,
@@ -132,6 +139,12 @@ function clampFontScale(value: unknown): number {
   return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, n))
 }
 
+/** Whole seconds, 0..[MAX_VERSE_GAP_SECONDS]; anything else is no gap. */
+function clampVerseGap(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULTS.verseGapSeconds
+  return Math.min(MAX_VERSE_GAP_SECONDS, Math.max(0, Math.round(value)))
+}
+
 /** A stored id list, unique positive integers only; a broken list falls back. */
 function cleanIds(value: unknown, fallback: number[]): number[] {
   return Array.isArray(value)
@@ -151,6 +164,7 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
     favoriteReciterIds: cleanIds(partial.favoriteReciterIds, DEFAULTS.favoriteReciterIds),
     pinnedSurahIds: cleanIds(partial.pinnedSurahIds, DEFAULTS.pinnedSurahIds),
     fontScale: clampFontScale(partial.fontScale ?? DEFAULTS.fontScale),
+    verseGapSeconds: clampVerseGap(partial.verseGapSeconds),
     pagePresentation: partial.pagePresentation === 'single' ? 'single' : 'facing',
     developerMode: Boolean(partial.developerMode ?? DEFAULTS.developerMode),
     colorSystem: partial.colorSystem === 'legacy' ? 'legacy' : 'ladder',

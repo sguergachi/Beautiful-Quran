@@ -39,6 +39,7 @@ import { MediaSessionBridge, browserMediaSession } from './mediaSessionBridge'
 import { wantsGapless5Transport } from './gaplessPolicy'
 import { buildPlaylist, type PlaylistItem } from './playlistPlan'
 import { PLAYBACK_MESSAGES, describePlaybackError } from './playbackErrors'
+import { verseGapFollows } from './verseGap'
 
 export { wantsGapless5Transport } from './gaplessPolicy'
 
@@ -142,6 +143,15 @@ export class PlayerController {
   private gapless5: Gapless5Backend | null = null
   /** Serializes transport swaps when speed is cycled quickly. */
   private transportChain: Promise<void> = Promise.resolve()
+  /** Silence after each verse (Settings → Playback), in milliseconds. */
+  private verseGapMs = 0
+  /**
+   * The silence after a verse, while it holds. Play intent stays on and the
+   * finished verse stays current; [timer] then carries on into what follows.
+   * A pause in the silence clears [timer] but keeps the hold, so Play goes
+   * straight on to the next verse rather than replaying the tail of this one.
+   */
+  private verseGap: { timer: number | null } | null = null
 
   constructor(
     prefetcher: AudioPrefetcher = new AudioPrefetcher(),
@@ -216,7 +226,9 @@ export class PlayerController {
   }
 
   private onMediaPause() {
-    if (this.recoveringStall || this.gaplessAdvancing) return
+    // The element pauses itself for the verse gap (and at a clip's natural
+    // end just before it); play intent holds through the silence.
+    if (this.recoveringStall || this.gaplessAdvancing || this.verseGap) return
     if (this.pauseSuppressRemaining > 0) {
       this.pauseSuppressRemaining--
       return
@@ -321,7 +333,11 @@ export class PlayerController {
 
   private async applyGapless5TransportLocked(): Promise<void> {
     // Re-evaluate after waiting in the queue — a later setSpeed may have run.
-    const enabled = wantsGapless5Transport(this.gapless5Preferred, this.state.speed)
+    const enabled = wantsGapless5Transport(
+      this.gapless5Preferred,
+      this.state.speed,
+      this.verseGapMs,
+    )
     if (this.gapless5Enabled === enabled) return
 
     const resume = {
@@ -636,9 +652,13 @@ export class PlayerController {
    * rather than sitting in silence until natural `ended`.
    */
   private maybeAdvanceAtAudibleEnd() {
-    if (this.gapless5Enabled || this.gaplessAdvancing || !this.state.isPlaying) return
+    if (this.gapless5Enabled || this.gaplessAdvancing || this.verseGap || !this.state.isPlaying) return
     const current = this.playlist[this.index]
     if (!this.joins.crossedAudibleEnd(current)) return
+    if (this.verseGapApplies()) {
+      this.holdVerseGap()
+      return
+    }
 
     const next = this.peekNextIndex({ forStandby: false })
     if (next == null) return
@@ -692,7 +712,7 @@ export class PlayerController {
     if (this.gapless5Enabled) return
     if (this.gaplessTimer != null) window.clearTimeout(this.gaplessTimer)
     this.gaplessTimer = null
-    if (!this.state.isPlaying || this.gaplessAdvancing) return
+    if (!this.state.isPlaying || this.gaplessAdvancing || this.verseGap) return
     const item = this.playlist[this.index]
     const bounds = this.joins.boundsFor(item)
     const duration = this.active.duration
@@ -800,6 +820,10 @@ export class PlayerController {
    */
   async seekToWordAndPlay(ayah: number, positionMs: number) {
     if (!this.content || !this.reciter) return
+    // A word of the finished verse, tapped in its silence, is played from
+    // there: the gap is over, and the element must be started again.
+    const fromGap = this.verseGap != null
+    this.endVerseGap()
     const range = this.state.repeatRange
     const keepRange =
       this.state.repeatMode === 'range' &&
@@ -830,7 +854,7 @@ export class PlayerController {
 
     if (this.index !== idx || np.ayah !== ayah) {
       await this.playIndex(idx, true)
-    } else if (!this.state.isPlaying) {
+    } else if (!this.state.isPlaying || fromGap) {
       await this.play()
       if (!this.state.isPlaying) return
     }
@@ -842,6 +866,12 @@ export class PlayerController {
     autoplay = true,
     opts: { quiet?: boolean; fadeIn?: boolean } = {},
   ) {
+    // Any move (the gap's own continuation included) ends the silence. The
+    // element is already paused, so a load that does not play says so here.
+    if (this.verseGap) {
+      this.endVerseGap()
+      if (!autoplay) this.patch({ isPlaying: false })
+    }
     if (i < 0 || i >= this.playlist.length) {
       this.setBuffering(false)
       this.patch({ isPlaying: false })
@@ -870,7 +900,7 @@ export class PlayerController {
       // Intent before await play() so chrome recess does not wait on the
       // media element (and so a mid-await pause still sees isPlaying).
       this.publishNowPlaying({ playing: true })
-      this.active.loop = this.state.repeatMode === 'ayah'
+      this.active.loop = this.nativeAyahLoop()
       // Prefer transport helper so defaultPlaybackRate stays in sync.
       this.transport.setSpeed(this.state.speed)
       this.updateMediaSession()
@@ -951,7 +981,7 @@ export class PlayerController {
     if (autoplay) this.beginPauseSuppress()
     this.transport.loadActive({
       src,
-      loop: this.state.repeatMode === 'ayah',
+      loop: this.nativeAyahLoop(),
       playbackRate: this.state.speed,
       volume: opts.fadeIn ? 0 : 1,
     })
@@ -1156,6 +1186,11 @@ export class PlayerController {
     // Bump playToken so any in-flight playIndex / waitForCanPlay aborts without
     // restarting audio after the user already paused.
     this.playToken++
+    // Paused in the silence: stay paused there, and go on from it on Play.
+    if (this.verseGap) {
+      this.clearVerseGapTimer()
+      this.mediaSession.setPlaying(null)
+    }
     // User intent to stop wins — never let a pending swap suppress this pause.
     this.pauseSuppressRemaining = 0
     this.recoveringStall = false
@@ -1175,6 +1210,13 @@ export class PlayerController {
 
   async play() {
     if (!this.playlist.length) return
+    if (this.verseGap) {
+      // Play in the silence goes on at once to what follows the verse.
+      this.endVerseGap()
+      this.patch({ isPlaying: true, error: null })
+      await this.continueAfterVerse()
+      return
+    }
     this.joins.cancelFades()
     // Recede chrome / flip the transport on the tap, before canplay.
     this.patch({ isPlaying: true, error: null })
@@ -1237,6 +1279,7 @@ export class PlayerController {
   }
 
   async next() {
+    this.endVerseGap()
     // Media-session / UI next always advances (ayah-repeat only loops on ended).
     const next = this.peekNextIndex({ forStandby: false })
     if (next == null) {
@@ -1320,9 +1363,16 @@ export class PlayerController {
       this.onTime()
       return
     }
+    // A seek within the finished verse during its silence plays on from there.
+    const resumeFromGap = this.verseGap != null && this.state.isPlaying
+    this.endVerseGap()
     this.programmedSeek = { targetMs: Math.max(0, ms), atMs: performance.now() }
     this.active.currentTime = Math.max(0, ms / 1000)
     this.onTime()
+    if (resumeFromGap) {
+      void this.play()
+      return
+    }
     this.scheduleGaplessBoundary()
   }
 
@@ -1371,13 +1421,14 @@ export class PlayerController {
   setRepeatMode(mode: PlayerState['repeatMode'], range: PlayerState['repeatRange'] = null) {
     this.repeatSelectionGeneration++
     this.patch({ repeatMode: mode, repeatRange: range })
-    this.active.loop = mode === 'ayah'
+    this.active.loop = this.nativeAyahLoop()
     this.gapless5?.applyRepeat(mode)
     // Standby target may change when entering/leaving range or surah repeat.
     void this.prepareStandby()
   }
 
   stop() {
+    this.endVerseGap()
     this.playToken++
     this.pauseSuppressRemaining = 0
     this.recoveringStall = false
@@ -1405,6 +1456,11 @@ export class PlayerController {
 
   /** Shared advance used by natural `ended` and the gapless safety net. */
   private async advanceAfterClip() {
+    if (this.verseGap) return
+    if (this.verseGapApplies()) {
+      this.holdVerseGap()
+      return
+    }
     if (this.state.repeatMode === 'ayah') {
       // Prefer native loop; this is a fallback if loop was unset.
       this.active.currentTime = 0
@@ -1425,6 +1481,78 @@ export class PlayerController {
       this.setBuffering(true)
     }
     // Full volume — sequential join fades created an audible hole between ayahs.
+    await this.playIndex(next, true, { fadeIn: false })
+  }
+
+  /**
+   * Seconds of silence after each verse. Ending the setting mid-silence goes
+   * on at once, before the transport may change (Gapless-5 holds no gap).
+   */
+  async setVerseGap(ms: number): Promise<void> {
+    this.verseGapMs = Math.max(0, ms)
+    this.active.loop = this.nativeAyahLoop()
+    if (this.verseGapMs <= 0 && this.verseGap) {
+      const playing = this.verseGap.timer != null
+      this.endVerseGap()
+      if (playing) await this.continueAfterVerse()
+    }
+    // A repeat clip must end (not loop natively) to take its silence.
+    void this.prepareStandby()
+    await this.applyGapless5Transport()
+  }
+
+  /** Ayah repeat loops in the element itself, unless each pass takes a gap. */
+  private nativeAyahLoop(): boolean {
+    return this.state.repeatMode === 'ayah' && this.verseGapMs <= 0
+  }
+
+  private verseGapApplies(): boolean {
+    if (this.verseGapMs <= 0) return false
+    const continues = this.state.repeatMode === 'ayah' || this.peekNextIndex() != null
+    return verseGapFollows(this.playlist[this.index]?.ayah, continues)
+  }
+
+  /** Silence the finished verse and carry on after [verseGapMs]. */
+  private holdVerseGap() {
+    this.endVerseGap()
+    this.stopTick()
+    this.joins.cancelFades()
+    this.verseGap = { timer: null }
+    if (!this.active.paused) this.active.pause()
+    this.setBuffering(false)
+    // Re-assert: a clip's natural end pauses the element just before `ended`.
+    this.patch({ isPlaying: true, error: null })
+    this.mediaSession.setPlaying(true)
+    this.verseGap.timer = window.setTimeout(() => {
+      if (!this.verseGap) return
+      this.endVerseGap()
+      void this.continueAfterVerse()
+    }, this.verseGapMs)
+  }
+
+  private clearVerseGapTimer() {
+    if (this.verseGap?.timer != null) window.clearTimeout(this.verseGap.timer)
+    if (this.verseGap) this.verseGap.timer = null
+  }
+
+  private endVerseGap() {
+    if (!this.verseGap) return
+    this.clearVerseGapTimer()
+    this.verseGap = null
+    this.mediaSession.setPlaying(null)
+  }
+
+  /** After the silence: the verse again on repeat, else what follows it. */
+  private async continueAfterVerse() {
+    if (this.state.repeatMode === 'ayah') {
+      await this.playIndex(this.index, true, { fadeIn: false })
+      return
+    }
+    const next = this.peekNextIndex()
+    if (next == null) {
+      this.patch({ isPlaying: false })
+      return
+    }
     await this.playIndex(next, true, { fadeIn: false })
   }
 
