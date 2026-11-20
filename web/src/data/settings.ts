@@ -73,6 +73,8 @@ export interface Settings {
   playbackSpeed: number
   /** Silence after each verse before the next begins, in seconds. 0 is none. */
   verseGapSeconds: number
+  /** Repeating a whole chapter opens with the basmalah only the first time round. */
+  skipRepeatedBasmalah: boolean
   /** Reveals developer tools (e.g. the Ornaments Lab). Off by default. */
   developerMode: boolean
   /**
@@ -116,6 +118,7 @@ const DEFAULTS: Settings = {
   lastAyah: 1,
   playbackSpeed: 1,
   verseGapSeconds: 0,
+  skipRepeatedBasmalah: true,
   developerMode: false,
   educationGuidesEnabled: false,
   gapless5Playback: true,
@@ -190,6 +193,7 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
     pinnedSurahIds: cleanIds(partial.pinnedSurahIds, DEFAULTS.pinnedSurahIds),
     fontScale: clampFontScale(partial.fontScale ?? DEFAULTS.fontScale),
     verseGapSeconds: clampVerseGap(partial.verseGapSeconds),
+    skipRepeatedBasmalah: partial.skipRepeatedBasmalah !== false,
     pagePresentation: partial.pagePresentation === 'single' ? 'single' : 'facing',
     developerMode,
     englishLeafText: partial.englishLeafText === 'gloss' ? 'gloss' : 'translation',

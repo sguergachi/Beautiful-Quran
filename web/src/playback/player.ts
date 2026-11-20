@@ -145,6 +145,9 @@ export class PlayerController {
   private transportChain: Promise<void> = Promise.resolve()
   /** Silence after each verse (Settings → Playback), in milliseconds. */
   private verseGapMs = 0
+  /** Setting: a repeating chapter drops its basmalah once it has been heard. */
+  private skipRepeatedBasmalah = true
+  private basmalahHeard = false
   /**
    * The silence after a verse, while it holds. Play intent stays on and the
    * finished verse stays current; [timer] then carries on into what follows.
@@ -473,6 +476,7 @@ export class PlayerController {
     this.index = index
     const item = this.playlist[index]
     if (!item) return
+    if (item.ayah === BASMALAH_PLAYLIST_AYAH) this.basmalahHeard = true
     this.patch({
       nowPlaying: {
         surahId: this.surahId,
@@ -766,6 +770,7 @@ export class PlayerController {
         repeatMode: this.state.repeatMode,
         repeatRange: this.state.repeatRange,
         forStandby: opts.forStandby,
+        skipLeadIn: this.skipRepeatedBasmalah && this.basmalahHeard,
       },
     )
   }
@@ -790,6 +795,7 @@ export class PlayerController {
     this.surahId = content.surah.id
     this.playlist = buildPlaylist(content, reciter, startAyah)
     this.index = 0
+    this.basmalahHeard = false
     this.joins.clearStandby()
     this.gapless5?.clear()
     this.prefetcher.resumeWarm()
@@ -1488,6 +1494,10 @@ export class PlayerController {
    * Seconds of silence after each verse. Ending the setting mid-silence goes
    * on at once, before the transport may change (Gapless-5 holds no gap).
    */
+  setSkipRepeatedBasmalah(on: boolean) {
+    this.skipRepeatedBasmalah = on
+  }
+
   async setVerseGap(ms: number): Promise<void> {
     this.verseGapMs = Math.max(0, ms)
     this.active.loop = this.nativeAyahLoop()

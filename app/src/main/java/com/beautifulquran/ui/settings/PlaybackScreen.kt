@@ -47,6 +47,7 @@ internal fun playbackSummary(autoplayNextChapter: Boolean, verseGapSeconds: Int 
 internal fun PlaybackPage(
     settings: Settings,
     onToggleAutoplay: (Boolean) -> Unit,
+    onToggleSkipRepeatedBasmalah: (Boolean) -> Unit,
     onSetVerseGap: (Int) -> Unit,
     checkParams: BrushCheckParams,
     checkPaintToken: Int,
@@ -94,6 +95,16 @@ internal fun PlaybackPage(
                 checkPaintToken = checkPaintToken,
             )
             Caption("Pins play in your order, then the book carries on.")
+
+            Spacer(Modifier.height(36.dp))
+            ToggleRow(
+                label = "Bismillah once when repeating",
+                checked = settings.skipRepeatedBasmalah,
+                onChange = onToggleSkipRepeatedBasmalah,
+                checkParams = checkParams,
+                checkPaintToken = checkPaintToken,
+            )
+            Caption("Repeating a chapter opens with it the first time only. Another chapter starts afresh.")
 
             Spacer(Modifier.height(36.dp))
             SectionLabel("Pause between verses")
