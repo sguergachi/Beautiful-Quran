@@ -672,6 +672,38 @@ fun HomeScreen(
         viewModel.dismissPinTip()
         pinTipOpen = false
     }
+    // One set of pinned ids and one pin handler for every place a chapter
+    // can be held: the rows and the Continue pill pin the same way.
+    val pinnedIds = remember(uiState.pinned) { uiState.pinned.mapTo(HashSet()) { it.id } }
+    // Pinning a chapter from the top of the sheet would grow the group above
+    // the viewport, out of sight (the list holds its place by key). Bring the
+    // group down into view instead; a reader deep in the list keeps their place.
+    var revealPinned by remember { mutableStateOf(false) }
+    LaunchedEffect(uiState.pinned.size) {
+        if (revealPinned) {
+            revealPinned = false
+            listState.animateScrollToItem(0)
+        }
+    }
+    // The chapter just pinned or unpinned travels to its new seat above the
+    // others, still wet, and dries off over the glide. Held here, not in the
+    // row: the row restarts in its new seat.
+    val reflowScope = rememberCoroutineScope()
+    var movedChapter by remember { mutableStateOf<Int?>(null) }
+    val movedWet = remember { Animatable(0f) }
+    val wetInk = MaterialTheme.colorScheme.primary.copy(alpha = WetInkAlpha)
+    fun toggleChapterPinned(id: Int) {
+        // The lesson completes on a real pin, not on the hold.
+        if (pinTipOpen && id !in pinnedIds) closePinTip()
+        revealPinned = id !in pinnedIds && !listState.canScrollBackward
+        movedChapter = id
+        reflowScope.launch {
+            movedWet.snapTo(1f)
+            movedWet.animateTo(0f, tween(HoldDryMs, easing = LinearOutSlowInEasing))
+            movedChapter = null
+        }
+        viewModel.togglePinned(id)
+    }
     // Layout facts read through derivedStateOf: the place row's bounds move
     // on every scroll frame and must not recompose the sheet (PERFORMANCE.md).
     val placeRowMeasured by remember { derivedStateOf { pinListBounds != null } }
@@ -828,28 +860,9 @@ fun HomeScreen(
                 // same row; only the place ribbon follows [placeKey]. One set
                 // decides both the band and the list below it, so neither can
                 // keep a copy of the other's chapter.
-                val pinnedIds = uiState.pinned.mapTo(HashSet()) { it.id }
-                // Pinning a chapter from the top of the sheet would grow the
-                // group above the viewport, out of sight (the list holds its
-                // place by key). Bring the group down into view instead; a
-                // reader deep in the list keeps their place.
-                var revealPinned by remember { mutableStateOf(false) }
-                LaunchedEffect(uiState.pinned.size) {
-                    if (revealPinned) {
-                        revealPinned = false
-                        listState.animateScrollToItem(0)
-                    }
-                }
                 // The band is the head of the chapter list, not a second list;
                 // see [chapterRows].
                 val bandCount = if (showPinned) uiState.pinned.size else 0
-                // The chapter just pinned or unpinned travels to its new seat
-                // above the others, still wet, and dries off over the glide.
-                // Held here, not in the row: the row restarts in its new seat.
-                val reflowScope = rememberCoroutineScope()
-                var movedChapter by remember { mutableStateOf<Int?>(null) }
-                val movedWet = remember { Animatable(0f) }
-                val wetInk = MaterialTheme.colorScheme.primary.copy(alpha = WetInkAlpha)
                 val sheetPaper = MaterialTheme.colorScheme.background
                 // Holding a pinned row lifts it; carried, the band reorders
                 // around it as a draft and the order is kept when it lets go.
@@ -981,18 +994,7 @@ fun HomeScreen(
                         // One place marker: only the row owning the place
                         // carries the green cloth (the pinned copy, when pinned).
                         currentAyah = uiState.continueTarget?.ayah?.takeIf { key == placeKey },
-                        onTogglePinned = {
-                            // The lesson completes on a real pin, not on the hold.
-                            if (pinTipOpen && surah.id !in pinnedIds) closePinTip()
-                            revealPinned = surah.id !in pinnedIds && !listState.canScrollBackward
-                            movedChapter = surah.id
-                            reflowScope.launch {
-                                movedWet.snapTo(1f)
-                                movedWet.animateTo(0f, tween(HoldDryMs, easing = LinearOutSlowInEasing))
-                                movedChapter = null
-                            }
-                            viewModel.togglePinned(surah.id)
-                        },
+                        onTogglePinned = { toggleChapterPinned(surah.id) },
                         placeUnfurlSignal = placeRibbonUnfurlEpoch,
                         onPlaceUnfurlConsumed = { consumed ->
                             placeRibbonUnfurlEpoch = remainingUnfurlSignal(
@@ -1318,6 +1320,11 @@ fun HomeScreen(
                                     focusManager.clearFocus()
                                     onOpenSurah(target.surah.id, target.ayah, null, null)
                                 },
+                                pinned = target.surah.id in pinnedIds,
+                                // The pill is no row to carry the wet ink to a
+                                // new seat, so it dries the ink itself.
+                                wet = { if (movedChapter == target.surah.id) movedWet.value else 0f },
+                                onHeld = { toggleChapterPinned(target.surah.id) },
                             )
                         }
                     }
@@ -1673,9 +1680,15 @@ private fun ContinuePill(
     onClick: () -> Unit,
     /** Dock flight progress: 0 resting, 1 settled exactly onto the chapter row. */
     docked: Float = 0f,
+    pinned: Boolean = false,
+    /** Holding the pill pins its chapter, or unpins it; null leaves it a tap (the dock ghost). */
+    onHeld: (() -> Unit)? = null,
+    /** Wet ink left on the pill after a hold, 1 → 0 as it dries; read at draw time. */
+    wet: () -> Float = { 0f },
 ) {
     val colors = MaterialTheme.colorScheme
     val settled = docked.coerceIn(0f, 1f)
+    val wetInkColor = colors.primary.copy(alpha = WetInkAlpha)
     val vertical = ContinuePillVertical + (ContinueRowVertical - ContinuePillVertical) * settled
     val shape = RoundedCornerShape(continueDockRadius(settled))
     Row(
@@ -1686,7 +1699,18 @@ private fun ContinuePill(
             // Clip the cloth to the wash so the ribbon's straight-cut ends
             // can never poke past the curve.
             .clip(shape)
-            .quietClickable(onClick = onClick)
+            .holdToPin(
+                pinned = pinned,
+                holdable = onHeld != null,
+                label = target.surah.nameTransliteration,
+                wetInk = wetInkColor,
+                onTap = onClick,
+                onHeld = { onHeld?.invoke() },
+            )
+            .drawBehind {
+                val ink = wet()
+                if (ink > 0f) drawRect(wetInkColor.copy(alpha = wetInkColor.alpha * ink))
+            }
             .padding(
                 start = continueDockStartInset(settled),
                 end = continueDockEndInset(settled),
