@@ -1318,6 +1318,11 @@ fun HomeScreen(
                                     focusManager.clearFocus()
                                     onOpenSurah(target.surah.id, target.ayah, null, null)
                                 },
+                                pinned = target.surah.id in uiState.pinned.map { it.id },
+                                onHeld = {
+                                    if (pinTipOpen) closePinTip()
+                                    viewModel.togglePinned(target.surah.id)
+                                },
                             )
                         }
                     }
@@ -1673,6 +1678,9 @@ private fun ContinuePill(
     onClick: () -> Unit,
     /** Dock flight progress: 0 resting, 1 settled exactly onto the chapter row. */
     docked: Float = 0f,
+    pinned: Boolean = false,
+    /** Holding the pill pins its chapter, or unpins it; null leaves it a tap (the dock ghost). */
+    onHeld: (() -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val settled = docked.coerceIn(0f, 1f)
@@ -1686,7 +1694,14 @@ private fun ContinuePill(
             // Clip the cloth to the wash so the ribbon's straight-cut ends
             // can never poke past the curve.
             .clip(shape)
-            .quietClickable(onClick = onClick)
+            .holdToPin(
+                pinned = pinned,
+                holdable = onHeld != null,
+                label = target.surah.nameTransliteration,
+                wetInk = colors.primary.copy(alpha = WetInkAlpha),
+                onTap = onClick,
+                onHeld = { onHeld?.invoke() },
+            )
             .padding(
                 start = continueDockStartInset(settled),
                 end = continueDockEndInset(settled),

@@ -62,6 +62,9 @@ moving between screens.
 
 - **Hold a row** to pin it (or unpin it, on the band), as ever: the row fills
   with wet ink and holding it full is the confirmation.
+- **Hold the Continue pill** to pin (or unpin) the chapter it names, without
+  scrolling to its row. Same gesture and ink; a tap still continues listening.
+  Android only for now.
 - **Reorder from the band's head.** The grips stick out, so they stay put
   away: the PINNED flag carries an icon-only button (up and down arrows,
   on the quiet ink rung secondary buttons use) at its right end, shown
