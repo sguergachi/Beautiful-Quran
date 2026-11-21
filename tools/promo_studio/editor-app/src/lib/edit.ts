@@ -23,6 +23,18 @@ export function findKey(raw: RawSpec, ref: KeyRef): Key | undefined {
 export function keyIndexNear(raw: RawSpec, c: Ctx, name: string, t: number): number {
   return (raw.tracks?.[name] || []).findIndex((k: Key) => Math.abs(k.t - t) < half(c));
 }
+/** How far from the playhead a key still counts as "the key here": the playhead's
+ *  key button lights for it, and dragging or setting a value edits it rather than
+ *  adding a second key a few frames away (which would play as a jump). */
+export const KEY_REACH = 0.1;
+/** The key on this track nearest t: one within half a frame, else the closest within KEY_REACH. */
+export function keyIndexReach(raw: RawSpec, c: Ctx, name: string, t: number): number {
+  const i = keyIndexNear(raw, c, name, t);
+  if (i >= 0) return i;
+  let best = -1, gap = KEY_REACH + 1e-9;
+  (raw.tracks?.[name] || []).forEach((k: Key, j: number) => { const d = Math.abs(k.t - t); if (d <= gap) { gap = d; best = j; } });
+  return best;
+}
 /** Every key, on any property, that sits at time t (within half a frame). */
 export function keysAt(raw: RawSpec, c: Ctx, t: number): KeyRef[] {
   const out: KeyRef[] = [];
@@ -46,12 +58,13 @@ function dropEmpty(raw: RawSpec, name: string, lastValue: number) {
   }
 }
 
-// Set a property at time t: a key there once it is animated, else its static value.
+// Set a property at time t: once it is animated, the key there (within KEY_REACH)
+// or a new one, else its static value.
 export function setProp(raw: RawSpec, c: Ctx, name: string, v: number, t: number) {
   const p = c.props[name];
   v = r3(clamp(v, p.min, p.max));
   if (animated(raw, name)) {
-    const keys = track(raw, name), i = keyIndexNear(raw, c, name, t);
+    const keys = track(raw, name), i = keyIndexReach(raw, c, name, t);
     if (i >= 0) keys[i].v = v;
     else { keys.push({ t: r3(t), v }); keys.sort((a, b) => a.t - b.t); }
   } else {

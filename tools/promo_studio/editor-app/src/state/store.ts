@@ -532,7 +532,7 @@ export function selectAll() {
 }
 /** The keys at the playhead, on every property. */
 /** How far either side of the playhead its key button reaches: a key just off the playhead still counts. */
-export const PLAYHEAD_REACH = 0.1;
+export const PLAYHEAD_REACH = E.KEY_REACH;
 /** The keys, on every property, within reach of the span a..b (a single time when b is left out). */
 export function keysNear(a: number, b = a): E.KeyRef[] {
   const raw = get().raw;
