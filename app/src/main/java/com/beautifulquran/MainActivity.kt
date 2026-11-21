@@ -164,7 +164,7 @@ import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.LocalQuranInk
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import com.beautifulquran.ui.theme.contrastingOverlayInk
-import com.beautifulquran.ui.theme.enableWideGamutIfFree
+import com.beautifulquran.ui.theme.applyWideGamutIfFree
 import com.beautifulquran.ui.theme.contrastingOverlayAccents
 import com.beautifulquran.ui.theme.oneSpace
 
@@ -181,6 +181,19 @@ class MainActivity : ComponentActivity() {
     /** Assistant / deep-link / Routine actions waiting for the paper stack. */
     private val pendingAssistantAction = MutableStateFlow<AssistantAction?>(null)
     private var foregroundAppFunctions: ForegroundAppFunctions? = null
+
+    /**
+     * Whether this window draws the Display P3 accents (ui/theme/WideGamut.kt).
+     * State, not a launch-time constant: it is asked again on every
+     * configuration change, so a window that lands on an sRGB display falls
+     * back to the sRGB accents instead of drawing P3 ones clipped.
+     */
+    private var wideGamut by mutableStateOf(false)
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        wideGamut = applyWideGamutIfFree(this)
+    }
 
     override fun onStart() {
         super.onStart()
@@ -213,7 +226,7 @@ class MainActivity : ComponentActivity() {
         FrameLog.attach(window)
         // Display P3 accents on a panel that composes P3 at 8 bits (free);
         // sRGB everywhere else. See ui/theme/WideGamut.kt.
-        val wideGamut = enableWideGamutIfFree(this)
+        wideGamut = applyWideGamutIfFree(this)
         // The entrance cover is always dark. The sheet theme sets its own icon
         // appearance once Compose has its persisted settings.
         WindowCompat.getInsetsController(window, window.decorView).apply {

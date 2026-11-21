@@ -917,7 +917,9 @@ or Nightfall under Royal Green, with Royal Green's accents either way, as
 
 **Wide colour.** On a panel that composes Display P3 at 8 bits — where wide
 colour costs no memory or bandwidth (`ui/theme/WideGamut.kt`) — the window
-runs in wide-gamut mode and the accents that are only ever drawn take a
+runs in wide-gamut mode (confirmed by `Window.isWideColorGamut`, re-checked on
+every configuration change; any sRGB panel, F16-preferring panel or failed
+request gets the exact sRGB accents) and the accents that are only ever drawn take a
 purer pigment: the rubies (Paper P3(0.668, 0.089, 0.180), Nightfall
 P3(0.965, 0.399, 0.436), Royal Green P3(0.966, 0.446, 0.472)) and Paper's
 deep gilt `goldDeep` P3(0.471, 0.358, 0.030). Everywhere else they keep their

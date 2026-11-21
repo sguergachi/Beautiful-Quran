@@ -650,7 +650,7 @@ fun BeautifulQuranTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     typeface: com.beautifulquran.data.BookTypeface = com.beautifulquran.data.BookTypeface.JUNICODE,
     scrollArabicFace: com.beautifulquran.data.ScrollArabicFace = com.beautifulquran.data.ScrollArabicFace.HAFS,
-    /** True only on a window [enableWideGamutIfFree] put in wide-colour mode. */
+    /** True only on a window [applyWideGamutIfFree] confirmed in wide-colour mode. */
     wideGamut: Boolean = false,
     content: @Composable () -> Unit,
 ) {
