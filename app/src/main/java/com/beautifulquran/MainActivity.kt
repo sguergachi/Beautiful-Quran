@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
@@ -109,6 +110,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalLocaleList
 import androidx.compose.ui.text.TextMeasurer
 import com.beautifulquran.ui.reader.MushafBelowLeaf
 import com.beautifulquran.ui.reader.LocalMushafBannerStyle
@@ -197,12 +199,14 @@ class MainActivity : ComponentActivity() {
         // deep-link launch has both drawn its sheets and warmed the Quran DB.
         var splashPending = true
         installSplashScreen().setKeepOnScreenCondition { splashPending }
-        enableEdgeToEdge()
-        // 3-button navigation: without this Android lays a grey contrast scrim
-        // over the bar. Drop it so the bar is transparent and the theme's
-        // paper (colorScheme.background) shows straight through.
-        window.isNavigationBarContrastEnforced = false
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        // 3-button navigation: the default (auto) style lets Android lay a grey
+        // contrast scrim over the bar. A fixed-dark style with a transparent
+        // scrim turns contrast enforcement off, so the theme's paper
+        // (colorScheme.background) shows straight through. Icons start light
+        // for the dark entrance cover; the sheet theme sets them afterwards.
+        enableEdgeToEdge(
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
         // Frame timings for the log export: the launch window, and any recording.
         FrameLog.attach(window)
@@ -489,8 +493,9 @@ private fun PaperStackApp(
     val leafDensity = LocalDensity.current
     val leafResolver = LocalFontFamilyResolver.current
     val leafLayoutDirection = LocalLayoutDirection.current
-    val leafMeasurer = remember(leafResolver, leafDensity, leafLayoutDirection) {
-        TextMeasurer(leafResolver, leafDensity, leafLayoutDirection)
+    val leafLocales = LocalLocaleList.current
+    val leafMeasurer = remember(leafResolver, leafLocales, leafDensity, leafLayoutDirection) {
+        TextMeasurer(leafResolver, leafLocales, leafDensity, leafLayoutDirection)
     }
     val windowSize = LocalWindowInfo.current.containerSize
     // The paper the system bars take out of the window. The reader's body pads

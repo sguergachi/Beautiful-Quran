@@ -838,8 +838,7 @@ fun HomeScreen(
                         Spacer(Modifier.height(SearchBottomBreath))
                     }
                     PaperSearchField(
-                        value = uiState.query,
-                        onValueChange = viewModel::onQueryChange,
+                        state = viewModel.queryField,
                         placeholder = "Concept, “exact phrase”, or 2:255",
                         contentDescription = "Search",
                         onFocusChanged = { focused ->
@@ -2124,7 +2123,7 @@ private fun Modifier.holdToPin(
                     val opens = up != null &&
                         (!canHold || holdOutcome(up.uptimeMillis - down.uptimeMillis, pace) == HoldOutcome.Tap)
                     if (opens) {
-                        up!!.consume()
+                        up.consume()
                         tap()
                     }
                 }

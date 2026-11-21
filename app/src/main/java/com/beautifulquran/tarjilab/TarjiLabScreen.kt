@@ -31,6 +31,10 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.maxLengthTrim
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -55,9 +59,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import com.beautifulquran.ui.theme.rememberMirroredRangeSliderState
+import com.beautifulquran.ui.theme.rememberMirroredSliderState
 import androidx.compose.material3.RangeSlider
-import androidx.compose.material3.RangeSliderState
-import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -246,7 +250,8 @@ fun TarjiLabScreen(
                         onReset = viewModel::resetKnobs,
                         onMatch = viewModel::matchPulse,
                         onExport = { viewModel.prepareSampleExport()?.let { exportLauncher.launch(it) } },
-                        onNotes = viewModel::updateSampleNotes,
+                        notes = viewModel.sampleNotesField,
+                        notesLimit = viewModel.sampleNotesLimit,
                         onFinished = viewModel::finishKnobEdit,
                         onImport = {
                             importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
@@ -798,7 +803,8 @@ private fun KnobsPanel(
     onMatch: () -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
-    onNotes: (String) -> Unit,
+    notes: TextFieldState,
+    notesLimit: Int,
     onFinished: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -883,13 +889,13 @@ private fun KnobsPanel(
                 WordAction("Import sample", onImport, QuranTheme.ink.secondary)
             }
             BasicTextField(
-                value = ui.sampleNotes,
-                onValueChange = onNotes,
+                state = notes,
+                inputTransformation = InputTransformation.maxLengthTrim(notesLimit),
                 textStyle = MaterialTheme.typography.bodySmall.copy(color = QuranTheme.ink.secondary),
-                maxLines = 2,
-                decorationBox = { field ->
+                lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 2),
+                decorator = { field ->
                     Box(Modifier.padding(vertical = 12.dp)) {
-                        if (ui.sampleNotes.isEmpty()) Text("Sample note (optional)",
+                        if (notes.text.isEmpty()) Text("Sample note (optional)",
                             style = MaterialTheme.typography.bodySmall, color = QuranTheme.ink.quiet)
                         field()
                     }
@@ -925,11 +931,7 @@ private fun PulseSpeedControl(
                 color = ink.secondary)
             LabIconAction(Icons.Rounded.AutoFixHigh, "Match this section", onMatch, enabled = canMatch)
         }
-        // Material3 1.5 dropped the value-based overloads' custom thumb/track slots; the state
-        // overload takes them, so the caller's range stays the source of truth via this mirror.
-        val sliderState = remember { RangeSliderState(low, high, 84, 1.5f..10f) }
-        if (sliderState.startValue != low) sliderState.startValue = low
-        if (sliderState.endValue != high) sliderState.endValue = high
+        val sliderState = rememberMirroredRangeSliderState(low, high, 1.5f..10f, steps = 84)
         RangeSlider(
             state = sliderState, onValueChange = onChange, onValueChangeFinished = onFinished,
             enabled = enabled,
@@ -990,10 +992,7 @@ private fun LabSlider(
             LabIconAction(Icons.Rounded.Remove, "Decrease $label", {
                 onChange((value - step).coerceIn(range)); onFinished()
             }, enabled = enabled && value > range.start)
-            // State overload: Material3 1.5 removed thumb/track from the value-based Slider.
-            val sliderState = remember(range) { SliderState(value.coerceIn(range), 0, range) }
-            val shown = value.coerceIn(range)
-            if (sliderState.value != shown) sliderState.value = shown
+            val sliderState = rememberMirroredSliderState(value, range)
             Slider(
                 state = sliderState,
                 onValueChange = onChange,

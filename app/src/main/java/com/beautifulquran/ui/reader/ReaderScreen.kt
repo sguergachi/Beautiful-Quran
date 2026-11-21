@@ -46,7 +46,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Tune
@@ -112,6 +115,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.LocalLocaleList
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -366,10 +370,11 @@ fun ReaderScreen(
     val rulerDensity = LocalDensity.current
     val rulerResolver = LocalFontFamilyResolver.current
     val rulerLayoutDirection = LocalLayoutDirection.current
+    val rulerLocales = LocalLocaleList.current
     // Its own measurer: the ruler lays out a thousand leaves off the main
     // thread and must not share a cache with the one the leaves are drawn from.
-    val rulerMeasurer = remember(rulerResolver, rulerDensity, rulerLayoutDirection) {
-        TextMeasurer(rulerResolver, rulerDensity, rulerLayoutDirection)
+    val rulerMeasurer = remember(rulerResolver, rulerLocales, rulerDensity, rulerLayoutDirection) {
+        TextMeasurer(rulerResolver, rulerLocales, rulerDensity, rulerLayoutDirection)
     }
     val rulerWindow = LocalWindowInfo.current.containerSize
     val leafMetrics = mushafLeafMetrics.value
@@ -1811,18 +1816,17 @@ fun ReaderScreen(
                 title = {
                     if (search.active) {
                         BasicTextField(
-                            value = search.query,
-                            onValueChange = { search.query = it },
-                            singleLine = true,
+                            state = search.queryField,
+                            lineLimits = TextFieldLineLimits.SingleLine,
                             textStyle = MaterialTheme.typography.bodyLarge.copy(
                                 color = MaterialTheme.colorScheme.onSurface,
                             ),
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                            decorationBox = { inner ->
+                            onKeyboardAction = { keyboard?.hide() },
+                            decorator = { inner ->
                                 Box(contentAlignment = Alignment.CenterStart) {
-                                    if (search.query.isEmpty()) {
+                                    if (search.queryField.text.isEmpty()) {
                                         Text(
                                             text = "Find an English word…",
                                             style = MaterialTheme.typography.bodyLarge,
@@ -3893,11 +3897,12 @@ private const val ChromeRecedeMs = InkEngine.CHROME_RECEDE_MS
  */
 private class SurahSearchState(
     activeState: MutableState<Boolean>,
-    queryState: MutableState<String>,
+    /** The search field's own text state; typing edits it in place. */
+    val queryField: TextFieldState,
     indexState: MutableState<Int>,
 ) {
     var active by activeState
-    var query by queryState
+    val query: String get() = queryField.text.toString()
     var index by indexState
 
     /** Non-null while a usable query is live (search open, ≥ 2 chars). */
@@ -3906,7 +3911,7 @@ private class SurahSearchState(
 
     fun close() {
         active = false
-        query = ""
+        queryField.clearText()
         index = 0
     }
 }
@@ -3914,7 +3919,7 @@ private class SurahSearchState(
 @Composable
 private fun rememberSurahSearchState(): SurahSearchState {
     val active = rememberSaveable { mutableStateOf(false) }
-    val query = rememberSaveable { mutableStateOf("") }
+    val query = rememberTextFieldState()
     val index = rememberSaveable { mutableIntStateOf(0) }
     return remember { SurahSearchState(active, query, index) }
 }

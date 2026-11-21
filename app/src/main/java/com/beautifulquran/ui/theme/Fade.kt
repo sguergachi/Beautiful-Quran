@@ -1188,6 +1188,7 @@ private class WordInkCache {
         if (input.placeholders.any { it.start < endExclusive && it.end > start }) return null
         val textMeasurer = measurer ?: TextMeasurer(
             defaultFontFamilyResolver = input.fontFamilyResolver,
+            defaultLocaleList = input.defaultLocaleList,
             defaultDensity = input.density,
             defaultLayoutDirection = input.layoutDirection,
             cacheSize = 0,
@@ -1384,6 +1385,7 @@ private class RaisedMarkTraceCache {
         if (fontPx <= 0f) return null
         val textMeasurer = measurer ?: TextMeasurer(
             defaultFontFamilyResolver = input.fontFamilyResolver,
+            defaultLocaleList = input.defaultLocaleList,
             defaultDensity = input.density,
             defaultLayoutDirection = input.layoutDirection,
             cacheSize = 0,

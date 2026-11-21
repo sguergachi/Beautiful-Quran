@@ -41,7 +41,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.placeCursorAtEnd
+import kotlinx.coroutines.flow.drop
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -71,7 +73,6 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -845,7 +846,7 @@ internal fun rememberWaslProgress(
         derivedStateOf {
             entryConnection?.at(
                 if (provisional || entryWindow == null) 0f else timeline.frame()?.takeIf { entryWindow.matches(it) }
-                    ?.let { entryWindow!!.progress(it) } ?: 0f,
+                    ?.let { entryWindow.progress(it) } ?: 0f,
                 entryPrefixStart, entryCompletion,
             ) ?: 0f
         }
@@ -2954,11 +2955,17 @@ internal fun VerseAnnotationField(
     val noteStyle = verseAnnotationStyle(fontScale = fontScale)
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    // Own the field as TextFieldValue so the caret opens at the end of any
-    // existing note. A plain String value lands the caret at 0, which forces
-    // the reader to arrow through text they already wrote.
-    var fieldValue by remember(isEditing) {
-        mutableStateOf(TextFieldValue(text, selection = TextRange(text.length)))
+    // Own the field's state so the caret opens at the end of any existing
+    // note; landing it at 0 forces the reader to arrow through text they
+    // already wrote.
+    val fieldState = remember(isEditing) {
+        TextFieldState(text, initialSelection = TextRange(text.length))
+    }
+    val latestOnAnnotationChange by rememberUpdatedState(onAnnotationChange)
+    LaunchedEffect(fieldState) {
+        snapshotFlow { fieldState.text.toString() }
+            .drop(1)
+            .collect { latestOnAnnotationChange?.invoke(it) }
     }
     // `onFocusChanged` delivers an initial callback the moment the field
     // attaches, with isFocused = false — *before* the LaunchedEffect below can
@@ -3083,11 +3090,7 @@ internal fun VerseAnnotationField(
         Spacer(Modifier.width(ANNOTATION_RULE_GAP))
         if (isEditing) {
             BasicTextField(
-                value = fieldValue,
-                onValueChange = {
-                    fieldValue = it
-                    onAnnotationChange?.invoke(it.text)
-                },
+                state = fieldState,
                 textStyle = noteStyle.copy(color = noteInk.copy(alpha = VERSE_ANNOTATION_INK_ALPHA)),
                 cursorBrush = SolidColor(markInk),
                 // Notes wrap freely, but the keyboard's Done key is the reader's
@@ -3096,7 +3099,7 @@ internal fun VerseAnnotationField(
                     capitalization = KeyboardCapitalization.Sentences,
                     imeAction = ImeAction.Done,
                 ),
-                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                onKeyboardAction = { focusManager.clearFocus() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester)
@@ -3105,17 +3108,20 @@ internal fun VerseAnnotationField(
                             everFocused = true
                             // Re-assert end caret on focus: the IME can reset
                             // selection when it attaches after requestFocus().
-                            val end = fieldValue.text.length
-                            if (fieldValue.selection != TextRange(end)) {
-                                fieldValue = fieldValue.copy(selection = TextRange(end))
+                            if (fieldState.selection != TextRange(fieldState.text.length)) {
+                                fieldState.edit { placeCursorAtEnd() }
                             }
                         } else if (everFocused) {
+                            // Edits reach the draft asynchronously; hand over the
+                            // final text before committing so a Done pressed
+                            // right after the last keystroke cannot lose it.
+                            onAnnotationChange?.invoke(fieldState.text.toString())
                             onEditDone()
                         }
                     },
-                decorationBox = { field ->
+                decorator = { field ->
                     Box {
-                        if (fieldValue.text.isEmpty()) {
+                        if (fieldState.text.isEmpty()) {
                             Text(
                                 "Write a note…",
                                 style = noteStyle,
