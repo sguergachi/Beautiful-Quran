@@ -28,7 +28,7 @@ class ReaderBenchmark {
         packageName = PackageName,
         metrics = listOf(FrameTimingMetric()),
         compilationMode = CompilationMode.Partial(),
-        iterations = 5,
+        iterations = iterations(5),
         setupBlock = {
             requireOfflineRecitationFixture()
             launchPastCover()
@@ -50,7 +50,7 @@ class ReaderBenchmark {
         packageName = PackageName,
         metrics = listOf(FrameTimingMetric()),
         compilationMode = CompilationMode.Partial(),
-        iterations = 5,
+        iterations = iterations(5),
         setupBlock = {
             launchPastCover()
             device.chooseReaderSettings("Mushaf")
@@ -72,7 +72,7 @@ class ReaderBenchmark {
         packageName = PackageName,
         metrics = listOf(FrameTimingMetric()),
         compilationMode = CompilationMode.Partial(),
-        iterations = 5,
+        iterations = iterations(5),
         setupBlock = {
             launchPastCover()
             device.chooseReaderSettings("Mushaf")
@@ -92,7 +92,7 @@ class ReaderBenchmark {
         packageName = PackageName,
         metrics = listOf(FrameTimingMetric()),
         compilationMode = CompilationMode.Partial(),
-        iterations = 5,
+        iterations = iterations(5),
         setupBlock = {
             launchPastCover()
             device.chooseReaderSettings("Scroll")
@@ -106,9 +106,8 @@ class ReaderBenchmark {
             device.waitForIdle()
         },
     ) {
-        val field = checkNotNull(device.findObject(By.desc("Search")))
         val started = SystemClock.elapsedRealtime()
-        field.text = "peace"
+        device.setSearchText("peace")
         device.waitForSearchResults()
         logBenchmark(
             "coldSearch query-to-first-results ${SystemClock.elapsedRealtime() - started}ms " +

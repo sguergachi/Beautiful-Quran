@@ -30,6 +30,7 @@ class BaselineProfileGenerator {
     @Test
     fun startup() = rule.collect(
         packageName = PackageName,
+        maxIterations = iterations(DefaultMaxIterations),
         includeInStartupProfile = true,
     ) {
         device.pressHome()
@@ -40,6 +41,7 @@ class BaselineProfileGenerator {
     @Test
     fun readerAndPaperNavigation() = rule.collect(
         packageName = PackageName,
+        maxIterations = iterations(DefaultMaxIterations),
         includeInStartupProfile = false,
     ) {
         requireOfflineRecitationFixture()
@@ -72,7 +74,35 @@ class BaselineProfileGenerator {
 
         device.pressBack()
         device.waitForChapters()
-        device.findObject(By.desc("Open settings")).click()
-        device.waitForSettings()
+        device.openSettings()
+    }
+
+    /**
+     * Home search: the word index, ranking, and the results' first layout. A
+     * cold query is where the word search builds its index, so it belongs in
+     * the general profile; it needs no recitation fixture.
+     */
+    @Test
+    fun homeSearch() = rule.collect(
+        packageName = PackageName,
+        maxIterations = iterations(DefaultMaxIterations),
+        includeInStartupProfile = false,
+    ) {
+        launchPastCover()
+        device.search("peace")
+        device.waitForSearchResults()
+        val results = device.searchResultsList()
+        results.fling(Direction.DOWN)
+        results.fling(Direction.UP)
+        // A second, warm query: ranking again over the index the first one built.
+        device.setSearchText("")
+        device.waitForSearchResultsGone()
+        device.setSearchText("mercy")
+        device.waitForSearchResults()
+    }
+
+    private companion object {
+        /** [BaselineProfileRule.collect]'s own default. */
+        const val DefaultMaxIterations = 15
     }
 }
