@@ -595,6 +595,18 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   Arabic instead of hundreds of private-use glyphs.
 - Chrome (`MushafReadingSheet`) keys the gilt seed on `settledPage`, not
   `currentPage`, so a fling does not regenerate ornaments mid-turn.
+- The dial HUD's warning ink (the 300 ms pre-pop pulse and the ripening band)
+  is a `ColorProducer` read at draw (`MushafDialHudInk`). Read in
+  composition, the pulse recomposed the whole label every frame. The trough
+  head's folio span still needs its colour in composition, so that one line
+  reads it in a scope of its own. A docked label is measured against the slot
+  whenever it already fits the 16 px-quantised clamp
+  (`mushafDialHudMeasureWidth`), so each clamp step along the wall no longer
+  throws away all four lines' paragraphs. A label the clamp actually cuts
+  still follows the clamp. In the distant-dial benchmark (emulator, two
+  iterations), UI frames over 8.3 ms fell 4.8% → 1.4% and UI p90 fell
+  5.5 → 3.2 ms. The landing frame is still dominated by the new leaf's glyph
+  uploads (see Future headroom).
 
 The 2026-10-08 emulator comparison used release APKs, AOT compilation, a
 settled page 5, and twelve rightward swipes to page 17 with 600 ms pauses.
