@@ -33,10 +33,9 @@ import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.LayerOutsets
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -191,28 +190,19 @@ fun androidx.compose.ui.graphics.GraphicsLayerScope.cachedAlpha(value: Float) {
  * only when the content itself changes, and each frame just draws a texture.
  *
  * The layer reaches [bleed] past the content on every side without changing
- * layout, so glyphs overhanging their box, which the fades' own layers keep,
- * are not clipped. While [still] is false the content draws directly as
- * before; read in the draw phase only, so switching never recomposes.
+ * layout ([LayerOutsets]), so glyphs overhanging their box, which the fades'
+ * own layers keep, are not clipped by the offscreen buffer. While [still] is
+ * false the content draws directly as before; read in the draw phase only, so
+ * switching never recomposes.
+ *
+ * Before Compose 1.12 the layer was widened by wrapping it in two opposing
+ * layout modifiers; outsets do the same with one node, no extra measure/place
+ * passes, on every word tile that rests faded.
  */
-fun Modifier.cachedWhileStill(bleed: Dp = FadeLayerBleed, still: () -> Boolean): Modifier = this
-    .layout { measurable, constraints ->
-        val room = bleed.roundToPx() * 2
-        val placeable = measurable.measure(constraints.offset(room, room))
-        layout(placeable.width - room, placeable.height - room) {
-            placeable.place(-room / 2, -room / 2)
-        }
-    }
-    .graphicsLayer {
+fun Modifier.cachedWhileStill(bleed: Dp = FadeLayerBleed, still: () -> Boolean): Modifier =
+    graphicsLayer {
+        outsets = LayerOutsets(bleed)
         compositingStrategy = if (still()) CompositingStrategy.Offscreen else CompositingStrategy.Auto
-    }
-    // Undoes the first layout, so the content's own layout size is unchanged.
-    .layout { measurable, constraints ->
-        val room = bleed.roundToPx() * 2
-        val placeable = measurable.measure(constraints.offset(-room, -room))
-        layout(placeable.width + room, placeable.height + room) {
-            placeable.place(room / 2, room / 2)
-        }
     }
 
 /**
