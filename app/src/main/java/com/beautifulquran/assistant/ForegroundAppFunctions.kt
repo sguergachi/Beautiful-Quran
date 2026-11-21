@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalAppFunctionsApi::class)
+
 package com.beautifulquran.assistant
 
 import android.app.appfunctions.AppFunction
@@ -10,6 +12,7 @@ import android.app.appsearch.GenericDocument
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.appfunctions.AppFunctionSignature
+import androidx.appfunctions.ExperimentalAppFunctionsApi
 import androidx.appfunctions.metadata.AppFunctionMetadata
 import androidx.lifecycle.lifecycleScope
 import com.beautifulquran.MainActivity
