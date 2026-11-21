@@ -97,6 +97,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
@@ -317,7 +318,10 @@ fun HomeScreen(
     val searchPaneBottomGap = 10.dp
     val searchPaneTopGapPx = with(density) { searchPaneTopGap.toPx() }
     val searchPaneBottomGapPx = with(density) { searchPaneBottomGap.toPx() }
-    val searchPaneHeight = with(density) {
+    // Read where the pane is measured, not here: the field's and the box's
+    // window bounds move with the sheet on every frame of a page turn, and
+    // read in composition they recomposed the whole of Chapters each time.
+    val searchPaneHeight: Density.() -> Dp = {
         val paneTop = searchBottom - boxTop + searchPaneTopGapPx
         val paneBottom = boxHeight - imeBottom - searchPaneBottomGapPx
         (paneBottom - paneTop).coerceAtLeast(0f).toDp()
@@ -776,7 +780,12 @@ fun HomeScreen(
                     end = padding.calculateEndPadding(layoutDirection),
                 )
                 .fillMaxSize()
-                .pointerInput(searchFocused, searchPaneVisible, searchBounds, searchPaneBounds) {
+                // Keyed on the two gates only. The bounds are read inside the
+                // gesture, which always sees their latest value: as keys they
+                // were read here in composition, and a page turn moves them on
+                // every frame — Chapters and every visible row recomposed for
+                // each frame of every turn.
+                .pointerInput(searchFocused, searchPaneVisible) {
                     // Empty-query dials only: an outside tap dismisses without
                     // activating the list under the pane. Once a query is up,
                     // result rows must receive the gesture (they clear focus
@@ -1264,7 +1273,15 @@ fun HomeScreen(
                         IntOffset(0, (searchBottom - boxTop + searchPaneTopGapPx).roundToInt())
                     }
                     .padding(start = HomeStartInset, end = HomeEndInset)
-                    .height(searchPaneHeight)
+                    // As .height(searchPaneHeight) did, measured in layout.
+                    .layout { measurable, constraints ->
+                        val height = searchPaneHeight().roundToPx()
+                            .coerceIn(constraints.minHeight, constraints.maxHeight)
+                        val placeable = measurable.measure(
+                            constraints.copy(minHeight = height, maxHeight = height),
+                        )
+                        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                    }
                     .onGloballyPositioned { searchPaneBounds = it.boundsInRoot() },
             )
 

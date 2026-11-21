@@ -142,6 +142,7 @@ import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.reader.focus.rememberReaderFocusController
 import com.beautifulquran.ui.share.ShareRibbon
 import com.beautifulquran.ui.theme.QuietButton
+import com.beautifulquran.ui.theme.cachedAlpha
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
@@ -166,6 +167,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -542,7 +544,13 @@ fun ReaderScreen(
     var bookmarkNoteTipRibbonCenterY by remember { mutableFloatStateOf(Float.NaN) }
     var ayahRailTipOpen by rememberSaveable { mutableStateOf(false) }
     var ayahRailTipRendered by remember { mutableStateOf(false) }
+    // The rail's centre in root coordinates. A page turn scales and slides
+    // this sheet, so the rail reports a new centre on every frame of a turn:
+    // composition reads only whether there is one (and the value itself only
+    // while the lesson is up), or the whole reader recomposed per frame of
+    // every turn and its cached sheet layer re-rendered with it.
     var ayahRailTipCenterY by remember { mutableFloatStateOf(Float.NaN) }
+    val ayahRailTipHasTarget by remember { derivedStateOf { ayahRailTipCenterY.isFinite() } }
     /**
      * Commits the open draft and closes the editor. Called when the field loses
      * focus, *before* opening another verse's note (so a draft is never carried
@@ -631,7 +639,7 @@ fun ReaderScreen(
     var retainedRepeatChoice by rememberSaveable { mutableStateOf<RepeatChoice?>(null) }
     val bookmarkNoteTipVisible = bookmarkNoteTipOpen &&
         bookmarkNoteTipSurah != 0 && bookmarkNoteTipAyah != 0
-    val ayahRailTipVisible = ayahRailTipOpen && ayahRailTipCenterY.isFinite()
+    val ayahRailTipVisible = ayahRailTipOpen && ayahRailTipHasTarget
     // Guide **Got it** rests near the playback fold; mute transport while open
     // so an overlapping thumb cannot fire Repeat / Play instead of dismiss.
     val contextualGuideOpen = bookmarkNoteTipOpen || ayahRailTipOpen
@@ -1471,21 +1479,24 @@ fun ReaderScreen(
 
     // Offer the rail lesson only as a chapter settles. Enabling the developer
     // gate over an already-open reader waits for the next chapter opening.
+    // Still restarted by every move of the rail — the lesson waits for it to
+    // sit still — but the centre is followed here, not as a composition key.
     LaunchedEffect(
         uiState.content?.surah?.id,
         initialFocusSettled,
-        ayahRailTipCenterY,
         chapterAdvancing,
         verseRevealForSurah,
     ) {
-        if (!initialFocusSettled || !ayahRailTipCenterY.isFinite() ||
-            chapterAdvancing || verseRevealForSurah != 0 || recitingActive
-        ) {
-            return@LaunchedEffect
-        }
-        delay(320)
-        if (viewModel.shouldShowAyahRailTip() && !bookmarkNoteTipOpen) {
-            ayahRailTipOpen = true
+        snapshotFlow { ayahRailTipCenterY }.collectLatest { centerY ->
+            if (!initialFocusSettled || !centerY.isFinite() ||
+                chapterAdvancing || verseRevealForSurah != 0 || recitingActive
+            ) {
+                return@collectLatest
+            }
+            delay(320)
+            if (viewModel.shouldShowAyahRailTip() && !bookmarkNoteTipOpen) {
+                ayahRailTipOpen = true
+            }
         }
     }
 
@@ -1699,7 +1710,7 @@ fun ReaderScreen(
     val bookmarkGuidePresent = (bookmarkNoteTipVisible || bookmarkNoteTipRendered) &&
         bookmarkTipHasTarget
     val railGuidePresent = (ayahRailTipVisible || ayahRailTipRendered) &&
-        ayahRailTipCenterY.isFinite()
+        ayahRailTipHasTarget
     val contextualGuideVisible =
         (bookmarkNoteTipVisible && bookmarkTipHasTarget) || ayahRailTipVisible
     val contextualGuideRendered = bookmarkGuidePresent || railGuidePresent
@@ -2624,7 +2635,11 @@ fun ReaderScreen(
                 .padding(bottom = padding.calculateBottomPadding())
                 .fillMaxSize()
                 .clipToBounds()
-                .graphicsLayer { alpha = readerContentAlpha.value }
+                // Cached while it fades in: as plain alpha the whole page was
+                // a fresh offscreen render pass every frame of the entrance —
+                // and those frames are the sheet's own turn, so the turn's
+                // cached sheet re-rendered the page each frame as well.
+                .graphicsLayer { cachedAlpha(readerContentAlpha.value) }
                 .onGloballyPositioned { readerRootY = it.positionInRoot().y },
         ) {
             val selectorSide = settings.ayahSelectorSide
@@ -3764,7 +3779,12 @@ fun ReaderScreen(
         AyahRailTip(
             visible = ayahRailTipVisible && !mushafMode,
             railSide = settings.ayahSelectorSide,
-            targetCenterY = with(density) { ayahRailTipCenterY.toDp() },
+            // Read only while the lesson shows; see ayahRailTipCenterY.
+            targetCenterY = if (ayahRailTipVisible || ayahRailTipRendered) {
+                with(density) { ayahRailTipCenterY.toDp() }
+            } else {
+                Dp.Unspecified
+            },
             onDismiss = {
                 viewModel.dismissAyahRailTip()
                 ayahRailTipOpen = false

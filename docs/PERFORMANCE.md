@@ -410,6 +410,45 @@ sheet's edge, which an offscreen layer on the sheet would clip. The remaining
 first-open compiles are not perspective draws (path-atlas, mesh and rect
 programs on the main framebuffer) and were not chased further.
 
+The texture only helps while nothing on the sheet changes, and in a 2026-11-21
+macrobenchmark of Home↔reader↔Settings turns (emulator, release) both cached
+sheets re-rendered on almost every frame: 487 recompositions in ~357 frames,
+two 1080 × 2400 layer renders a frame, 41% of frames over the 8.3 ms budget.
+A composition tracer and `CompositionObserver.onScopeInvalidated` named the
+states. Each was a layout position read in composition. The sheet's
+`graphicsLayer` transform moves the window and root bounds of everything on it
+every frame, so any `onGloballyPositioned` that writes a position is written
+every frame of a turn:
+
+- Home keyed its search-dismiss `pointerInput` on the search field's and dials
+  pane's root bounds, so the Scaffold content and every visible chapter row
+  recomposed per frame. Only the two gate booleans are keys now. The gesture
+  reads the bounds when it runs, which always gives the latest value. The
+  dials pane's height is computed in its layout lambda, not in composition.
+- The reader keyed the ayah-rail lesson on the rail's root centre
+  (`ayahRailTipCenterY`) and read it to size the tip, so `ReaderScreen` and
+  all its Scaffold slots recomposed every frame the sheet moved. Composition
+  now reads a `derivedStateOf` of whether a centre exists. It reads the value
+  itself only while the lesson is up. The lesson's wait still restarts on
+  every move of the rail, through `snapshotFlow` + `collectLatest`.
+- The reader's entrance fade (`readerContentAlpha`, which runs during the
+  opening turn) was plain layer alpha. That is a fresh full-page "alpha caused
+  saveLayer" pass every frame, inside the turning sheet's texture. It now uses
+  `cachedAlpha`, so the page renders once and the fade only modulates it.
+
+The same journey (same emulator, release, two iterations) was measured after
+all three fixes. Full-sheet layer renders per iteration fell 384 → 190.
+Render-thread work fell from p50 8.4 → 6.3 ms and p90 11.9 → 10.4 ms. Frames
+whose UI + render-thread work exceeded 8.3 ms fell 42.7% → 31.9%. With a
+composition tracer on, Home's rows recomposed 2,080 → 300 times per
+iteration, and `ReaderScreen` 179 → under 5. The ~190 renders left were not
+attributed. One of them is a persistent 932 × 485 "alpha caused saveLayer"
+present in every frame, even at rest, whose owner was not found. Emulator
+only, not a Pixel measurement.
+**Rule:** never read a position from `onGloballyPositioned` (or a
+`boundsInWindow`/`positionInRoot`) in composition on a sheet. Read it in a
+layout/draw lambda, a gesture or a coroutine, or derive the boolean you need.
+
 ### 4a″. Opening onto a verse lays it out once
 
 Continue, a bookmark or a search hit opens the reader mid-chapter. The list
