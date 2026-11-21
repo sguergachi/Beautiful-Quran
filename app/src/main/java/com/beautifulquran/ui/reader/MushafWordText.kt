@@ -18,11 +18,13 @@ import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.node.invalidateMeasurement
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalLocaleList
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -55,6 +57,7 @@ internal object MushafWordLayouts {
         val fontScale: Float,
         val direction: LayoutDirection,
         val resolver: FontFamily.Resolver,
+        val locales: LocaleList,
         val constraints: Constraints,
     )
 
@@ -76,13 +79,20 @@ internal object MushafWordLayouts {
         density: Density,
         direction: LayoutDirection,
         resolver: FontFamily.Resolver,
+        locales: LocaleList,
         constraints: Constraints = Constraints(),
     ): TextLayoutResult {
-        val key = Key(text, style, density.density, density.fontScale, direction, resolver, constraints)
+        val key = Key(text, style, density.density, density.fontScale, direction, resolver, locales, constraints)
         cached(key)?.let { return it }
         // Laid out exactly as BasicText(maxLines = 1, softWrap = false,
         // overflow = Visible) lays out its text.
-        val result = TextMeasurer(resolver, density, direction, cacheSize = 0).measure(
+        val result = TextMeasurer(
+            defaultFontFamilyResolver = resolver,
+            defaultLocaleList = locales,
+            defaultDensity = density,
+            defaultLayoutDirection = direction,
+            cacheSize = 0,
+        ).measure(
             text = AnnotatedString(text),
             style = style,
             overflow = TextOverflow.Visible,
@@ -166,6 +176,7 @@ private class MushafWordTextNode(
             density = this,
             direction = layoutDirection,
             resolver = currentValueOf(LocalFontFamilyResolver),
+            locales = currentValueOf(LocalLocaleList),
             constraints = constraints,
         )
         if (laid !== result) {
