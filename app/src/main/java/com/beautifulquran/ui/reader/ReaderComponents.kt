@@ -3301,218 +3301,57 @@ fun AyahBlock(
     val activeWord = if (english != null) english.activeWord else activeWord
     val englishClock = english?.clock
 
-    // The letter fade paces itself to how long the reciter dwells on the
-    // word, corrected for the chosen playback speed.
     RequestTarjiPulseLines(ayah, isActiveAyah)
-    val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
-    // Repeat washes share the same audio handoff but must not inherit the
-    // ordinary sweep's visual minimum and continue past the spoken word.
-    val repeatDwellMs = InkEngine.repeatDwellMs(activeWord, playbackSpeed)
-    val activation = activeWord?.activation ?: 0L
-    val activeWordStartMs = activeWord?.startMs ?: Long.MIN_VALUE
-
-    // Letter-level tajweed pacing of that sweep (Ink Lab toggle,
-    // docs/TAJWEED_PACING.md): null keeps the plain constant-rate wash.
-    // Gated on this ayah owning the active word — not the fade-led
-    // isActiveAyah — so a waqf hold is not dropped 500 ms before the audio
-    // boundary (see InkEngine.wordState). The verse-closing word is flagged
-    // so its waqf can be sustained.
-    val pacing = activeWord
-        ?.let { aw ->
-            val idx = ayah.words.indexOfFirst { it.position == aw.wordPosition }
-            ayah.words.getOrNull(idx)?.let { word ->
-                InkEngine.pacing(
-                    arabic = word.arabic,
-                    activeWord = aw,
-                    isAyahFinal = word.position == ayah.words.lastOrNull()?.position,
-                    prevArabic = ayah.words.getOrNull(idx - 1)?.arabic,
-                )
-            }
-        }
-
-    // Each word's ink behaviour, derived once for the whole ayah. All the
-    // policy (upcoming/active/recited/high-water, repeat chain) lives in
-    // InkEngine; the render branches below only draw what it decided.
-    val inks = ayah.words.map { word ->
-        InkEngine.word(
-            position = word.position,
-            activeWord = activeWord,
-            isActiveAyah = isActiveAyah,
-            dimmed = dimmed,
-        )
-    }
-    val activeIndex = inks.indexOfFirst { it.state == InkEngine.State.Active }
-    val incomingConnection = if (activeIndex > 0) {
-        InkEngine.connection(
-            prevArabic = ayah.words[activeIndex - 1].arabic,
-            arabic = ayah.words[activeIndex].arabic,
-        )
-    } else {
-        null
-    }
-    val outgoingConnection = if (activeIndex in 0 until ayah.words.lastIndex) {
-        InkEngine.connection(
-            prevArabic = ayah.words[activeIndex].arabic,
-            arabic = ayah.words[activeIndex + 1].arabic,
-        )
-    } else {
-        null
-    }
-    val outgoingProgress = rememberWaslProgress(
-        connection = outgoingConnection,
-        sweepMs = sweepMs,
-        identity = activeWord?.wordPosition,
-        activation = activation,
+    // The active word's wash and its carry-ins, shared with the mushaf
+    // (rememberAyahInkPack). English Scroll's words lend no short-word lead.
+    val wash = rememberAyahWordWash(
+        ayah = ayah,
         activeWord = activeWord,
         playbackSpeed = playbackSpeed,
-        verse = ayah,
+        isActiveAyah = isActiveAyah,
+        dimmed = dimmed,
+        shortWordLeads = readingMode != ReadingMode.ENGLISH_ONLY,
     )
-    // A short next word borrows its bloom time from this word's tail rather
-    // than trailing past its own end (InkEngine.shortWordLead).
-    val leadNext = ayah.words.getOrNull(activeIndex + 1)
-    val outgoingLead = remember(activeIndex, activation, activeWord?.startMs, activeWord?.reciterId, activeWord?.fromTap, playbackSpeed) {
-        leadNext?.takeIf {
-            readingMode != ReadingMode.ENGLISH_ONLY && activeIndex >= 0 && activeWord?.fromTap != true &&
-                activeWord?.nextWordPosition == it.position
-        }?.let { next ->
-            InkEngine.shortWordLead(
-                activeSweepMs = sweepMs,
-                activePaced = pacing != null,
-                activeRepeat = activeWord?.isRepeat == true,
-                nextArabic = next.arabic,
-                nextSweepMs = InkEngine.nextSweepMs(activeWord, playbackSpeed),
-                nextPaced = InkEngine.paces(
-                    next.arabic,
-                    isAyahFinal = next.position == ayah.words.lastOrNull()?.position,
-                    prevArabic = ayah.words[activeIndex].arabic,
-                ),
-                connected = outgoingConnection != null,
-            )
-        }
-    }
-    val leadWindow = rememberShortWordLead(
-        lead = outgoingLead,
-        sweepMs = sweepMs,
-        activation = activation,
-        activeWord = activeWord,
-        playbackSpeed = playbackSpeed,
-        verse = ayah,
-    )
-    val previousActive = remember { ActiveWordEntry(activeIndex, activation) }
-    val carriedIncoming = remember(activeIndex, activation) {
-        carriedFromPrevious(previousActive, activeIndex, activation, activeWord)
-    }
-    val incomingHandoff = if (carriedIncoming) previousActive.outgoingHandoff else 0f
-    // Captured at entry: the SideEffect below overwrites the entry with this
-    // word's own outgoing lead after the first frame.
-    val incomingLeadReach = remember(activeIndex, activation) {
-        if (carriedIncoming && incomingConnection == null) previousActive.outgoingLeadReach else 0f
-    }
-    SideEffect {
-        previousActive.index = activeIndex
-        previousActive.activation = activation
-        previousActive.generation = activeWord?.playbackActivation ?: 0L
-        previousActive.outgoingHandoff = outgoingProgress.atHandoff
-        previousActive.outgoingLeadReach = outgoingLead?.reach ?: 0f
-    }
-    val waslMainFeather = if (pacing != null) {
-        InkEngine.pacedFeather()
-    } else {
-        InkEngine.tuning.washFeather
-    }
-    val activeRevealStart = if (carriedIncoming && incomingConnection != null) {
-        waslWashProgress(
-            windowProgress = incomingHandoff,
-            endProgress = waslContinuationStart(
-                prefixFraction = incomingConnection.prefixFraction,
-                mainFeather = waslMainFeather,
-            ),
-        )
-    } else {
-        // A short word led in during its predecessor's tail continues from there.
-        incomingLeadReach
-    }
-    // A latched window (1) redraws exactly the partial edge carried across
-    // handoff while the active word's ordinary sweep continues from it.
-    val fullWaslWindow = remember { mutableStateOf(1f) }
-    val waslPrefixes = ayah.words.indices.map { index ->
-        when {
-            // Preserve the outgoing bloom's reached edge only across a natural
-            // adjacent handoff. A seek bumps activation and starts clean.
-            index == activeIndex && carriedIncoming && incomingConnection != null ->
-                WaslPrefix(
-                    windowProgress = fullWaslWindow,
-                    endProgress = activeRevealStart,
-                    feather = waslMainFeather,
-                    letterEndProgress = waslWashProgress(incomingHandoff, incomingConnection.prefixFraction),
-                )
-            index == activeIndex + 1 && outgoingConnection != null ->
-                WaslPrefix(
-                    windowProgress = outgoingProgress.value,
-                    endProgress = waslContinuationStart(
-                        prefixFraction = outgoingConnection.prefixFraction,
-                        mainFeather = waslMainFeather,
-                    ),
-                    feather = waslMainFeather,
-                    letterEndProgress = outgoingConnection.prefixFraction,
-                )
-            index == activeIndex && incomingLeadReach > 0f ->
-                WaslPrefix(
-                    windowProgress = fullWaslWindow,
-                    endProgress = incomingLeadReach,
-                    feather = waslMainFeather,
-                    letterEndProgress = incomingLeadReach,
-                )
-            index == activeIndex + 1 && outgoingLead != null ->
-                WaslPrefix(
-                    windowProgress = leadWindow,
-                    endProgress = outgoingLead.reach,
-                    feather = InkEngine.tuning.washFeather,
-                    letterEndProgress = outgoingLead.reach,
-                )
-            else -> null
-        }
-    }
 
     // One motion owner for every renderer; no text branch creates its own
     // clock or lifecycle state.
     val motions = rememberInkMotions(
         words = ayah.words,
-        inks = inks,
+        inks = wash.inks,
         // English without its verse clock yet (a verse's first frame): the plain
         // eased window, holding at a real pause (EnglishRevealTiming).
         activeSweepMs = when {
             readingMode == ReadingMode.ENGLISH_ONLY && englishClock == null ->
-                englishRevealDurationMs(sweepMs, activeWord?.spokenMs, playbackSpeed)
-            readingMode == ReadingMode.ENGLISH_ONLY -> sweepMs
+                englishRevealDurationMs(wash.sweepMs, activeWord?.spokenMs, playbackSpeed)
+            readingMode == ReadingMode.ENGLISH_ONLY -> wash.sweepMs
             // Arabic ink: short words bloom at the reciter's letter pace,
             // borrowing from the word before when they can.
             else -> InkEngine.visualSweepMs(
-                sweepMs,
-                ayah.words.getOrNull(activeIndex)?.arabic,
-                paced = pacing != null,
-                ledIn = incomingLeadReach > 0f,
-                lending = outgoingLead,
+                wash.sweepMs,
+                ayah.words.getOrNull(wash.activeIndex)?.arabic,
+                paced = wash.pacing != null,
+                ledIn = wash.incomingLeadReach > 0f,
+                lending = wash.outgoingLead,
             )
         },
         activeRepeatDwellMs = if (readingMode == ReadingMode.ENGLISH_ONLY && englishClock == null) {
-            englishRevealDurationMs(repeatDwellMs, activeWord?.spokenMs, playbackSpeed)
-        } else repeatDwellMs,
+            englishRevealDurationMs(wash.repeatDwellMs, activeWord?.spokenMs, playbackSpeed)
+        } else wash.repeatDwellMs,
         // English has no Arabic letter-pacing paint, but shares every other
         // lifecycle rule and the same low-level shaped bloom primitive.
-        pacing = pacing.takeUnless { readingMode == ReadingMode.ENGLISH_ONLY },
+        pacing = wash.pacing.takeUnless { readingMode == ReadingMode.ENGLISH_ONLY },
         activeVoicedSweepMs = if (readingMode == ReadingMode.ENGLISH_ONLY && englishClock == null) {
-            englishRevealDurationMs(sweepMs, activeWord?.spokenMs, playbackSpeed)
-        } else sweepMs,
+            englishRevealDurationMs(wash.sweepMs, activeWord?.spokenMs, playbackSpeed)
+        } else wash.sweepMs,
         englishClock = englishClock,
-        activeRevealStart = activeRevealStart.takeUnless {
+        activeRevealStart = wash.activeRevealStart.takeUnless {
             readingMode == ReadingMode.ENGLISH_ONLY
         } ?: 0f,
         waslPrefixes = if (readingMode == ReadingMode.ENGLISH_ONLY) {
             List(ayah.words.size) { null }
-        } else waslPrefixes,
-        activation = activation,
-        activeWordStartMs = activeWordStartMs,
+        } else wash.waslPrefixes,
+        activation = wash.activation,
+        activeWordStartMs = wash.activeWordStartMs,
         verse = ayah,
         sequentialSweeps = readingMode == ReadingMode.ENGLISH_ONLY,
         animateLyricInk =

@@ -660,6 +660,11 @@ tween-vs-snap rules, sweep entry and residual rules, repeat wash timing, the
 
 HighlightEngine V2 owns speech time. `rememberInkMotions` remains the single
 motion owner for scroll and mushaf, delegating to `HighlightMediaMotions`.
+What it is fed is shared too: `rememberAyahWordWash` (`AyahInkMotions.kt`)
+derives the active word's sweep, tajweed pacing, wasl carry and short-word
+lead for both `AyahBlock` and `rememberAyahInkPack`, its decisions in pure
+functions pinned by `AyahWordWashTest`. English Scroll differs only in lending
+no short-word lead.
 `HighlightWash.transition` captures an occurrence window; drawing projects the
 shared `HighlightTimeline` through that window. The replaced speech-time
 `Animatable` owners (`rememberLetterSweep` and `rememberRepeatWash`) are gone.
