@@ -595,6 +595,20 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   Arabic instead of hundreds of private-use glyphs.
 - Chrome (`MushafReadingSheet`) keys the gilt seed on `settledPage`, not
   `currentPage`, so a fling does not regenerate ornaments mid-turn.
+- QCF word and verse-mark cells are `MushafWordText` nodes. They are laid out
+  as `BasicText(maxLines = 1, softWrap = false, overflow = Visible)` would lay
+  them out, and drawn the way foundation's text node draws. The layouts come
+  from `MushafWordLayouts`, a process-wide LRU of 2,048 `TextLayoutResult`s
+  keyed by glyphs, exact style (the page face, size, narrowing and colour),
+  density, direction, font resolver and constraints. In the page-turn
+  benchmark, per-word `TextAnnotatedStringNode` measures were ~55 ms of the
+  three slowest frames (145 ms together; 283 layouts, ~0.2 ms each). A leaf
+  that comes back (the one
+  just turned from, or a dial landing on a visited page) now reuses its cells.
+  A leaf's first composition still measures each cell once. The forward-only
+  page-turn benchmark only visits new pages, so it is unchanged within noise
+  (UI + render-thread frames over 8.3 ms: 17.7% before, 20.4% after, two
+  iterations each). The revisit gain was not measured.
 - The dial HUD's warning ink (the 300 ms pre-pop pulse and the ripening band)
   is a `ColorProducer` read at draw (`MushafDialHudInk`). Read in
   composition, the pulse recomposed the whole label every frame. The trough
