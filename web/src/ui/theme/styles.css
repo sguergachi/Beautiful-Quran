@@ -34,7 +34,7 @@
   --green-wash: #e2e4d8;
   --emboss-dark: rgba(0, 0, 0, 0.141);
   --emboss-light: rgba(255, 255, 255, 0.349);
-  --repeat: #b4551e;
+  --repeat: #c25f3b;
   --bookmark: #b3122f;
   --annotation: #6b2838;
   --font-ui: system-ui, sans-serif;
@@ -170,7 +170,7 @@
   --repeat: #ff8948;
   --bookmark: #ff727b;
   --annotation: #f4a4b2;
-  --glint: #fff7de;
+  --glint: #fff4d5;
   color-scheme: dark;
 }
 
