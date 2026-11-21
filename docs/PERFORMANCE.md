@@ -688,6 +688,17 @@ debug emulator were **525 ms** for `peace` and **876 ms** for the multi-word con
 debounce. The complete rank then replaces it. App startup stays free of a
 full-Quran scan.
 
+The results list lays out only what is on screen. Every section header, hit,
+and expand/collapse row is its own keyed `LazyColumn` item; the keys come from
+`wordSearchRowKey`, which is positional so two hits on one verse cannot
+collide. The results used to sit in one item holding a `Column` of every row
+of every section. That item's first layout composed and measured all of them
+in one frame: 35–43 ms on the emulator for `peace`, however few rows were
+visible. The list has no item spacing, so the rows stack exactly as the
+Column stacked them. In the cold-search macrobenchmark (emulator, release, two
+iterations each), the worst UI frame fell 43 → 24 ms. Frames whose UI +
+render-thread work exceeded 8.3 ms fell 18.2% → 8.9%.
+
 The candidate query may use the longest token from a phrase even when that
 token is short. This preserves the sub-second first-result path for literal
 phrases such as `if he`; single short tokens still skip the broad SQL fallback.

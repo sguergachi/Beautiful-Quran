@@ -1167,7 +1167,13 @@ fun HomeScreen(
                     }
 
                     if (showWordSections) {
-                        item(key = "word-results") {
+                        // One lazy item per row, not one item holding them all:
+                        // as a single Column, the first results composed and
+                        // measured every hit of every section in one frame
+                        // (~35–43 ms on the emulator), however few were on
+                        // screen. The rows stack exactly as the Column did —
+                        // the list has no item spacing of its own.
+                        item(key = "word-results", contentType = "word-results-label") {
                             Column(Modifier.fillMaxWidth()) {
                                 if (correctedQuery != null) {
                                     SearchCorrectionLabel(
@@ -1194,31 +1200,52 @@ fun HomeScreen(
                                         8.dp
                                     },
                                 )
-                                uiState.wordSections.forEach { section ->
-                                    WordSearchSurahHeader(section = section)
-                                    section.hits.forEach { hit ->
-                                        WordSearchHitRow(
-                                            hit = hit,
-                                            query = uiState.query,
-                                            onClick = {
-                                                focusManager.clearFocus()
-                                                onOpenSearchHit(hit, uiState.query)
-                                            },
-                                        )
-                                    }
-                                    if (section.hiddenCount > 0) {
-                                        WordSearchExpandRow(
-                                            section = section,
-                                            onClick = { viewModel.toggleWordSearchSection(section.surahId) },
-                                        )
-                                    } else if (
-                                        section.expanded &&
-                                        section.totalCount > WORD_SEARCH_PREVIEW_LIMIT
-                                    ) {
-                                        WordSearchCollapseRow(
-                                            onClick = { viewModel.toggleWordSearchSection(section.surahId) },
-                                        )
-                                    }
+                            }
+                        }
+                        uiState.wordSections.forEachIndexed { sectionIndex, section ->
+                            item(
+                                key = wordSearchRowKey(WordSearchRow.Header, sectionIndex, section.surahId),
+                                contentType = "word-search-header",
+                            ) {
+                                WordSearchSurahHeader(section = section)
+                            }
+                            itemsIndexed(
+                                section.hits,
+                                key = { hitIndex, _ ->
+                                    wordSearchRowKey(WordSearchRow.Hit, sectionIndex, section.surahId, hitIndex)
+                                },
+                                contentType = { _, _ -> "word-search-hit" },
+                            ) { _, hit ->
+                                WordSearchHitRow(
+                                    hit = hit,
+                                    query = uiState.query,
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        onOpenSearchHit(hit, uiState.query)
+                                    },
+                                )
+                            }
+                            if (section.hiddenCount > 0) {
+                                item(
+                                    key = wordSearchRowKey(WordSearchRow.Expand, sectionIndex, section.surahId),
+                                    contentType = "word-search-toggle",
+                                ) {
+                                    WordSearchExpandRow(
+                                        section = section,
+                                        onClick = { viewModel.toggleWordSearchSection(section.surahId) },
+                                    )
+                                }
+                            } else if (
+                                section.expanded &&
+                                section.totalCount > WORD_SEARCH_PREVIEW_LIMIT
+                            ) {
+                                item(
+                                    key = wordSearchRowKey(WordSearchRow.Collapse, sectionIndex, section.surahId),
+                                    contentType = "word-search-toggle",
+                                ) {
+                                    WordSearchCollapseRow(
+                                        onClick = { viewModel.toggleWordSearchSection(section.surahId) },
+                                    )
                                 }
                             }
                         }
@@ -1633,6 +1660,24 @@ internal fun chapterRows(
 
 /** Key of the chapter row that owns the reading place. */
 internal fun placeRowKey(continueId: Int?): String? = continueId?.let(::chapterKey)
+
+/** The kinds of row a word-search section lays out, each its own lazy item. */
+internal enum class WordSearchRow { Header, Hit, Expand, Collapse }
+
+/**
+ * A word-search row's lazy key. Positional within the results (section, then
+ * hit) so two hits on one verse can never collide, and prefixed so no result
+ * row can share a key with a chapter row or a label.
+ */
+internal fun wordSearchRowKey(
+    row: WordSearchRow,
+    sectionIndex: Int,
+    surahId: Int,
+    hitIndex: Int = 0,
+): String = when (row) {
+    WordSearchRow.Hit -> "word-hit-$sectionIndex-$surahId-$hitIndex"
+    else -> "word-${row.name.lowercase()}-$sectionIndex-$surahId"
+}
 
 /** The reflow when a chapter is pinned or unpinned: the row glides to its
  * new seat and the list closes or opens around it. */
