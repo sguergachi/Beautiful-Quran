@@ -36,6 +36,9 @@ data class PageTurnFlip(
  */
 class PageTurnSounds(context: Context) {
 
+    /** Live gate from Customize; checked at play time so a mid-turn toggle is silent. */
+    var enabled: Boolean = true
+
     // Media usage keeps the flip on the listener's media volume; SoundPool never
     // takes audio focus, so a page turn never ducks or pauses the recitation.
     private val soundPool = SoundPool.Builder()
@@ -162,6 +165,7 @@ class PageTurnSounds(context: Context) {
         (0.95f + abs(velocity) * 0.05f).coerceIn(0.92f, 1.12f)
 
     private fun playStem(res: Int, rate: Float) {
+        if (!enabled) return
         val sampleId = sampleIds[res] ?: return
         if (sampleId !in loadedSamples) return // async load; earliest turns stay quiet
         soundPool.play(sampleId, VOLUME, VOLUME, 1, 0, rate)

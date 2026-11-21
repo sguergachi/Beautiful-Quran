@@ -378,6 +378,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenBegan = {
                                     val sounds = coverSounds
                                         ?: PageTurnSounds(this@MainActivity).also { coverSounds = it }
+                                    sounds.enabled = settings.soundEffectsEnabled
                                     sounds.playCoverOpen()
                                 },
                                 onReady = {
@@ -760,6 +761,7 @@ private fun PaperStackApp(
 
     val context = LocalContext.current
     val pageTurnSounds = remember { PageTurnSounds(context) }
+    pageTurnSounds.enabled = settings.soundEffectsEnabled
     DisposableEffect(pageTurnSounds) {
         onDispose { pageTurnSounds.release() }
     }

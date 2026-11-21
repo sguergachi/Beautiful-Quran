@@ -440,6 +440,15 @@ internal fun CustomizeScreen(
             )
         }
 
+        Section("Sound")
+        ToggleRow(
+            label = "Sound effects",
+            checked = settings.soundEffectsEnabled,
+            onChange = { value -> onUpdate { it.copy(soundEffectsEnabled = value) } },
+            checkParams = checkParams,
+            checkPaintToken = checkPaintToken,
+        )
+
         Spacer(Modifier.height(48.dp))
         }
         }
