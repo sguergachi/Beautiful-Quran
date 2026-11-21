@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,6 +33,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.home.ReturnToAyahPill
+import com.beautifulquran.ui.theme.QuietButton
 import com.beautifulquran.ui.theme.QuranTheme
 
 /**
@@ -153,7 +153,7 @@ internal fun PinnedChapterPlayback(
                         .align(Alignment.CenterEnd)
                         .padding(end = 4.dp),
                 ) {
-                    IconButton(
+                    QuietButton(
                         onClick = {
                             host.closing = true
                             host.onClose()

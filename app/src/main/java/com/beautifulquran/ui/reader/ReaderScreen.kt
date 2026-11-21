@@ -61,7 +61,6 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -142,6 +141,7 @@ import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.reader.focus.rememberReaderFocusController
 import com.beautifulquran.ui.share.ShareRibbon
+import com.beautifulquran.ui.theme.QuietButton
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
@@ -1927,7 +1927,7 @@ fun ReaderScreen(
                     // and search change its ink or action.
                     Row {
                         if (search.active || mushafMode) {
-                            IconButton(
+                            QuietButton(
                                 onClick = { if (search.active) search.close() else onBack() },
                                 enabled = search.active || !recitingActive,
                                 modifier = Modifier.offset(x = topBarStartShift),
@@ -1956,7 +1956,7 @@ fun ReaderScreen(
                                 )
                             }
                         } else {
-                            IconButton(
+                            QuietButton(
                                 onClick = onBack,
                                 enabled = !recitingActive,
                                 // Ink on the left text rule. Offset, not padding:
@@ -1997,7 +1997,7 @@ fun ReaderScreen(
                                 maxLines = 1,
                                 modifier = Modifier.widthIn(min = 40.dp),
                             )
-                            IconButton(
+                            QuietButton(
                                 onClick = {
                                     if (searchMatches.isNotEmpty()) {
                                         keyboard?.hide()
@@ -2013,7 +2013,7 @@ fun ReaderScreen(
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            IconButton(
+                            QuietButton(
                                 onClick = {
                                     if (searchMatches.isNotEmpty()) {
                                         keyboard?.hide()
@@ -2031,7 +2031,7 @@ fun ReaderScreen(
                         }
                     } else {
                         if (!mushafMode) {
-                            IconButton(
+                            QuietButton(
                                 onClick = { search.active = true },
                                 enabled = !recitingActive,
                                 modifier = Modifier.offset(x = -topBarEndShift),

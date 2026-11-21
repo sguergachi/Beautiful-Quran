@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -21,11 +20,9 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +48,7 @@ import com.beautifulquran.ui.reader.speedActive
 import com.beautifulquran.ui.reader.speedLabel
 import com.beautifulquran.ui.reader.InkLabToggleButton
 import com.beautifulquran.ui.reader.ReciterNameButton
+import com.beautifulquran.ui.theme.QuietButton
 import com.beautifulquran.ui.theme.FloatingPaperEnter
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.QuranTheme
@@ -173,7 +171,7 @@ fun FloatingPlaybackControl(
                             .fillMaxWidth()
                             .padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
                     ) {
-                        IconButton(onClick = onRepeatClick, modifier = Modifier.size(48.dp)) {
+                        QuietButton(onClick = onRepeatClick, modifier = Modifier.size(48.dp)) {
                             Icon(
                                 imageVector = state.repeatIcon,
                                 contentDescription = "Repeat",
@@ -184,30 +182,29 @@ fun FloatingPlaybackControl(
                                 },
                             )
                         }
-                        IconButton(onClick = onFastBackward, modifier = Modifier.size(48.dp)) {
+                        QuietButton(onClick = onFastBackward, modifier = Modifier.size(48.dp)) {
                             Icon(
                                 Icons.Rounded.FastRewind,
                                 contentDescription = "Fast backward",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        IconButton(onClick = onPlayPause, modifier = Modifier.size(56.dp)) {
+                        QuietButton(onClick = onPlayPause, modifier = Modifier.size(56.dp)) {
                             PlayPauseGlyph(
                                 playing = state.isPlaying,
                                 buffering = state.isBuffering,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        IconButton(onClick = onFastForward, modifier = Modifier.size(48.dp)) {
+                        QuietButton(onClick = onFastForward, modifier = Modifier.size(48.dp)) {
                             Icon(
                                 Icons.Rounded.FastForward,
                                 contentDescription = "Fast forward",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        TextButton(
+                        QuietButton(
                             onClick = onSpeed,
-                            contentPadding = PaddingValues(0.dp),
                             modifier = Modifier.size(48.dp),
                         ) {
                             Text(
@@ -222,7 +219,7 @@ fun FloatingPlaybackControl(
                         }
                     }
                 }
-                IconButton(
+                QuietButton(
                     onClick = onClose,
                     modifier = Modifier
                         .align(Alignment.TopEnd)

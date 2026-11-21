@@ -18,7 +18,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -37,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.share.AyahRef
+import com.beautifulquran.ui.theme.QuietButton
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
 import com.beautifulquran.ui.theme.SerifFontFamily
@@ -74,7 +74,7 @@ fun ShareComposeSheet(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    QuietButton(onClick = onBack) {
                         Icon(
                             Icons.Rounded.Close,
                             contentDescription = "Close send page",

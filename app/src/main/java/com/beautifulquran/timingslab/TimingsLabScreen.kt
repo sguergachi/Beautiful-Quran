@@ -48,10 +48,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.beautifulquran.ui.theme.QuietButton
 import com.beautifulquran.ui.theme.LightStatusBarIconsWhileShown
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -262,7 +262,7 @@ private fun LabHeader(
     ) {
         // The Lab is a sheet that rose over the reader; the chevron lowers it
         // back onto the exact page it came from. onExit runs in the closer.
-        IconButton(onClick = onBack) {
+        QuietButton(onClick = onBack) {
             Icon(
                 Icons.Rounded.KeyboardArrowDown,
                 contentDescription = "Close",
@@ -327,7 +327,7 @@ private fun OverflowMenu(
     var expanded by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { expanded = true; confirmClear = false }) {
+        QuietButton(onClick = { expanded = true; confirmClear = false }) {
             Icon(
                 Icons.Rounded.MoreHoriz,
                 contentDescription = "More",
@@ -427,7 +427,7 @@ private fun AdjustPanel(
                 color = if (isRepeat) accents.repeatInk else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = viewModel::closeTune, modifier = Modifier.size(32.dp)) {
+            QuietButton(onClick = viewModel::closeTune, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Rounded.Close,
                     contentDescription = "Done",
@@ -682,7 +682,7 @@ private fun TransportBar(
             Spacer(Modifier.weight(1f))
             RecIndicator(ui.recordedMarks, accents)
         } else {
-            IconButton(onClick = viewModel::playPause, modifier = Modifier.size(48.dp)) {
+            QuietButton(onClick = viewModel::playPause, modifier = Modifier.size(48.dp)) {
                 if (ui.isBuffering && !ui.isPlaying) {
                     CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
                 } else {
@@ -694,7 +694,7 @@ private fun TransportBar(
                     )
                 }
             }
-            IconButton(onClick = viewModel::restart, modifier = Modifier.size(40.dp)) {
+            QuietButton(onClick = viewModel::restart, modifier = Modifier.size(40.dp)) {
                 Icon(
                     Icons.Rounded.Replay,
                     contentDescription = "Restart",

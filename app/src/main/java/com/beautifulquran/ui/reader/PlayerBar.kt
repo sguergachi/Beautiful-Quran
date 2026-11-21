@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,11 +25,9 @@ import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -51,6 +48,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.beautifulquran.playback.PlayerUiState
+import com.beautifulquran.ui.theme.QuietButton
 import com.beautifulquran.ui.theme.cachedAlpha
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.QuranTheme
@@ -178,7 +176,7 @@ fun PlayerBar(
             ) {
                 val repeatActive = state.repeatActive
                 val speedActive = state.speedActive
-                IconButton(
+                QuietButton(
                     onClick = onRepeatClick,
                     enabled = enabled,
                     modifier = Modifier
@@ -196,7 +194,7 @@ fun PlayerBar(
                         modifier = Modifier.size(22.dp),
                     )
                 }
-                IconButton(
+                QuietButton(
                     onClick = onFastBackward,
                     enabled = enabled && isThisSurahLoaded,
                     modifier = Modifier.size(48.dp),
@@ -207,7 +205,7 @@ fun PlayerBar(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(
+                QuietButton(
                     onClick = onPlayPause,
                     enabled = enabled,
                     modifier = Modifier.size(56.dp),
@@ -218,7 +216,7 @@ fun PlayerBar(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(
+                QuietButton(
                     onClick = onFastForward,
                     enabled = enabled && isThisSurahLoaded,
                     modifier = Modifier.size(48.dp),
@@ -229,10 +227,9 @@ fun PlayerBar(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(
+                QuietButton(
                     onClick = onSpeed,
                     enabled = enabled,
-                    contentPadding = PaddingValues(0.dp),
                     modifier = Modifier
                         .size(48.dp)
                         .graphicsLayer { cachedAlpha(if (speedActive) 1f else chromeAlpha()) },
@@ -261,7 +258,7 @@ internal fun InkLabToggleButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    IconButton(onClick = onClick, modifier = modifier.size(40.dp)) {
+    QuietButton(onClick = onClick, modifier = modifier.size(40.dp)) {
         Icon(
             imageVector = Icons.Rounded.Tune,
             contentDescription = if (expanded) "Close Ink Lab" else "Open Ink Lab",

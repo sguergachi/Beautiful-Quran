@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.QuietButton
 import com.beautifulquran.ui.theme.mixedCaseTrackingEm
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.quietClickable
@@ -28,7 +29,6 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -340,7 +340,7 @@ internal fun MushafReadingSheet(
                     iconSize = 24.dp,
                     tint = primary,
                 )
-                IconButton(onClick = onPlayPause, enabled = enabled, modifier = Modifier.size(MushafTransportRow)) {
+                QuietButton(onClick = onPlayPause, enabled = enabled, modifier = Modifier.size(MushafTransportRow)) {
                     PlayPauseGlyph(
                         playing = playerState.isPlaying && isThisSurahLoaded,
                         buffering = playerState.isBuffering && isThisSurahLoaded,
@@ -626,7 +626,7 @@ private fun GutterIcon(
     buttonSize: Dp = 40.dp,
     iconSize: Dp = 20.dp,
 ) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(buttonSize)) {
+    QuietButton(onClick = onClick, enabled = enabled, modifier = modifier.size(buttonSize)) {
         Icon(image, contentDescription = label, tint = tint, modifier = Modifier.size(iconSize))
     }
 }

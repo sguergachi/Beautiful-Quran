@@ -5,6 +5,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -685,11 +686,13 @@ fun BeautifulQuranTheme(
         LocalQuranTypePalette provides typePalette,
         LocalScrollArabicType provides scrollArabicType(scrollArabicFace),
     ) {
-        MaterialTheme(
-            colorScheme = colors,
-            typography = QuranTypography,
-            content = content,
-        )
+        MaterialTheme(colorScheme = colors, typography = QuranTypography) {
+            // Taps never ripple (docs/DESIGN.md). Every control taps through
+            // quietClickable / QuietButton; this keeps any Material component
+            // that slips through — a lab's menu item, a slider thumb — quiet too.
+            // MaterialTheme does not re-provide it, so nested overlays keep it.
+            CompositionLocalProvider(LocalRippleConfiguration provides null, content = content)
+        }
     }
 }
 
