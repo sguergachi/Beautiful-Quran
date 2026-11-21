@@ -16,6 +16,18 @@ test("setProp keys an animated property at t and sets a static one", () => {
   assert.equal(raw.props.rotate, 30, "clamped to the property's range");
 });
 
+test("setProp edits the key within the playhead's reach instead of adding one a frame away", () => {
+  // a drag at 2.621 s, 21 ms past the 2.6 s key the playhead button lights for,
+  // used to add a second key there: a 21 ms jump instead of the eased move into 2.6
+  const keys = [{ t: 0, v: 0.5 }, { t: 2.6, v: 0.5, ease: "inOutCubic" }, { t: 10.4, v: 0.5 }];
+  let { raw } = run({ tracks: { pan_y: keys } }, (r, c) => E.setProp(r, c, "pan_y", 0.46, 2.621));
+  assert.deepEqual(raw.tracks.pan_y.map((k: any) => [k.t, k.v, k.ease]), [[0, 0.5, undefined], [2.6, 0.46, "inOutCubic"], [10.4, 0.5, undefined]]);
+  ({ raw } = run({ tracks: { pan_y: keys } }, (r, c) => E.setProp(r, c, "pan_y", 0.46, 2.75)));
+  assert.deepEqual(raw.tracks.pan_y.map((k: any) => k.t), [0, 2.6, 2.75, 10.4], "beyond reach: a new key");
+  ({ raw } = run({ tracks: { pan_y: [{ t: 1, v: 0.5 }, { t: 1.15, v: 0.5 }] } }, (r, c) => E.setProp(r, c, "pan_y", 0.4, 1.09)));
+  assert.deepEqual(raw.tracks.pan_y.map((k: any) => k.v), [0.5, 0.4], "the nearer key wins");
+});
+
 test("toggleKey adds the current value and removing the last key keeps it static", () => {
   let { raw, out } = run({ props: { zoom: 1.5 } }, (r, c) => E.toggleKey(r, c, "zoom", 2));
   assert.deepEqual(out, { prop: "zoom", t: 2 });
