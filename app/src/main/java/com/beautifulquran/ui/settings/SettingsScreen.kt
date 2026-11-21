@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -103,7 +104,7 @@ import com.beautifulquran.ui.theme.paperSelectHaptic
 import com.beautifulquran.ui.theme.paperToggleHaptic
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shippedCheckParams
-import com.beautifulquran.ui.theme.themePreviewAccents
+import com.beautifulquran.ui.theme.quranThemeParts
 import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.typeScale
@@ -1251,7 +1252,7 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
 @Composable
 internal fun ThemeColorPreview(mode: ThemeMode) {
     val fill = themePreviewColors(mode).first()
-    val accents = themePreviewAccents(mode)
+    val accents = quranThemeParts(mode, isSystemInDarkTheme()).third
     Canvas(Modifier.size(width = 64.dp, height = 22.dp)) {
         val corner = CornerRadius(6.dp.toPx())
         drawRoundRect(fill, cornerRadius = corner)

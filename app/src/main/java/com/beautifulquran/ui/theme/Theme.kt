@@ -14,7 +14,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import com.beautifulquran.data.ThemeMode
 
 // "Paper" light palette
@@ -510,58 +509,6 @@ private val RoyalGreenAccents = QuranAccents(
     glintInk = Color(0xFFFFF4D5),
 )
 
-// ---------------------------------------------------------------------------
-// Display P3 accents — only on a wide-gamut window (WideGamut.kt).
-//
-// A handful of accents were always pressed against the sRGB edge: the rubies
-// and the paper's deep gilt. On a P3 window they take the purer pigment the
-// panel can show; everywhere else — an sRGB phone, a shared image, the web — the
-// sRGB values above stay exactly as they are. Nothing else moves: not the
-// inks, the greens, the paper, or the dark golds.
-//
-// Only accents that are only ever *drawn* go wide. Compose sets a Text's
-// colour through `toArgb()`, which clips it to sRGB, so a colour that also
-// colours words would land there as a clipped value that is neither the P3
-// pigment nor its sRGB original, beside drawn copies that are P3. That rules
-// out gold (the Mushaf's ayah marks and search hits are text), goldInk and the
-// dark sheets' repeatInk (the ink engine's text) until Compose text is
-// colour-managed; their P3 values are in docs/DESIGN.md "Color".
-// ---------------------------------------------------------------------------
-
-private fun displayP3(red: Float, green: Float, blue: Float) =
-    Color(red, green, blue, colorSpace = ColorSpaces.DisplayP3)
-
-private val LightAccentsP3 = LightAccents.copy(
-    goldDeep = displayP3(0.471f, 0.358f, 0.030f),
-    bookmarkRibbon = displayP3(0.668f, 0.089f, 0.180f),
-)
-
-private val DarkAccentsP3 = DarkAccents.copy(
-    bookmarkRibbon = displayP3(0.965f, 0.399f, 0.436f),
-)
-
-private val RoyalGreenAccentsP3 = RoyalGreenAccents.copy(
-    bookmarkRibbon = displayP3(0.966f, 0.446f, 0.472f),
-)
-
-/** The accents [themeMode] draws with — its P3 set only when [wideGamut]. */
-internal fun quranAccents(themeMode: ThemeMode, systemDark: Boolean, wideGamut: Boolean): QuranAccents {
-    val dark = themeMode == ThemeMode.DARK || (themeMode == ThemeMode.SYSTEM && systemDark)
-    return when {
-        themeMode == ThemeMode.ROYAL_GREEN -> if (wideGamut) RoyalGreenAccentsP3 else RoyalGreenAccents
-        dark -> if (wideGamut) DarkAccentsP3 else DarkAccents
-        else -> if (wideGamut) LightAccentsP3 else LightAccents
-    }
-}
-
-/** Whether this window was granted wide colour (see [BeautifulQuranTheme]). */
-val LocalWideGamut = staticCompositionLocalOf { false }
-
-/** The accents a theme would draw with here — for a preview of a theme that is not the current one. */
-@Composable
-fun themePreviewAccents(themeMode: ThemeMode): QuranAccents =
-    quranAccents(themeMode, isSystemInDarkTheme(), LocalWideGamut.current)
-
 @Composable
 fun themePreviewColors(themeMode: ThemeMode): List<Color> {
     val systemDark = isSystemInDarkTheme()
@@ -650,12 +597,15 @@ fun BeautifulQuranTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     typeface: com.beautifulquran.data.BookTypeface = com.beautifulquran.data.BookTypeface.JUNICODE,
     scrollArabicFace: com.beautifulquran.data.ScrollArabicFace = com.beautifulquran.data.ScrollArabicFace.HAFS,
-    /** True only on a window [enableWideGamutIfFree] put in wide-colour mode. */
-    wideGamut: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
-    val accents = quranAccents(themeMode, systemDark, wideGamut)
+    val accents = when (themeMode) {
+        ThemeMode.SYSTEM -> if (systemDark) DarkAccents else LightAccents
+        ThemeMode.LIGHT -> LightAccents
+        ThemeMode.DARK -> DarkAccents
+        ThemeMode.ROYAL_GREEN -> RoyalGreenAccents
+    }
     val ink = when (themeMode) {
         ThemeMode.SYSTEM -> if (systemDark) NightInkLadder else LightInk
         ThemeMode.LIGHT -> LightInk
@@ -679,7 +629,6 @@ fun BeautifulQuranTheme(
     val typePalette = quranTypePalette(typeface, darkPaper)
     androidx.compose.runtime.CompositionLocalProvider(
         LocalQuranAccents provides accents,
-        LocalWideGamut provides wideGamut,
         LocalQuranInk provides ink,
         LocalSettingsSheet provides settingsSheet,
         LocalReadingPaper provides colors.background,

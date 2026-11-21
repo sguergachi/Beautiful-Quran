@@ -164,7 +164,6 @@ import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.LocalQuranInk
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import com.beautifulquran.ui.theme.contrastingOverlayInk
-import com.beautifulquran.ui.theme.enableWideGamutIfFree
 import com.beautifulquran.ui.theme.contrastingOverlayAccents
 
 /** Grace after a concordance jump so the programmatic settle / page turn
@@ -210,9 +209,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Frame timings for the log export: the launch window, and any recording.
         FrameLog.attach(window)
-        // Display P3 accents on a panel that composes P3 at 8 bits (free);
-        // sRGB everywhere else. See ui/theme/WideGamut.kt.
-        val wideGamut = enableWideGamutIfFree(this)
         // The entrance cover is always dark. The sheet theme sets its own icon
         // appearance once Compose has its persisted settings.
         WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -346,7 +342,6 @@ class MainActivity : ComponentActivity() {
                     themeMode = settings.themeMode,
                     typeface = settings.activeBookTypeface,
                     scrollArabicFace = settings.activeScrollArabicFace,
-                    wideGamut = wideGamut,
                 ) {
                     // Cold start paints the closed mushaf first; the paper stack
                     // mounts under it after two board frames (onWarmStack),
