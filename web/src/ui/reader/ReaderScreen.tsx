@@ -128,10 +128,11 @@ function activeSearchQuery(active: boolean, query: string): string | null {
  * A data-URI SVG background can't resolve `var(--ink)` (it isn't part of
  * the live cascade), so the whisper-faint field weave needs a literal
  * color resolved from the reader's own theme instead — same `--ink` values
- * as styles.css, with the chapter field softened by 25% on both platforms. `--emboss-light` is white at low alpha in every theme.
+ * as styles.css, with the chapter field softened by 25% on both platforms (Paper's then lifted
+ * a tenth, as on Android). `--emboss-light` is white at low alpha in every theme.
  */
 function chapterWeaveInk(themeMode: string): string {
-  return resolveTheme(themeMode) === 'light' ? 'rgba(28, 27, 24, 0.03)' : 'rgba(232, 226, 213, 0.03)'
+  return resolveTheme(themeMode) === 'light' ? 'rgba(28, 27, 24, 0.033)' : 'rgba(232, 226, 213, 0.03)'
 }
 
 /**

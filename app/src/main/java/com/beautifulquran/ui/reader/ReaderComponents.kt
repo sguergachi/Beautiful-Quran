@@ -94,6 +94,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
@@ -3855,6 +3856,8 @@ fun ChapterOpening(
 ) {
     val accents = LocalQuranAccents.current
     val weaveFade = MaterialTheme.colorScheme.background
+    // Paper carries its header line work a tenth stronger than the dark sheets.
+    val weaveLift = if (weaveFade.luminance() > 0.5f) PAPER_WEAVE_LIFT else 1f
     val ornament = remember(chapterNumber, ayahCount) {
         generateChapterOrnament(chapterOrnamentSeed(chapterNumber, ayahCount))
     }
@@ -3868,8 +3871,8 @@ fun ChapterOpening(
                     .matchParentSize()
                     .generatedFieldWeave(
                         field = ornament.field,
-                        ink = QuranTheme.ink.wash.let { it.copy(alpha = it.alpha * 0.675f) },
-                        embossLight = accents.embossLight.copy(alpha = 0.03375f),
+                        ink = QuranTheme.ink.wash.let { it.copy(alpha = it.alpha * 0.675f * weaveLift) },
+                        embossLight = accents.embossLight.copy(alpha = 0.03375f * weaveLift),
                     )
                     .verticalFadingEdges(color = weaveFade, top = 40.dp, bottom = 32.dp),
             )
@@ -4096,6 +4099,9 @@ fun OrnateSurahTitle(
         }
     }
 }
+
+/** Paper's chapter-header weave, relative to the dark sheets' strength. */
+private const val PAPER_WEAVE_LIFT = 1.1f
 
 /** Air under the name's descenders handed to the paper below the caps line. */
 private val TOP_BAR_NAME_TRIM = 5.dp
