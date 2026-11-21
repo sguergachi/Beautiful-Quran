@@ -41,6 +41,8 @@ import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -461,6 +463,8 @@ private fun InkCircledChoiceLabel(
         textAlign = textAlign,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = ink),
         modifier = modifier
+            // The circle is drawn, not spoken: say which word it is around.
+            .semantics { this.selected = selected }
             .quietClickable {
                 if (!selected) view.paperSelectHaptic()
                 onSelect()

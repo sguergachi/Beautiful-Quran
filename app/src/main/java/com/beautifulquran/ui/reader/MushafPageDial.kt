@@ -56,6 +56,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -1091,6 +1092,9 @@ private val MushafDialPageTick = 7.dp
  */
 internal val MushafDialBelowGrab = 8.dp
 
+/** The grab strip's test tag; the :baselineprofile dial journeys aim their swipe at it. */
+internal const val MushafPageDialTag = "mushafPageDial"
+
 /** The undo target is generous along the rule while its visible dot stays furniture-sized. */
 private val MushafDialReturnHitWidth = 44.dp
 private val MushafDialReturnDot = 26.dp
@@ -1983,6 +1987,7 @@ internal fun MushafPageDial(
                 .fillMaxWidth()
                 .height(MushafDialSlot + MushafDialBelowGrab)
                 .systemGestureExclusion()
+                .testTag(MushafPageDialTag)
                 .pointerInput(pages) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)

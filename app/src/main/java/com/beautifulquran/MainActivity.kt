@@ -64,6 +64,8 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
@@ -354,7 +356,10 @@ class MainActivity : ComponentActivity() {
                     DisposableEffect(Unit) {
                         onDispose { coverSounds?.release() }
                     }
-                    Box(Modifier.fillMaxSize()) {
+                    // Test tags surface as resource ids, so the :baselineprofile
+                    // journeys can find controls that carry no text of their
+                    // own (the mushaf dial) without inventing a spoken label.
+                    Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
                         if (stackMounted) {
                             PaperStackApp(
                                 themeMode = settings.themeMode,
