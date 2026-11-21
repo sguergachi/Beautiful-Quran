@@ -65,6 +65,13 @@ const GAIN = 0.32
 /** A turn whose audio could not start this soon after it began plays nothing. */
 const LATE_MS = 160
 
+/** The Customize switch. One gate covers every caller — stack, cover, leaves. */
+let soundEffectsEnabled = true
+
+export function setSoundEffectsEnabled(enabled: boolean): void {
+  soundEffectsEnabled = enabled
+}
+
 /** Never the same recording twice running. */
 export function nextFlipIndex(last: number, random: number, count: number = FLIPS.length): number {
   const index = Math.min(count - 1, Math.floor(random * count))
@@ -151,7 +158,7 @@ export function playFlip(schedule: FlipSchedule, initiatedAt = performance.now()
     sources.length = 0
     gain?.disconnect()
   }
-  if (!ctx) return cancel
+  if (!ctx || !soundEffectsEnabled) return cancel
   const flip = FLIPS[(lastFlip = nextFlipIndex(lastFlip, Math.random()))]!
   void fetchStems().then(() => decodeStems(ctx)).then(() => {
     const late = performance.now() - initiatedAt

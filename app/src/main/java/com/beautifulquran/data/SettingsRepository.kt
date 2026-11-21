@@ -137,6 +137,8 @@ data class Settings(
      * gloss the app ships later. Off hides every annotation and its entry
      * gesture; stored writing is never deleted. See docs/ANNOTATIONS.md. */
     val annotationsEnabled: Boolean = true,
+    /** Page-turn and cover-open sound effects; on for every reader until turned off. */
+    val soundEffectsEnabled: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val ayahSelectorSide: AyahSelectorSide = AyahSelectorSide.LEFT,
     /** Last verse recited — shared by Continue Listening and the green ribbon. */
@@ -237,6 +239,7 @@ class SettingsRepository(context: Context) {
         showTransliteration = prefs.getBoolean("showTransliteration", false),
         showTranslation = prefs.getBoolean("showTranslation", false),
         annotationsEnabled = prefs.getBoolean("annotationsEnabled", true),
+        soundEffectsEnabled = prefs.getBoolean("soundEffectsEnabled", true),
         themeMode = prefs.enum("themeMode", ThemeMode.SYSTEM),
         ayahSelectorSide = prefs.enum("ayahSelectorSide", AyahSelectorSide.LEFT),
         lastSurah = prefs.getInt("lastSurah", 0),
@@ -382,6 +385,7 @@ class SettingsRepository(context: Context) {
             putBoolean("showTransliteration", next.showTransliteration)
             putBoolean("showTranslation", next.showTranslation)
             putBoolean("annotationsEnabled", next.annotationsEnabled)
+            putBoolean("soundEffectsEnabled", next.soundEffectsEnabled)
             putInt("themeMode", next.themeMode.ordinal)
             putInt("ayahSelectorSide", next.ayahSelectorSide.ordinal)
             putInt("lastSurah", next.lastSurah)
