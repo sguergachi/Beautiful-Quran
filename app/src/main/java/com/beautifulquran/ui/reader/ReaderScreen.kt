@@ -2145,13 +2145,22 @@ fun ReaderScreen(
             )
         },
         bottomBar = {
-            AyahWheelDismissHost(
-                // A pinned bar is hosted (and its taps caught) by the root;
-                // this slot only holds its height.
-                expanded = ayahSelectorExpanded && !playbackPinned,
-                onDismiss = { ayahSelectorDismissRequests += 1 },
-                content = readerBottomBar,
-            )
+            // The Mushaf sets its own transport on the paper, so this slot
+            // must stay *empty* there, not hold an empty host: Scaffold takes
+            // any bottom bar it is given — even a zero-height one — as the
+            // thing that clears the navigation bar, and drops the inset. The
+            // reading sheet then ran under the gesture pill (or the three
+            // buttons), and the leaf was a navigation bar taller than the one
+            // MainActivity paginates the English book for.
+            if (!mushafMode) {
+                AyahWheelDismissHost(
+                    // A pinned bar is hosted (and its taps caught) by the root;
+                    // this slot only holds its height.
+                    expanded = ayahSelectorExpanded && !playbackPinned,
+                    onDismiss = { ayahSelectorDismissRequests += 1 },
+                    content = readerBottomBar,
+                )
+            }
         },
     ) { padding ->
         val content = uiState.content
