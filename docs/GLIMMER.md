@@ -76,8 +76,8 @@ visible beneath the paper.
 
 Wet ink is optically fuller than dry ink, with a rounded liquid film across
 the stroke interior and localized window reflections. Fresh carbon pigment
-is a near-black `#060708`; it settles to the slightly lighter warm charcoal
-`#34322E` as it dries. Pooling can deepen the wet pigment further, while the
+is a near-black `#060708`; it settles to the page's own scripture ink
+(`#1C1B18`) as it dries. Pooling can deepen the wet pigment further, while the
 localized reflection still catches light. The wet orange repeat accent
 (`#C25F3B`, a warm orange terracotta)
 dries to a slightly paler, less saturated terracotta (about `#CA8164`)
@@ -239,8 +239,8 @@ The word half of the gate is:
 state == Active
 ```
 
-The theme half requires the white-gold glimmer accent (`#F8E9BE`) provided by
-Nightfall and Royal Green. Paper does not define that accent, so it does not
+The theme half requires the white-gold glimmer accent (`glintInk`: `#FFF0C7`
+on Nightfall, `#FFF4D5` on Royal Green) provided by those two themes. Paper does not define that accent, so it does not
 glimmer; on Paper the same wet/dry clock drives the paper ink instead
 ([PAPER_INK.md](PAPER_INK.md)).
 

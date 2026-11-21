@@ -173,6 +173,13 @@ invisible anyway. The tilt sensor's demand is kept alive by an explicit
 `GildingDemand(liveSheen)` in the ceremony, since the renderers' own demands
 see the frozen wrapper.
 
+The leather under all of it (`CoverLeather`) is a radial ramp between two
+greens only a few eight-bit steps apart, so on Android 13+ it is an AGSL copy
+of the gradient with ±1 step of triangular noise (paint dither off, so it does
+not stack with Skia's). The shader and paint are built once; a board resize
+rewrites two uniforms, and no frame allocates. Below 13 it is the plain
+gradient it always was.
+
 The QF SQLite cache opens and migrates lazily on the first background read.
 The application launches its checkpoint/refresh decision on `Dispatchers.IO`,
 so these disk operations do not delay the first cover composition. The bundled
