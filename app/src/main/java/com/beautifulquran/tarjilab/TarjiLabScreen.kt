@@ -56,6 +56,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.RangeSliderState
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -923,16 +925,21 @@ private fun PulseSpeedControl(
                 color = ink.secondary)
             LabIconAction(Icons.Rounded.AutoFixHigh, "Match this section", onMatch, enabled = canMatch)
         }
+        // Material3 1.5 dropped the value-based overloads' custom thumb/track slots; the state
+        // overload takes them, so the caller's range stays the source of truth via this mirror.
+        val sliderState = remember { RangeSliderState(low, high, 84, 1.5f..10f) }
+        if (sliderState.startValue != low) sliderState.startValue = low
+        if (sliderState.endValue != high) sliderState.endValue = high
         RangeSlider(
-            value = low..high, onValueChange = onChange, onValueChangeFinished = onFinished,
-            valueRange = 1.5f..10f, steps = 84, enabled = enabled,
+            state = sliderState, onValueChange = onChange, onValueChangeFinished = onFinished,
+            enabled = enabled,
             startThumb = { PulseThumb(pulseColor) }, endThumb = { PulseThumb(pulseColor) },
             track = { state ->
                 Canvas(Modifier.fillMaxWidth().height(24.dp)) {
                     val y = size.height / 2
                     drawLine(ink.hairline, Offset(0f, y), Offset(size.width, y), 3.dp.toPx(), StrokeCap.Round)
-                    drawLine(pulseColor, Offset((state.activeRangeStart - 1.5f) / 8.5f * size.width, y),
-                        Offset((state.activeRangeEnd - 1.5f) / 8.5f * size.width, y), 3.dp.toPx(), StrokeCap.Round)
+                    drawLine(pulseColor, Offset((state.startValue - 1.5f) / 8.5f * size.width, y),
+                        Offset((state.endValue - 1.5f) / 8.5f * size.width, y), 3.dp.toPx(), StrokeCap.Round)
                 }
             },
             modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Slowest and fastest pulse speed" },
@@ -983,12 +990,15 @@ private fun LabSlider(
             LabIconAction(Icons.Rounded.Remove, "Decrease $label", {
                 onChange((value - step).coerceIn(range)); onFinished()
             }, enabled = enabled && value > range.start)
+            // State overload: Material3 1.5 removed thumb/track from the value-based Slider.
+            val sliderState = remember(range) { SliderState(value.coerceIn(range), 0, range) }
+            val shown = value.coerceIn(range)
+            if (sliderState.value != shown) sliderState.value = shown
             Slider(
-                value = value.coerceIn(range),
+                state = sliderState,
                 onValueChange = onChange,
                 onValueChangeFinished = onFinished,
                 enabled = enabled,
-                valueRange = range,
                 thumb = {
                     PulseThumb(if (enabled) GlintGold else ink.quiet)
                 },

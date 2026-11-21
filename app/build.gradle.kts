@@ -62,10 +62,11 @@ val qcfAssetsDir = layout.buildDirectory.dir("generated/qcfAssets/qcf-v2-fonts")
 
 android {
     namespace = "com.beautifulquran"
-    // API 37 ships as platforms/android-37.0; pin the minor so AGP resolves it.
+    // API 37 ships as platforms/android-37.N; pin the minor so AGP resolves it.
+    // Compose 1.13 requires compileSdk 37.1+.
     compileSdk {
         version = release(37) {
-            minorApiLevel = 0
+            minorApiLevel = 1
         }
     }
 

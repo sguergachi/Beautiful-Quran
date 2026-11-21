@@ -501,8 +501,8 @@ exported from `~/.bashrc`, so **login shells are already set up** — standard
 build/test commands from the "Build, test, run" section above work as-is.
 
 - The startup update script re-creates `local.properties`, so a fresh checkout
-  builds. Install `platforms;android-37.0` and `build-tools;36.0.0` if missing
-  (`compileSdk` uses API 37.0).
+  builds. Install `platforms;android-37.1` and `build-tools;36.0.0` if missing
+  (`compileSdk` uses API 37.1; Compose 1.13 requires it).
 - **Emulator / GUI run works here** (KVM available): `scripts/run_android_app.sh`
   after a one-time `scripts/setup_android_emulator.sh`. Still verify with
   `./gradlew testDebugUnitTest` before committing — the signature word-sync
