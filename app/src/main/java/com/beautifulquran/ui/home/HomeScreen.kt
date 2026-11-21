@@ -70,7 +70,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.withTimeoutOrNull
-import androidx.compose.ui.composed
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -109,7 +109,6 @@ import kotlin.math.roundToInt
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
-import android.os.Build
 import android.os.SystemClock
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.runtime.DisposableEffect
@@ -1144,7 +1143,7 @@ fun HomeScreen(
                                         )
                                     },
                                 )
-                                .then(if (pinned) Modifier.pinnedBand() else Modifier)
+                                .then(if (pinned) Modifier.pinnedBand(QuranTheme.accents.greenWash) else Modifier)
                                 // The band closes with its own air before the
                                 // full list resumes.
                                 .then(
@@ -1590,9 +1589,7 @@ internal fun continueLazyIndex(
  * however many chapters are pinned. The place ribbon hangs in the sheet-edge
  * lane on top of it.
  */
-private fun Modifier.pinnedBand(): Modifier = composed {
-    background(QuranTheme.accents.greenWash)
-}
+private fun Modifier.pinnedBand(greenWash: Color): Modifier = background(greenWash)
 
 /** A chapter row's one key, on the band or in the list: a pinned chapter
  * moves rather than showing twice, so the row itself can travel. */
@@ -2088,13 +2085,7 @@ private fun Modifier.holdToPin(
                         }
                         full = elapsed >= (HoldStartMs + HoldFillMs) * pace
                     }
-                    view.performHapticFeedback(
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                            HapticFeedbackConstants.CONFIRM
-                        } else {
-                            HapticFeedbackConstants.LONG_PRESS
-                        },
-                    )
+                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                     held()
                 }
                 var up: PointerInputChange? = null

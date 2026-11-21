@@ -580,7 +580,7 @@ private fun DrawScope.inkStroke(
     val pad = 4f
     drawContext.canvas.saveLayer(
         Rect(bounds.left - pad, bounds.top - pad, bounds.right + pad, bounds.bottom + pad),
-        Paint(),
+        layerPaint(),
     )
     drawPath(path, color)
     drawRect(

@@ -1,8 +1,5 @@
 package com.beautifulquran.tarjilab
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
@@ -64,6 +61,7 @@ import com.beautifulquran.ui.theme.rememberMirroredSliderState
 import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.beautifulquran.ui.theme.LightStatusBarIconsWhileShown
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -90,12 +88,10 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.ui.reader.InkEngine
 import com.beautifulquran.playback.TarjiDetectorMode
@@ -160,16 +156,7 @@ fun TarjiLabScreen(
         }
     }
 
-    val view = LocalView.current
-    DisposableEffect(view) {
-        val window = view.context.findActivity()?.window
-        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
-        val previous = controller?.isAppearanceLightStatusBars
-        controller?.isAppearanceLightStatusBars = false
-        onDispose {
-            if (previous != null) controller.isAppearanceLightStatusBars = previous
-        }
-    }
+    LightStatusBarIconsWhileShown()
 
     Column(
         modifier = Modifier
@@ -1018,10 +1005,4 @@ private fun LabSlider(
         }
         if (showHelp) Text(help, style = MaterialTheme.typography.bodySmall, color = QuranTheme.ink.secondary)
     }
-}
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }

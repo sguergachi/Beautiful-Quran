@@ -1,9 +1,12 @@
 package com.beautifulquran.ui.theme
 
+import androidx.compose.ui.graphics.ColorFilter
+import android.os.Looper
 import android.graphics.Bitmap
 import android.graphics.BlurMaskFilter
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -26,6 +29,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.text.TextLayoutInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.TextMeasurer
@@ -104,7 +108,7 @@ fun Modifier.letterFadeIn(
         drawIntoCanvas { canvas ->
             canvas.saveLayer(
                 Rect(-bleedPx, -bleedPx, size.width + bleedPx, size.height + bleedPx),
-                Paint(),
+                layerPaint(),
             )
         }
         drawContent()
@@ -147,6 +151,60 @@ fun Modifier.letterFadeIn(
 }
 
 /**
+ * The paint handed to `saveLayer` on the ink draw paths, reset on each call.
+ * `Canvas.saveLayer` copies the paint's alpha, blend mode and color filter
+ * into the recorded layer and keeps no reference, and these draws run on the
+ * UI thread, so one instance serves every layer instead of allocating a Paint
+ * (and its native peer) per word per frame — the bloom list alone is rebuilt
+ * every frame for each unread word of the active verse (127 on 2:282). Off the
+ * main thread it falls back to a fresh paint.
+ */
+internal fun layerPaint(
+    alpha: Float = 1f,
+    blendMode: BlendMode = BlendMode.SrcOver,
+    colorFilter: ColorFilter? = null,
+): Paint {
+    val paint = if (Looper.myLooper() === Looper.getMainLooper()) SharedLayerPaint else Paint()
+    paint.alpha = alpha
+    paint.blendMode = blendMode
+    paint.colorFilter = colorFilter
+    return paint
+}
+
+private val SharedLayerPaint = Paint()
+
+/** An uncached measurer for [measureLoneWord], matched to a laid-out paragraph. */
+private fun loneWordMeasurer(input: TextLayoutInput): TextMeasurer = TextMeasurer(
+    defaultFontFamilyResolver = input.fontFamilyResolver,
+    defaultLocaleList = input.defaultLocaleList,
+    defaultDensity = input.density,
+    defaultLayoutDirection = input.layoutDirection,
+    cacheSize = 0,
+)
+
+/**
+ * Lays out `[start, endExclusive)` of [input]'s text on its own, one line,
+ * with the paragraph's style, density and fonts (no first-line indent), so a
+ * word can be drawn or traced apart from its line. Callers check the lone
+ * word's advance against the line's before trusting it.
+ */
+private fun TextMeasurer.measureLoneWord(
+    input: TextLayoutInput,
+    start: Int,
+    endExclusive: Int,
+): TextLayoutResult = measure(
+    text = input.text.subSequence(start, endExclusive),
+    style = input.style.copy(textIndent = TextIndent.None),
+    overflow = TextOverflow.Visible,
+    softWrap = false,
+    maxLines = 1,
+    layoutDirection = input.layoutDirection,
+    density = input.density,
+    fontFamilyResolver = input.fontFamilyResolver,
+    skipCache = true,
+)
+
+/**
  * Draw-phase alpha for word-local text. Unlike a tight graphics layer, this
  * offscreen layer includes enough bleed for Latin serifs and Arabic marks that
  * paint beyond the word's advance, so animated ink never shears an overhang.
@@ -163,7 +221,7 @@ fun Modifier.glyphLayerAlpha(alpha: () -> Float): Modifier = drawWithContent {
     drawIntoCanvas { canvas ->
         canvas.saveLayer(
             Rect(-bleed, -bleed, size.width + bleed, size.height + bleed),
-            Paint().apply { this.alpha = value },
+            layerPaint(alpha = value),
         )
     }
     drawContent()
@@ -527,7 +585,7 @@ fun Modifier.shapedWordBloom(
             drawIntoCanvas { canvas ->
                 canvas.saveLayer(
                     Rect(-extra, -extra, size.width + extra, size.height + extra),
-                    Paint(),
+                    layerPaint(),
                 )
             }
         }
@@ -732,7 +790,7 @@ fun Modifier.shapedWordBloom(
                             // Fade the finished tint and halo together. SrcIn
                             // below also reaches the halo inside the range;
                             // fading its source would dry that light twice.
-                            Paint().apply { alpha = bloom.layerAlpha.coerceIn(0f, 1f) },
+                            layerPaint(alpha = bloom.layerAlpha.coerceIn(0f, 1f)),
                         )
                     }
                     // Glow rides the same DstIn directional wash as the tint —
@@ -1176,24 +1234,8 @@ private class WordInkCache {
         if (textLayout.getLineForOffset(endExclusive - 1) != line) return null
         val input = textLayout.layoutInput
         if (input.placeholders.any { it.start < endExclusive && it.end > start }) return null
-        val textMeasurer = measurer ?: TextMeasurer(
-            defaultFontFamilyResolver = input.fontFamilyResolver,
-            defaultLocaleList = input.defaultLocaleList,
-            defaultDensity = input.density,
-            defaultLayoutDirection = input.layoutDirection,
-            cacheSize = 0,
-        ).also { measurer = it }
-        val word = textMeasurer.measure(
-            text = input.text.subSequence(start, endExclusive),
-            style = input.style.copy(textIndent = TextIndent.None),
-            overflow = TextOverflow.Visible,
-            softWrap = false,
-            maxLines = 1,
-            layoutDirection = input.layoutDirection,
-            density = input.density,
-            fontFamilyResolver = input.fontFamilyResolver,
-            skipCache = true,
-        )
+        val textMeasurer = measurer ?: loneWordMeasurer(input).also { measurer = it }
+        val word = textMeasurer.measureLoneWord(input, start, endExclusive)
         val a = word.getHorizontalPosition(0, usePrimaryDirection = true)
         val b = word.getHorizontalPosition(endExclusive - start, usePrimaryDirection = true)
         if (abs(abs(b - a) - box.width) > WordInkAdvanceSlackPx) return null
@@ -1373,24 +1415,8 @@ private class RaisedMarkTraceCache {
         if (!fontSize.isSp) return null
         val fontPx = with(input.density) { fontSize.toPx() }
         if (fontPx <= 0f) return null
-        val textMeasurer = measurer ?: TextMeasurer(
-            defaultFontFamilyResolver = input.fontFamilyResolver,
-            defaultLocaleList = input.defaultLocaleList,
-            defaultDensity = input.density,
-            defaultLayoutDirection = input.layoutDirection,
-            cacheSize = 0,
-        ).also { measurer = it }
-        val word = textMeasurer.measure(
-            text = input.text.subSequence(start, endExclusive),
-            style = input.style.copy(textIndent = TextIndent.None),
-            overflow = TextOverflow.Visible,
-            softWrap = false,
-            maxLines = 1,
-            layoutDirection = input.layoutDirection,
-            density = input.density,
-            fontFamilyResolver = input.fontFamilyResolver,
-            skipCache = true,
-        )
+        val textMeasurer = measurer ?: loneWordMeasurer(input).also { measurer = it }
+        val word = textMeasurer.measureLoneWord(input, start, endExclusive)
         val wordLength = word.layoutInput.text.length
         if (wordLength <= 0 || word.size.width <= 0 || word.size.height <= 0) return null
         val wordLeft = minOf(
@@ -1461,7 +1487,7 @@ private fun DrawScope.coverRaisedMarks(
         drawIntoCanvas { canvas ->
             canvas.saveLayer(
                 Rect(mask.left, mask.top, mask.left + mask.width, mask.top + mask.height),
-                Paint().apply { this.blendMode = BlendMode.DstOut },
+                layerPaint(blendMode = BlendMode.DstOut),
             )
         }
         drawImage(
@@ -2107,48 +2133,59 @@ fun Modifier.verticalFadingEdges(
     /** Opaque paper band under the bottom fade — lifts the soft edge above a
      *  bottom chrome strip (e.g. the cover sheet's floating playback bar). */
     bottomInset: Dp = 0.dp,
-): Modifier = drawWithContent {
-    drawContent()
+): Modifier = drawWithCache {
+    // Scrolling redraws the content under the edges every frame; the bands
+    // and their gradients depend only on size, color and insets, so they are
+    // built once per size here rather than allocated per scroll frame.
     val topInsetPx = topInset.toPx()
-    if (topInsetPx > 0f) {
-        drawRect(
-            color = color,
-            topLeft = Offset.Zero,
-            size = Size(size.width, topInsetPx),
-        )
-    }
     val topPx = top.toPx()
-    if (topPx > 0f) {
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(color, color.copy(alpha = 0f)),
-                startY = topInsetPx,
-                endY = topInsetPx + topPx,
-            ),
-            topLeft = Offset(0f, topInsetPx),
-            size = Size(size.width, topPx),
-        )
-    }
     val bottomInsetPx = bottomInset.toPx()
-    if (bottomInsetPx > 0f) {
-        drawRect(
-            color = color,
-            topLeft = Offset(0f, size.height - bottomInsetPx),
-            size = Size(size.width, bottomInsetPx),
-        )
-    }
     val bottomPx = bottom.toPx()
-    if (bottomPx > 0f) {
-        val fadeBottom = size.height - bottomInsetPx
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(color.copy(alpha = 0f), color),
-                startY = fadeBottom - bottomPx,
-                endY = fadeBottom,
-            ),
-            topLeft = Offset(0f, fadeBottom - bottomPx),
-            size = Size(size.width, bottomPx),
+    val fadeBottom = size.height - bottomInsetPx
+    val topBrush = if (topPx > 0f) {
+        Brush.verticalGradient(
+            colors = listOf(color, color.copy(alpha = 0f)),
+            startY = topInsetPx,
+            endY = topInsetPx + topPx,
         )
+    } else {
+        null
+    }
+    val bottomBrush = if (bottomPx > 0f) {
+        Brush.verticalGradient(
+            colors = listOf(color.copy(alpha = 0f), color),
+            startY = fadeBottom - bottomPx,
+            endY = fadeBottom,
+        )
+    } else {
+        null
+    }
+    onDrawWithContent {
+        drawContent()
+        if (topInsetPx > 0f) {
+            drawRect(color = color, topLeft = Offset.Zero, size = Size(size.width, topInsetPx))
+        }
+        if (topBrush != null) {
+            drawRect(
+                brush = topBrush,
+                topLeft = Offset(0f, topInsetPx),
+                size = Size(size.width, topPx),
+            )
+        }
+        if (bottomInsetPx > 0f) {
+            drawRect(
+                color = color,
+                topLeft = Offset(0f, size.height - bottomInsetPx),
+                size = Size(size.width, bottomInsetPx),
+            )
+        }
+        if (bottomBrush != null) {
+            drawRect(
+                brush = bottomBrush,
+                topLeft = Offset(0f, fadeBottom - bottomPx),
+                size = Size(size.width, bottomPx),
+            )
+        }
     }
 }
 

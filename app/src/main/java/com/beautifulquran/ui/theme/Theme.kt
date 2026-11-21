@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -550,6 +551,20 @@ fun royalGreenOverlayColorScheme(): ColorScheme = RoyalGreenColors
 /** The ladder that goes with [royalGreenOverlayColorScheme]. */
 @Composable
 fun royalGreenOverlayInk(): QuranInk = RoyalInkLadder
+
+/**
+ * Hosts a contextual teaching bloom on the fixed royal-green surface. The
+ * overlay swaps the sheet out from under its content, so it swaps the ink
+ * ladder too: the sheet's rungs are solved against the sheet's paper and land
+ * on the wrong weights here. Typography is the sheet's own.
+ */
+@Composable
+fun RoyalGreenOverlay(content: @Composable () -> Unit) {
+    val typography = MaterialTheme.typography
+    CompositionLocalProvider(LocalQuranInk provides royalGreenOverlayInk()) {
+        MaterialTheme(colorScheme = royalGreenOverlayColorScheme(), typography = typography, content = content)
+    }
+}
 
 /** These contrasting overlays are always a dark surface, so their gold/orange
  * accents use the dark set regardless of the user's theme — the reader's own

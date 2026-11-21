@@ -24,12 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Repeat
-import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,7 +50,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.theme.cachedAlpha
 import com.beautifulquran.ui.theme.DisclosureChevron
@@ -182,9 +176,8 @@ fun PlayerBar(
                         bottom = 4.dp,
                     ),
             ) {
-                val repeatActive = state.repeatMode != Player.REPEAT_MODE_OFF || state.repeatRange != null
-                val speedActive = state.speed != 1f
-                val singleAyahRange = state.repeatRange?.let { it.first == it.last } == true
+                val repeatActive = state.repeatActive
+                val speedActive = state.speedActive
                 IconButton(
                     onClick = onRepeatClick,
                     enabled = enabled,
@@ -193,11 +186,7 @@ fun PlayerBar(
                         .graphicsLayer { cachedAlpha(if (repeatActive) 1f else chromeAlpha()) },
                 ) {
                     Icon(
-                        imageVector = if (state.repeatMode == Player.REPEAT_MODE_ONE || singleAyahRange) {
-                            Icons.Rounded.RepeatOne
-                        } else {
-                            Icons.Rounded.Repeat
-                        },
+                        imageVector = state.repeatIcon,
                         contentDescription = "Repeat",
                         tint = if (repeatActive) {
                             MaterialTheme.colorScheme.primary
@@ -223,24 +212,11 @@ fun PlayerBar(
                     enabled = enabled,
                     modifier = Modifier.size(56.dp),
                 ) {
-                    if (state.isBuffering && isThisSurahLoaded) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = if (state.isPlaying && isThisSurahLoaded) {
-                                Icons.Rounded.Pause
-                            } else {
-                                Icons.Rounded.PlayArrow
-                            },
-                            contentDescription = if (state.isPlaying) "Pause" else "Play",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(34.dp),
-                        )
-                    }
+                    PlayPauseGlyph(
+                        playing = state.isPlaying && isThisSurahLoaded,
+                        buffering = state.isBuffering && isThisSurahLoaded,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 IconButton(
                     onClick = onFastForward,
@@ -262,7 +238,7 @@ fun PlayerBar(
                         .graphicsLayer { cachedAlpha(if (speedActive) 1f else chromeAlpha()) },
                 ) {
                     Text(
-                        text = "${if (state.speed % 1f == 0f) state.speed.toInt() else state.speed}×",
+                        text = state.speedLabel,
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.SemiBold,
                             fontSize = typeScale(15.sp),

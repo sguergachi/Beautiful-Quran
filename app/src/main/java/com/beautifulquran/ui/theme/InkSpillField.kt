@@ -31,7 +31,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
-import kotlin.math.hypot
 
 /**
  * Optically scatters the live reader only where the vellum is translucent.
@@ -526,7 +525,3 @@ internal const val VellumSpotShader = """
     }
 """
 
-private fun Offset.normalized(): Offset {
-    val length = hypot(x, y)
-    return if (length > 1e-4f) this / length else Offset(1f, 0f)
-}

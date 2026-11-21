@@ -1,8 +1,7 @@
 package com.beautifulquran.ui.entrance
 
 import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
@@ -285,8 +284,9 @@ fun EntranceCover(
     }
 
     // Full-bleed leather: hide the status bar for the ceremony, restore after.
+    val activityWindow = LocalActivity.current?.window
     DisposableEffect(view) {
-        val window = view.context.findActivity()?.window
+        val window = activityWindow
         val controller = window?.let { WindowCompat.getInsetsController(it, view) }
         controller?.hide(WindowInsetsCompat.Type.statusBars())
         controller?.systemBarsBehavior =
@@ -669,10 +669,4 @@ private fun CoverLoadProgress(
 private fun openFade(t: Float): Float {
     val f = ((t - 0.55f) / 0.45f).coerceIn(0f, 1f)
     return f * f * (3f - 2f * f)
-}
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }

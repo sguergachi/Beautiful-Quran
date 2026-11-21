@@ -146,6 +146,7 @@ import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.theme.cachedAlpha
 import com.beautifulquran.ui.theme.paperink.PaperInk
 import com.beautifulquran.ui.theme.cachedWhileStill
+import com.beautifulquran.ui.theme.layerPaint
 import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.forCaps
 import com.beautifulquran.ui.theme.liningFigures
@@ -988,17 +989,26 @@ internal fun rememberInkCoverRelease(enabled: Boolean, state: InkEngine.State): 
     val history = remember { InkCoverRelease(read) }
     val releasing = history.releasing(upcoming)
     SideEffect { history.commit(upcoming, read) }
-    val remaining = animateFloatAsState(
+    val remaining = rememberInkDepartureRemaining(upcoming, label = "inkCoverRelease")
+    return remaining.takeIf { releasing }
+}
+
+/**
+ * The ink-departure clock both covers ride: 1 while a word is read, easing to
+ * 0 over [InkEngine.INK_DEPARTURE_MS] once it becomes upcoming again (a seek
+ * or repeat sends it back), and snapping straight to 1 when it is read anew.
+ */
+@Composable
+internal fun rememberInkDepartureRemaining(upcoming: Boolean, label: String): State<Float> =
+    animateFloatAsState(
         targetValue = if (upcoming) 0f else 1f,
         animationSpec = if (upcoming) {
             tween(InkEngine.INK_DEPARTURE_MS, easing = FastOutSlowInEasing)
         } else {
             snap()
         },
-        label = "inkCoverRelease",
+        label = label,
     )
-    return remaining.takeIf { releasing }
-}
 
 internal class InkMotion(
     val ink: InkEngine.Word,
@@ -1211,10 +1221,7 @@ private fun Modifier.bleedAlphaLayer(alpha: () -> Float, color: () -> Color): Mo
     drawIntoCanvas { canvas ->
         canvas.saveLayer(
             Rect(-bleed, -bleed, size.width + bleed, size.height + bleed),
-            Paint().apply {
-                this.alpha = a
-                colorFilter = ColorFilter.tint(color())
-            },
+            layerPaint(alpha = a, colorFilter = ColorFilter.tint(color())),
         )
     }
     drawContent()

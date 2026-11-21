@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
@@ -14,9 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.reader.ContextualPulseMark
 import com.beautifulquran.ui.theme.ContextualFeatureTip
 import com.beautifulquran.ui.theme.ContextualTipPlacement
-import com.beautifulquran.ui.theme.LocalQuranInk
-import com.beautifulquran.ui.theme.royalGreenOverlayColorScheme
-import com.beautifulquran.ui.theme.royalGreenOverlayInk
+import com.beautifulquran.ui.theme.RoyalGreenOverlay
 
 /**
  * The pinning lesson, written around the live row of the chapter being read:
@@ -36,34 +33,26 @@ internal fun PinChapterTip(
 ) {
     val paper = MaterialTheme.colorScheme.background
     val ink = MaterialTheme.colorScheme.onSurface
-    val typography = MaterialTheme.typography
-    // The overlay swaps the sheet out from under its content, so it has to
-    // swap the ink ladder too (see AyahRailTip).
-    CompositionLocalProvider(LocalQuranInk provides royalGreenOverlayInk()) {
-        MaterialTheme(
-            colorScheme = royalGreenOverlayColorScheme(),
-            typography = typography,
-        ) {
-            ContextualFeatureTip(
-                visible = visible,
-                title = "Keep it at the top",
-                body = "Press and hold this chapter to pin it.",
-                onDismiss = onDismiss,
-                spotlightCenter = { target },
-                placement = ContextualTipPlacement(bodyAngleDegrees = 0f),
-                actionCenter = {
-                    DpOffset(maxWidth - 68.dp, maxHeight - 72.dp)
-                },
-                dismissPaperColor = paper,
-                dismissInkColor = ink,
-                onRenderedChange = onRenderedChange,
-                contentPadding = PaddingValues(start = 18.dp, end = 28.dp),
-                guideWidthFraction = 0.62f,
-                guideHeight = 300.dp,
-                mark = { ContextualPulseMark() },
-                modifier = modifier.fillMaxSize(),
-            )
-        }
+    RoyalGreenOverlay {
+        ContextualFeatureTip(
+            visible = visible,
+            title = "Keep it at the top",
+            body = "Press and hold this chapter to pin it.",
+            onDismiss = onDismiss,
+            spotlightCenter = { target },
+            placement = ContextualTipPlacement(bodyAngleDegrees = 0f),
+            actionCenter = {
+                DpOffset(maxWidth - 68.dp, maxHeight - 72.dp)
+            },
+            dismissPaperColor = paper,
+            dismissInkColor = ink,
+            onRenderedChange = onRenderedChange,
+            contentPadding = PaddingValues(start = 18.dp, end = 28.dp),
+            guideWidthFraction = 0.62f,
+            guideHeight = 300.dp,
+            mark = { ContextualPulseMark() },
+            modifier = modifier.fillMaxSize(),
+        )
     }
 }
 

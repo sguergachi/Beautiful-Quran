@@ -2,9 +2,8 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.domain.EnglishTypography
 import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.view.WindowManager
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -108,15 +107,12 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.platform.LocalLocaleList
-import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -368,14 +364,10 @@ fun ReaderScreen(
     // of the phone. See EnglishLeafRuler.
     val mushafLeafMetrics = remember { mutableStateOf<FloatArray?>(null) }
     val rulerDensity = LocalDensity.current
-    val rulerResolver = LocalFontFamilyResolver.current
-    val rulerLayoutDirection = LocalLayoutDirection.current
-    val rulerLocales = LocalLocaleList.current
-    // Its own measurer: the ruler lays out a thousand leaves off the main
-    // thread and must not share a cache with the one the leaves are drawn from.
-    val rulerMeasurer = remember(rulerResolver, rulerLocales, rulerDensity, rulerLayoutDirection) {
-        TextMeasurer(rulerResolver, rulerLocales, rulerDensity, rulerLayoutDirection)
-    }
+    // Its own measurer (rememberTextMeasurer makes a fresh instance per call
+    // site): the ruler lays out a thousand leaves off the main thread and must
+    // not share a cache with the one the leaves are drawn from.
+    val rulerMeasurer = rememberTextMeasurer()
     val rulerWindow = LocalWindowInfo.current.containerSize
     val leafMetrics = mushafLeafMetrics.value
     val inkLabOpen = playbackHost?.inkLabOpen == true
@@ -798,8 +790,9 @@ fun ReaderScreen(
         }
     }
     val view = LocalView.current
+    val activityWindow = LocalActivity.current?.window
     DisposableEffect(view, recitingActive, keepStatusBarVisible) {
-        val window = view.context.findActivity()?.window
+        val window = activityWindow
         val controller = window?.let { WindowCompat.getInsetsController(it, view) }
         if (recitingActive) {
             window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -3880,12 +3873,6 @@ fun ReaderScreen(
  */
 private const val REPEAT_BLEED_ORIGIN_X = 0.5f
 private const val REPEAT_BLEED_ORIGIN_Y = 0.88f
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
-}
 
 /** Chrome / rail / bookmark fade while recitation starts or stops. */
 private const val ChromeRecedeMs = InkEngine.CHROME_RECEDE_MS

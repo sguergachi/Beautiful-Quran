@@ -20,11 +20,6 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Repeat
-import androidx.compose.material.icons.rounded.RepeatOne
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,9 +42,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.dp
-import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
 import com.beautifulquran.ui.reader.InkLabPanel
+import com.beautifulquran.ui.reader.PlayPauseGlyph
+import com.beautifulquran.ui.reader.repeatActive
+import com.beautifulquran.ui.reader.repeatIcon
+import com.beautifulquran.ui.reader.speedActive
+import com.beautifulquran.ui.reader.speedLabel
 import com.beautifulquran.ui.reader.InkLabToggleButton
 import com.beautifulquran.ui.reader.ReciterNameButton
 import com.beautifulquran.ui.theme.FloatingPaperEnter
@@ -174,20 +173,14 @@ fun FloatingPlaybackControl(
                             .fillMaxWidth()
                             .padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
                     ) {
-                        val rangeActive = state.repeatRange != null
-                        val singleAyahRange = state.repeatRange?.let { it.first == it.last } == true
                         IconButton(onClick = onRepeatClick, modifier = Modifier.size(48.dp)) {
                             Icon(
-                                imageVector = if (state.repeatMode == Player.REPEAT_MODE_ONE || singleAyahRange) {
-                                    Icons.Rounded.RepeatOne
-                                } else {
-                                    Icons.Rounded.Repeat
-                                },
+                                imageVector = state.repeatIcon,
                                 contentDescription = "Repeat",
-                                tint = if (state.repeatMode == Player.REPEAT_MODE_OFF && !rangeActive) {
-                                    QuranTheme.ink.furniture
-                                } else {
+                                tint = if (state.repeatActive) {
                                     MaterialTheme.colorScheme.primary
+                                } else {
+                                    QuranTheme.ink.furniture
                                 },
                             )
                         }
@@ -199,24 +192,11 @@ fun FloatingPlaybackControl(
                             )
                         }
                         IconButton(onClick = onPlayPause, modifier = Modifier.size(56.dp)) {
-                            if (state.isBuffering) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = if (state.isPlaying) {
-                                        Icons.Rounded.Pause
-                                    } else {
-                                        Icons.Rounded.PlayArrow
-                                    },
-                                    contentDescription = if (state.isPlaying) "Pause" else "Play",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(34.dp),
-                                )
-                            }
+                            PlayPauseGlyph(
+                                playing = state.isPlaying,
+                                buffering = state.isBuffering,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         IconButton(onClick = onFastForward, modifier = Modifier.size(48.dp)) {
                             Icon(
@@ -231,12 +211,12 @@ fun FloatingPlaybackControl(
                             modifier = Modifier.size(48.dp),
                         ) {
                             Text(
-                                text = "${if (state.speed % 1f == 0f) state.speed.toInt() else state.speed}×",
+                                text = state.speedLabel,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (state.speed == 1f) {
-                                    QuranTheme.ink.furniture
-                                } else {
+                                color = if (state.speedActive) {
                                     MaterialTheme.colorScheme.primary
+                                } else {
+                                    QuranTheme.ink.furniture
                                 },
                             )
                         }
