@@ -208,6 +208,12 @@ private fun TextMeasurer.measureLoneWord(
  * Draw-phase alpha for word-local text. Unlike a tight graphics layer, this
  * offscreen layer includes enough bleed for Latin serifs and Arabic marks that
  * paint beyond the word's advance, so animated ink never shears an overhang.
+ *
+ * Kept as a saveLayer, not `graphicsLayer { outsets = LayerOutsets(...) }`
+ * ([cachedWhileStill]'s port): a RenderNode's alpha layer quantises alpha by
+ * truncation where [layerPaint] rounds, so resting unread ink (0.2661 → 67
+ * vs 68 of 255) would shift, and an Offscreen layer would be resampled under
+ * the reader's sliding and scaling sheets instead of drawn in device space.
  */
 fun Modifier.glyphLayerAlpha(alpha: () -> Float): Modifier = drawWithContent {
     val value = alpha().coerceIn(0f, 1f)

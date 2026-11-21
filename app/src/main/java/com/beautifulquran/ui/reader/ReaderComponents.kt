@@ -1213,7 +1213,10 @@ private fun Modifier.tarjiPulseTrace(trace: InkEngine.TarjiTrace, rtl: Boolean, 
     }
 
 /** Draw-phase alpha gate for a glyph layer, padded by [GlintLayerBleed] so the
- * halo's blur is not clipped at the layer edge. */
+ * halo's blur is not clipped at the layer edge. A saveLayer, not a
+ * `graphicsLayer` with outsets: a layer colour filter forces a compositing
+ * RenderNode, rendered at its own resolution and resampled under the reader's
+ * sliding and scaling sheets, softening the glint (see [glyphLayerAlpha]). */
 private fun Modifier.bleedAlphaLayer(alpha: () -> Float, color: () -> Color): Modifier = drawWithContent {
     val a = alpha()
     if (a <= 0f) return@drawWithContent
