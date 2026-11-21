@@ -43,7 +43,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -64,6 +63,7 @@ import com.beautifulquran.domain.juzOpeningAt
 import com.beautifulquran.ui.theme.BookTextPaintFlags
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.LocalQuranAccents
+import com.beautifulquran.ui.theme.setManagedColor
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import com.beautifulquran.ui.theme.QuranTypeProfile
 import com.beautifulquran.ui.theme.SerifFontFamily
@@ -727,18 +727,16 @@ internal fun AyahSelectorRail(
                     // The number's own ink; the annotations trail at a fraction
                     // of it, so the aside is never louder than the figure.
                     val numberInkAlpha = (0.30f + 0.5f * focus) * arrival * edgeFade
-                    numberPaint.color = when {
-                        isSelected -> accents.gold.copy(alpha = 0.95f * arrival).toArgb()
-                        isBookmarked -> accents.bookmarkRibbon
-                            .copy(alpha = (0.4f + 0.5f * focus) * arrival * edgeFade)
-                            .toArgb()
-                        isPlace -> currentPlaceGreen
-                            .copy(alpha = (0.4f + 0.5f * focus) * arrival * edgeFade)
-                            .toArgb()
-                        else -> onSurface
-                            .copy(alpha = numberInkAlpha)
-                            .toArgb()
-                    }
+                    numberPaint.setManagedColor(
+                        when {
+                            isSelected -> accents.gold.copy(alpha = 0.95f * arrival)
+                            isBookmarked -> accents.bookmarkRibbon
+                                .copy(alpha = (0.4f + 0.5f * focus) * arrival * edgeFade)
+                            isPlace -> currentPlaceGreen
+                                .copy(alpha = (0.4f + 0.5f * focus) * arrival * edgeFade)
+                            else -> onSurface.copy(alpha = numberInkAlpha)
+                        },
+                    )
                     numberPaint.textSize = if (isSelected) {
                         selectedNumberSize.toPx()
                     } else {
@@ -788,7 +786,7 @@ internal fun AyahSelectorRail(
                         } else {
                             start - bounds.left
                         }
-                        paint.color = markInk.toArgb()
+                        paint.setManagedColor(markInk)
                         drawIntoCanvas { canvas ->
                             // The signs are ornaments, not letters: centre their ink on the row so
                             // they sit at the x-height of the words beside them, instead of

@@ -4930,19 +4930,39 @@ button.ayah-mark {
  * Enter: circle clip expands (ink spreads open). Exit: a hole punches open
  * from the same origin, revealing the reader underneath — same as Android. */
 .ink-bleed {
-  /* Royal Green palette — scoped so the bleed does not inherit reader paper. */
+  /* Royal Green palette — scoped so the bleed does not inherit reader paper.
+   * Values are Android's RoyalGreenColors / RoyalInkLadder exactly. */
   --paper: #062c24;
   --paper-surface: #0a382e;
-  --ink: #e8e2d5;
-  --ink-muted: #97917f;
-  --accent: #7fb8a4;
-  --accent-soft: #7fb8a4;
+  --paper-high: #10483b;
+  --ink: #f8f2e4;
+  --ink-muted: #d0cab8;
+  --ink-rung-strong: rgb(248 242 228 / 0.952);
+  --ink-rung-body: rgb(248 242 228 / 0.876);
+  --ink-rung-secondary: rgb(248 242 228 / 0.811);
+  --ink-rung-tertiary: rgb(208 202 184 / 0.903);
+  --ink-rung-muted: rgb(208 202 184 / 0.8);
+  --ink-rung-quiet: rgb(208 202 184 / 0.718);
+  --ink-rung-furniture: rgb(208 202 184 / 0.573);
+  --ink-rung-hairline: rgb(208 202 184 / 0.402);
+  --ink-rung-wash: rgb(208 202 184 / 0.212);
+  --accent: #8cc6b1;
+  --on-accent: #06382d;
+  --accent-soft: #8cc6b1;
   --accent-container: #0e5c4a;
-  --gold: #d9b44a;
-  --gold-bright: #e9cd7a;
-  --gold-deep: #a8842a;
-  --repeat: #e06a18;
-  --bookmark: #d64358;
+  /* Accents are Android's TimingsLabAccents (Royal Green) under either sheet. */
+  --gold: #d0aa4d;
+  --gold-ink: #d7b255;
+  --gold-bright: #f2d68f;
+  --gold-deep: #a07f38;
+  --green-ink: #95d9c1;
+  --green-quiet: #78b49f;
+  --green-wash: #133b32;
+  --emboss-dark: rgba(0, 0, 0, 0.4);
+  --emboss-light: rgba(255, 255, 255, 0.122);
+  --repeat: #ff8948;
+  --bookmark: #ff727b;
+  --annotation: #f4a4b2;
   color-scheme: dark;
 
   position: absolute;
@@ -4989,18 +5009,25 @@ button.ayah-mark {
 
 /* Under Royal Green the reader already is that green — Nightfall for contrast. */
 [data-theme='royal_green'] .ink-bleed {
-  --paper: #0a0b0c;
-  --paper-surface: #111315;
-  --ink: #e8e2d5;
-  --ink-muted: #97917f;
-  --accent: #7fb8a4;
-  --accent-soft: #7fb8a4;
-  --accent-container: #282d30;
-  --gold: #d9b44a;
-  --gold-bright: #e9cd7a;
-  --gold-deep: #a8842a;
-  --repeat: #e06a18;
-  --bookmark: #d64358;
+  /* Android DarkColors / NightInkLadder; accents stay Royal Green (above). */
+  --paper: #0c0b09;
+  --paper-surface: #141310;
+  --paper-high: #1e1c18;
+  --ink: #f3ecdf;
+  --ink-muted: #cbc4b3;
+  --ink-rung-strong: rgb(243 236 223 / 0.96);
+  --ink-rung-body: rgb(243 236 223 / 0.89);
+  --ink-rung-secondary: rgb(243 236 223 / 0.829);
+  --ink-rung-tertiary: rgb(203 196 179 / 0.916);
+  --ink-rung-muted: rgb(203 196 179 / 0.819);
+  --ink-rung-quiet: rgb(203 196 179 / 0.743);
+  --ink-rung-furniture: rgb(203 196 179 / 0.614);
+  --ink-rung-hairline: rgb(203 196 179 / 0.453);
+  --ink-rung-wash: rgb(203 196 179 / 0.28);
+  --accent: #88c0ac;
+  --on-accent: #06382d;
+  --accent-soft: #88c0ac;
+  --accent-container: #2b2822;
 }
 
 .ink-bleed-inner {
@@ -6950,8 +6977,9 @@ html[data-entrance='true'] body {
   z-index: 18;
   pointer-events: none;
   /* Fixed royal-green teaching surface — Android royalGreenOverlayColorScheme. */
-  --tip-ink: #e8e2d5;
-  --tip-ink-muted: rgba(232, 226, 213, 0.76);
+  /* RoyalInkLadder: title in scripture (onSurface), lesson in body. */
+  --tip-ink: #f8f2e4;
+  --tip-ink-muted: rgb(248 242 228 / 0.876);
   color: var(--tip-ink);
 }
 

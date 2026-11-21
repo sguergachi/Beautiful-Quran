@@ -925,7 +925,7 @@ private fun TarjiStatusLine() {
     var status by remember { mutableStateOf("…") }
     val idleColor = MaterialTheme.colorScheme.onSurfaceVariant
     var signalColor by remember { mutableStateOf(idleColor) }
-    val gold = Color(0xFFF8E9BE) // the glint's white-gold
+    val gold = com.beautifulquran.ui.theme.GlintWhiteGold
     androidx.compose.runtime.LaunchedEffect(mode) {
         while (true) {
             val v = com.beautifulquran.playback.VoiceEnergy.active

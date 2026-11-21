@@ -178,10 +178,7 @@ private fun ShaderInkSpillField(
         shader.setFloatUniform("blurStrength", tuning.blurStrength)
         shader.setFloatUniform("vellumGrain", tuning.vellumGrain)
         shader.setFloatUniform("verticalTaper", tuning.verticalTaper)
-        shader.setColorUniform(
-            "inkColor",
-            android.graphics.Color.valueOf(color.red, color.green, color.blue, color.alpha),
-        )
+        shader.setManagedColorUniform("inkColor", color)
         drawRect(brush)
     }
 }

@@ -239,15 +239,18 @@ fun MushafCoverFrame(
 /**
  * Gilds the content it wraps: a vertical gold-leaf gradient is composited
  * onto the rendered glyphs (SrcAtop), so text itself reads as leafed gold.
- * The offscreen layer is only the size of the mark — a few dp — so this is
- * reserved for small ornaments like ayah numbers.
+ * The leaf is the same three-stop ramp as every other gilt figure ([goldBrush]:
+ * deep → bright → deep), here on a fixed vertical axis, so the light catches
+ * the middle of the mark rather than only its top. The offscreen layer is
+ * only the size of the mark — a few dp — so this is reserved for small
+ * ornaments like ayah numbers.
  */
 fun Modifier.gilded(bright: Color, deep: Color): Modifier =
     graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
             drawRect(
-                brush = Brush.verticalGradient(listOf(bright, deep)),
+                brush = Brush.verticalGradient(listOf(deep, bright, deep)),
                 blendMode = BlendMode.SrcAtop,
             )
         }

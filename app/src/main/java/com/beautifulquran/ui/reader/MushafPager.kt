@@ -95,7 +95,6 @@ import androidx.core.content.res.ResourcesCompat
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import com.beautifulquran.R
 import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_INK_MID_EM
 import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_GLYPH
@@ -105,6 +104,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.core.snap
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.setManagedColor
 
 /**
  * What the leaf needs to know about playback, in one place so it can be handed
@@ -2070,7 +2070,7 @@ private fun MushafBasmalahLine(
         android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             typeface = face
             textSize = fontPx
-            color = ink.toArgb()
+            setManagedColor(ink)
             textAlign = android.graphics.Paint.Align.CENTER
         }
     }

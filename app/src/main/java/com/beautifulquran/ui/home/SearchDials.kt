@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -53,8 +55,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.abs
 import com.beautifulquran.ui.theme.QuranTheme
 
-/** Dark ink for text sitting on the flat gold Open button — readable on both light and dark gold. */
-private val OnGold = Color(0xFF241B00)
 private val SurahWheelHorizontalPadding = 8.dp
 private val SurahNumberColumnWidth = 22.dp
 private val SurahNameGap = 8.dp
@@ -263,7 +263,6 @@ private fun NumberItem(value: Int, selected: Boolean) {
 
 @Composable
 private fun GoRow(surah: Surah, ayah: Int, onClick: () -> Unit) {
-    val accents = LocalQuranAccents.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
@@ -277,15 +276,16 @@ private fun GoRow(surah: Surah, ayah: Int, onClick: () -> Unit) {
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.padding(horizontal = 6.dp))
+        // A quiet green word, like every other text action: gold is ornament,
+        // never interaction, and a filled pill is chrome (docs/DESIGN.md).
         Text(
             text = "Open",
             style = MaterialTheme.typography.labelLarge,
-            color = OnGold,
+            color = QuranTheme.accents.greenInk,
             modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .quietClickable(onClick = onClick)
-                .background(accents.gold)
-                .padding(horizontal = 22.dp, vertical = 9.dp),
+                .quietClickable(role = Role.Button, onClick = onClick)
+                .minimumInteractiveComponentSize()
+                .padding(horizontal = 12.dp),
         )
     }
 }

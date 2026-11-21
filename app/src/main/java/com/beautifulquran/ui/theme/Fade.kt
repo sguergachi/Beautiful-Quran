@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.StrokeCap
@@ -838,7 +837,7 @@ fun Modifier.shapedWordBloom(
                         val glowPaint = android.graphics.Paint(
                             android.graphics.Paint.ANTI_ALIAS_FLAG,
                         ).apply {
-                            color = glowColor.copy(alpha = glowAlpha).toArgb()
+                            setManagedColor(glowColor.copy(alpha = glowAlpha))
                         }
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawBitmap(

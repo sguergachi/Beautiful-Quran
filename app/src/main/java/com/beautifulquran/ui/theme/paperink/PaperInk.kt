@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.TextLayoutInput
 import androidx.compose.ui.text.TextLayoutResult
 import com.beautifulquran.domain.TajweedPacing
+import com.beautifulquran.ui.theme.setManagedColorUniform
 import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 import kotlin.math.ceil
@@ -119,6 +120,10 @@ object PaperInk {
         internal var shader: Any? = null
         /** Whether [shader] samples the shared paper yet, not its placeholder. */
         internal var paperBound = false
+        /** The inks last written to [shader]; Unspecified until the first draw. */
+        internal var dryInk = Color.Unspecified
+        internal var wetInk = Color.Unspecified
+        internal var repeatColor = Color.Unspecified
     }
 
     /**
@@ -462,9 +467,21 @@ object PaperInk {
             shader.setFloatUniform("repeatTint", frame.repeatTint)
             shader.setFloatUniform("retained", frame.retained)
             shader.setFloatUniform("evaporation", frame.evaporation)
-            shader.setFloatUniform("dryInk", frame.dryInk.red, frame.dryInk.green, frame.dryInk.blue)
-            shader.setFloatUniform("wetInk", frame.wetInk.red, frame.wetInk.green, frame.wetInk.blue)
-            shader.setFloatUniform("repeatColor", frame.repeatColor.red, frame.repeatColor.green, frame.repeatColor.blue)
+            // Colour-managed, and set only when they change: a colour uniform
+            // goes through the framework's colour conversion, and a word's inks
+            // rarely move between frames.
+            if (word.dryInk != frame.dryInk) {
+                shader.setManagedColorUniform("dryInk", frame.dryInk)
+                word.dryInk = frame.dryInk
+            }
+            if (word.wetInk != frame.wetInk) {
+                shader.setManagedColorUniform("wetInk", frame.wetInk)
+                word.wetInk = frame.wetInk
+            }
+            if (word.repeatColor != frame.repeatColor) {
+                shader.setManagedColorUniform("repeatColor", frame.repeatColor)
+                word.repeatColor = frame.repeatColor
+            }
             shader.setFloatUniform("unreadAlpha", frame.unreadAlpha)
             shader.setFloatUniform("weight", paperInkPoolingWeight(frame.pooling, word.unit * 160f, density))
             shader.setFloatUniform("reflectionStrength", frame.reflection)

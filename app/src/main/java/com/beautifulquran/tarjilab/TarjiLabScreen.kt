@@ -84,7 +84,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -97,13 +96,13 @@ import com.beautifulquran.ui.reader.InkEngine
 import com.beautifulquran.playback.TarjiDetectorMode
 import com.beautifulquran.ui.theme.ArabicWordStyle
 import com.beautifulquran.ui.theme.InkCircledChoiceRow
+import com.beautifulquran.ui.theme.GlintWhiteGold
 import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.setManagedColor
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.QuranTheme
-
-private val GlintGold = Color(0xFFF8E9BE)
 
 /**
  * Live detector workbench: loop real PCM and tune the algorithm while its
@@ -409,7 +408,7 @@ private fun LabIconAction(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale = animateFloatAsState(if (pressed) 0.9f else 1f, label = "control press")
-    val ink = if (!enabled) QuranTheme.ink.quiet else if (selected || prominent) GlintGold else QuranTheme.ink.secondary
+    val ink = if (!enabled) QuranTheme.ink.quiet else if (selected || prominent) GlintWhiteGold else QuranTheme.ink.secondary
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.size(48.dp)
@@ -464,7 +463,7 @@ private fun PreviewWord(
         val level = com.beautifulquran.ui.theme.glintLightLevel(
             light.next(resonance.light, System.nanoTime(), tuning.tarjiLightSmoothMs),
             ui.displayKnobs.glintBrightness, tuning.tarjiLightRise, tuning.tarjiLightFall)
-        val pulseColor = com.beautifulquran.ui.theme.glintLightColor(GlintGold, level, tuning.glintRestLight)
+        val pulseColor = com.beautifulquran.ui.theme.glintLightColor(GlintWhiteGold, level, tuning.glintRestLight)
         Canvas(Modifier.fillMaxSize()) {
             val amount = com.beautifulquran.ui.theme.glintGlowAlpha(0.3f, level, tuning.tarjiGlowGain, tuning.glintRestLight)
             if (amount > 0.01f) {
@@ -634,7 +633,7 @@ private fun WaveformPanel(
                 val left = viewX(hold.startMs, size.width, view)
                 val right = viewX(hold.endMs, size.width, view)
                 drawRect(
-                    GlintGold.copy(alpha = 0.07f),
+                    GlintWhiteGold.copy(alpha = 0.07f),
                     topLeft = Offset(left, 0f),
                     size = Size((right - left).coerceAtLeast(0f), size.height),
                 )
@@ -767,14 +766,14 @@ private fun DetectorReadout(ui: TarjiLabViewModel.TarjiLabUiState, playheadMs: F
             color = QuranTheme.ink.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(if (ui.showingReference) "Reference" else status,
             style = MaterialTheme.typography.labelSmall,
-            color = if (ui.showingReference) GlintGold else if ((point?.gain ?: 0f) > 0.001f) QuranTheme.accents.greenInk else QuranTheme.ink.secondary,
+            color = if (ui.showingReference) GlintWhiteGold else if ((point?.gain ?: 0f) > 0.001f) QuranTheme.accents.greenInk else QuranTheme.ink.secondary,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 private fun DrawScope.drawGuide(text: String, color: Color) {
     val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color.toArgb()
+        setManagedColor(color)
         textSize = 30f
         textAlign = android.graphics.Paint.Align.CENTER
     }
@@ -986,14 +985,14 @@ private fun LabSlider(
                 onValueChangeFinished = onFinished,
                 enabled = enabled,
                 thumb = {
-                    PulseThumb(if (enabled) GlintGold else ink.quiet)
+                    PulseThumb(if (enabled) GlintWhiteGold else ink.quiet)
                 },
                 track = { state ->
                     Canvas(Modifier.fillMaxWidth().height(24.dp)) {
                         val fraction = ((state.value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
                         val start = Offset(0f, size.height / 2)
                         drawLine(ink.hairline, start, Offset(size.width, start.y), 3.dp.toPx(), StrokeCap.Round)
-                        drawLine(if (enabled) GlintGold else ink.quiet, start,
+                        drawLine(if (enabled) GlintWhiteGold else ink.quiet, start,
                             Offset(size.width * fraction, start.y), 3.dp.toPx(), StrokeCap.Round)
                     }
                 },

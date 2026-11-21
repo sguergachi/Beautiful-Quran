@@ -175,6 +175,14 @@ data class QuranAccents(
 
 val LocalQuranAccents = staticCompositionLocalOf { LightAccents }
 
+/**
+ * The fresh-ink glint's white gold — Nightfall's [QuranAccents.glintInk]: a
+ * breath brighter than the page's own ink, so fresh ink glints on the night
+ * page without shouting. The developer labs show the glint with it off the
+ * reading page, where the theme may have no glint of its own.
+ */
+val GlintWhiteGold = Color(0xFFFFF0C7)
+
 private val LightColors: ColorScheme = lightColorScheme(
     primary = DeepGreen,
     onPrimary = Color.White,
@@ -469,9 +477,7 @@ private val DarkAccents = QuranAccents(
     // instead of muddying into the surface.
     bookmarkRibbon = Color(0xFFFF6672),
     annotationInk = Color(0xFFF0A5B1),
-    // White gold: a breath brighter than the page's own ink, so fresh ink
-    // glints on the night page without shouting.
-    glintInk = Color(0xFFFFF0C7),
+    glintInk = GlintWhiteGold,
 )
 
 /** Royal Green's paper is a full step lighter than Nightfall's, so it cannot

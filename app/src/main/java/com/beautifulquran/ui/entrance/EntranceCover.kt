@@ -43,7 +43,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
@@ -70,8 +69,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import com.beautifulquran.ui.theme.CoverAccents
-import com.beautifulquran.ui.theme.CoverLeatherCenter
-import com.beautifulquran.ui.theme.CoverLeatherEdge
 import com.beautifulquran.ui.theme.CoverParchment
 import com.beautifulquran.ui.theme.GildingDemand
 import com.beautifulquran.ui.theme.GildingTilt
@@ -298,6 +295,7 @@ fun EntranceCover(
     }
 
     val accents = CoverAccents
+    val leather = remember { CoverLeather() }
     // The gilding catches light as the phone is tilted. Without an
     // accelerometer to tilt it, the cover keeps its slow idle sweep; the
     // indeterminate load bar rides the same one.
@@ -435,13 +433,8 @@ fun EntranceCover(
                     clip = true
                 }
                 .drawWithCache {
-                    val leather = Brush.radialGradient(
-                        0f to CoverLeatherCenter,
-                        1f to CoverLeatherEdge,
-                        center = Offset(size.width / 2f, size.height * 0.42f),
-                        radius = size.height * 0.75f,
-                    )
-                    onDrawBehind { drawRect(leather) }
+                    leather.resize(size)
+                    onDrawBehind { with(leather) { drawLeather() } }
                 }
                 .quietClickable(
                     enabled = phase != EntrancePhase.Opening,
