@@ -1,8 +1,5 @@
 package com.beautifulquran.tarjilab
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
@@ -31,6 +28,10 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.maxLengthTrim
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -55,9 +56,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import com.beautifulquran.ui.theme.rememberMirroredRangeSliderState
+import com.beautifulquran.ui.theme.rememberMirroredSliderState
 import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.beautifulquran.ui.theme.LightStatusBarIconsWhileShown
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,28 +84,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.ui.reader.InkEngine
 import com.beautifulquran.playback.TarjiDetectorMode
 import com.beautifulquran.ui.theme.ArabicWordStyle
 import com.beautifulquran.ui.theme.InkCircledChoiceRow
+import com.beautifulquran.ui.theme.GlintWhiteGold
 import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.setManagedColor
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.QuranTheme
-
-private val GlintGold = Color(0xFFF8E9BE)
 
 /**
  * Live detector workbench: loop real PCM and tune the algorithm while its
@@ -154,16 +155,7 @@ fun TarjiLabScreen(
         }
     }
 
-    val view = LocalView.current
-    DisposableEffect(view) {
-        val window = view.context.findActivity()?.window
-        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
-        val previous = controller?.isAppearanceLightStatusBars
-        controller?.isAppearanceLightStatusBars = false
-        onDispose {
-            if (previous != null) controller.isAppearanceLightStatusBars = previous
-        }
-    }
+    LightStatusBarIconsWhileShown()
 
     Column(
         modifier = Modifier
@@ -244,7 +236,8 @@ fun TarjiLabScreen(
                         onReset = viewModel::resetKnobs,
                         onMatch = viewModel::matchPulse,
                         onExport = { viewModel.prepareSampleExport()?.let { exportLauncher.launch(it) } },
-                        onNotes = viewModel::updateSampleNotes,
+                        notes = viewModel.sampleNotesField,
+                        notesLimit = viewModel.sampleNotesLimit,
                         onFinished = viewModel::finishKnobEdit,
                         onImport = {
                             importLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
@@ -415,7 +408,7 @@ private fun LabIconAction(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale = animateFloatAsState(if (pressed) 0.9f else 1f, label = "control press")
-    val ink = if (!enabled) QuranTheme.ink.quiet else if (selected || prominent) GlintGold else QuranTheme.ink.secondary
+    val ink = if (!enabled) QuranTheme.ink.quiet else if (selected || prominent) GlintWhiteGold else QuranTheme.ink.secondary
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.size(48.dp)
@@ -470,7 +463,7 @@ private fun PreviewWord(
         val level = com.beautifulquran.ui.theme.glintLightLevel(
             light.next(resonance.light, System.nanoTime(), tuning.tarjiLightSmoothMs),
             ui.displayKnobs.glintBrightness, tuning.tarjiLightRise, tuning.tarjiLightFall)
-        val pulseColor = com.beautifulquran.ui.theme.glintLightColor(GlintGold, level, tuning.glintRestLight)
+        val pulseColor = com.beautifulquran.ui.theme.glintLightColor(GlintWhiteGold, level, tuning.glintRestLight)
         Canvas(Modifier.fillMaxSize()) {
             val amount = com.beautifulquran.ui.theme.glintGlowAlpha(0.3f, level, tuning.tarjiGlowGain, tuning.glintRestLight)
             if (amount > 0.01f) {
@@ -640,7 +633,7 @@ private fun WaveformPanel(
                 val left = viewX(hold.startMs, size.width, view)
                 val right = viewX(hold.endMs, size.width, view)
                 drawRect(
-                    GlintGold.copy(alpha = 0.07f),
+                    GlintWhiteGold.copy(alpha = 0.07f),
                     topLeft = Offset(left, 0f),
                     size = Size((right - left).coerceAtLeast(0f), size.height),
                 )
@@ -773,14 +766,14 @@ private fun DetectorReadout(ui: TarjiLabViewModel.TarjiLabUiState, playheadMs: F
             color = QuranTheme.ink.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(if (ui.showingReference) "Reference" else status,
             style = MaterialTheme.typography.labelSmall,
-            color = if (ui.showingReference) GlintGold else if ((point?.gain ?: 0f) > 0.001f) QuranTheme.accents.greenInk else QuranTheme.ink.secondary,
+            color = if (ui.showingReference) GlintWhiteGold else if ((point?.gain ?: 0f) > 0.001f) QuranTheme.accents.greenInk else QuranTheme.ink.secondary,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 private fun DrawScope.drawGuide(text: String, color: Color) {
     val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color.toArgb()
+        setManagedColor(color)
         textSize = 30f
         textAlign = android.graphics.Paint.Align.CENTER
     }
@@ -796,7 +789,8 @@ private fun KnobsPanel(
     onMatch: () -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
-    onNotes: (String) -> Unit,
+    notes: TextFieldState,
+    notesLimit: Int,
     onFinished: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -881,13 +875,13 @@ private fun KnobsPanel(
                 WordAction("Import sample", onImport, QuranTheme.ink.secondary)
             }
             BasicTextField(
-                value = ui.sampleNotes,
-                onValueChange = onNotes,
+                state = notes,
+                inputTransformation = InputTransformation.maxLengthTrim(notesLimit),
                 textStyle = MaterialTheme.typography.bodySmall.copy(color = QuranTheme.ink.secondary),
-                maxLines = 2,
-                decorationBox = { field ->
+                lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 2),
+                decorator = { field ->
                     Box(Modifier.padding(vertical = 12.dp)) {
-                        if (ui.sampleNotes.isEmpty()) Text("Sample note (optional)",
+                        if (notes.text.isEmpty()) Text("Sample note (optional)",
                             style = MaterialTheme.typography.bodySmall, color = QuranTheme.ink.quiet)
                         field()
                     }
@@ -923,16 +917,17 @@ private fun PulseSpeedControl(
                 color = ink.secondary)
             LabIconAction(Icons.Rounded.AutoFixHigh, "Match this section", onMatch, enabled = canMatch)
         }
+        val sliderState = rememberMirroredRangeSliderState(low, high, 1.5f..10f, steps = 84)
         RangeSlider(
-            value = low..high, onValueChange = onChange, onValueChangeFinished = onFinished,
-            valueRange = 1.5f..10f, steps = 84, enabled = enabled,
+            state = sliderState, onValueChange = onChange, onValueChangeFinished = onFinished,
+            enabled = enabled,
             startThumb = { PulseThumb(pulseColor) }, endThumb = { PulseThumb(pulseColor) },
             track = { state ->
                 Canvas(Modifier.fillMaxWidth().height(24.dp)) {
                     val y = size.height / 2
                     drawLine(ink.hairline, Offset(0f, y), Offset(size.width, y), 3.dp.toPx(), StrokeCap.Round)
-                    drawLine(pulseColor, Offset((state.activeRangeStart - 1.5f) / 8.5f * size.width, y),
-                        Offset((state.activeRangeEnd - 1.5f) / 8.5f * size.width, y), 3.dp.toPx(), StrokeCap.Round)
+                    drawLine(pulseColor, Offset((state.startValue - 1.5f) / 8.5f * size.width, y),
+                        Offset((state.endValue - 1.5f) / 8.5f * size.width, y), 3.dp.toPx(), StrokeCap.Round)
                 }
             },
             modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Slowest and fastest pulse speed" },
@@ -983,21 +978,21 @@ private fun LabSlider(
             LabIconAction(Icons.Rounded.Remove, "Decrease $label", {
                 onChange((value - step).coerceIn(range)); onFinished()
             }, enabled = enabled && value > range.start)
+            val sliderState = rememberMirroredSliderState(value, range)
             Slider(
-                value = value.coerceIn(range),
+                state = sliderState,
                 onValueChange = onChange,
                 onValueChangeFinished = onFinished,
                 enabled = enabled,
-                valueRange = range,
                 thumb = {
-                    PulseThumb(if (enabled) GlintGold else ink.quiet)
+                    PulseThumb(if (enabled) GlintWhiteGold else ink.quiet)
                 },
                 track = { state ->
                     Canvas(Modifier.fillMaxWidth().height(24.dp)) {
                         val fraction = ((state.value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
                         val start = Offset(0f, size.height / 2)
                         drawLine(ink.hairline, start, Offset(size.width, start.y), 3.dp.toPx(), StrokeCap.Round)
-                        drawLine(if (enabled) GlintGold else ink.quiet, start,
+                        drawLine(if (enabled) GlintWhiteGold else ink.quiet, start,
                             Offset(size.width * fraction, start.y), 3.dp.toPx(), StrokeCap.Round)
                     }
                 },
@@ -1009,10 +1004,4 @@ private fun LabSlider(
         }
         if (showHelp) Text(help, style = MaterialTheme.typography.bodySmall, color = QuranTheme.ink.secondary)
     }
-}
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }

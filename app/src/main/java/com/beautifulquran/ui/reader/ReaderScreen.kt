@@ -2,9 +2,8 @@ package com.beautifulquran.ui.reader
 
 import com.beautifulquran.domain.EnglishTypography
 import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.view.WindowManager
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -46,7 +45,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Tune
@@ -59,7 +61,6 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -105,14 +106,12 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -142,6 +141,8 @@ import com.beautifulquran.ui.reader.MushafQcfFonts
 import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.reader.focus.rememberReaderFocusController
 import com.beautifulquran.ui.share.ShareRibbon
+import com.beautifulquran.ui.theme.QuietButton
+import com.beautifulquran.ui.theme.cachedAlpha
 import com.beautifulquran.ui.theme.FloatingPaperControl
 import com.beautifulquran.ui.theme.InkRevealOverlay
 import com.beautifulquran.ui.theme.IslamicReturnToAyahButton
@@ -166,6 +167,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -364,13 +366,10 @@ fun ReaderScreen(
     // of the phone. See EnglishLeafRuler.
     val mushafLeafMetrics = remember { mutableStateOf<FloatArray?>(null) }
     val rulerDensity = LocalDensity.current
-    val rulerResolver = LocalFontFamilyResolver.current
-    val rulerLayoutDirection = LocalLayoutDirection.current
-    // Its own measurer: the ruler lays out a thousand leaves off the main
-    // thread and must not share a cache with the one the leaves are drawn from.
-    val rulerMeasurer = remember(rulerResolver, rulerDensity, rulerLayoutDirection) {
-        TextMeasurer(rulerResolver, rulerDensity, rulerLayoutDirection)
-    }
+    // Its own measurer (rememberTextMeasurer makes a fresh instance per call
+    // site): the ruler lays out a thousand leaves off the main thread and must
+    // not share a cache with the one the leaves are drawn from.
+    val rulerMeasurer = rememberTextMeasurer()
     val rulerWindow = LocalWindowInfo.current.containerSize
     val leafMetrics = mushafLeafMetrics.value
     val inkLabOpen = playbackHost?.inkLabOpen == true
@@ -545,7 +544,13 @@ fun ReaderScreen(
     var bookmarkNoteTipRibbonCenterY by remember { mutableFloatStateOf(Float.NaN) }
     var ayahRailTipOpen by rememberSaveable { mutableStateOf(false) }
     var ayahRailTipRendered by remember { mutableStateOf(false) }
+    // The rail's centre in root coordinates. A page turn scales and slides
+    // this sheet, so the rail reports a new centre on every frame of a turn:
+    // composition reads only whether there is one (and the value itself only
+    // while the lesson is up), or the whole reader recomposed per frame of
+    // every turn and its cached sheet layer re-rendered with it.
     var ayahRailTipCenterY by remember { mutableFloatStateOf(Float.NaN) }
+    val ayahRailTipHasTarget by remember { derivedStateOf { ayahRailTipCenterY.isFinite() } }
     /**
      * Commits the open draft and closes the editor. Called when the field loses
      * focus, *before* opening another verse's note (so a draft is never carried
@@ -634,7 +639,7 @@ fun ReaderScreen(
     var retainedRepeatChoice by rememberSaveable { mutableStateOf<RepeatChoice?>(null) }
     val bookmarkNoteTipVisible = bookmarkNoteTipOpen &&
         bookmarkNoteTipSurah != 0 && bookmarkNoteTipAyah != 0
-    val ayahRailTipVisible = ayahRailTipOpen && ayahRailTipCenterY.isFinite()
+    val ayahRailTipVisible = ayahRailTipOpen && ayahRailTipHasTarget
     // Guide **Got it** rests near the playback fold; mute transport while open
     // so an overlapping thumb cannot fire Repeat / Play instead of dismiss.
     val contextualGuideOpen = bookmarkNoteTipOpen || ayahRailTipOpen
@@ -793,8 +798,9 @@ fun ReaderScreen(
         }
     }
     val view = LocalView.current
+    val activityWindow = LocalActivity.current?.window
     DisposableEffect(view, recitingActive, keepStatusBarVisible) {
-        val window = view.context.findActivity()?.window
+        val window = activityWindow
         val controller = window?.let { WindowCompat.getInsetsController(it, view) }
         if (recitingActive) {
             window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -1473,21 +1479,24 @@ fun ReaderScreen(
 
     // Offer the rail lesson only as a chapter settles. Enabling the developer
     // gate over an already-open reader waits for the next chapter opening.
+    // Still restarted by every move of the rail — the lesson waits for it to
+    // sit still — but the centre is followed here, not as a composition key.
     LaunchedEffect(
         uiState.content?.surah?.id,
         initialFocusSettled,
-        ayahRailTipCenterY,
         chapterAdvancing,
         verseRevealForSurah,
     ) {
-        if (!initialFocusSettled || !ayahRailTipCenterY.isFinite() ||
-            chapterAdvancing || verseRevealForSurah != 0 || recitingActive
-        ) {
-            return@LaunchedEffect
-        }
-        delay(320)
-        if (viewModel.shouldShowAyahRailTip() && !bookmarkNoteTipOpen) {
-            ayahRailTipOpen = true
+        snapshotFlow { ayahRailTipCenterY }.collectLatest { centerY ->
+            if (!initialFocusSettled || !centerY.isFinite() ||
+                chapterAdvancing || verseRevealForSurah != 0 || recitingActive
+            ) {
+                return@collectLatest
+            }
+            delay(320)
+            if (viewModel.shouldShowAyahRailTip() && !bookmarkNoteTipOpen) {
+                ayahRailTipOpen = true
+            }
         }
     }
 
@@ -1701,7 +1710,7 @@ fun ReaderScreen(
     val bookmarkGuidePresent = (bookmarkNoteTipVisible || bookmarkNoteTipRendered) &&
         bookmarkTipHasTarget
     val railGuidePresent = (ayahRailTipVisible || ayahRailTipRendered) &&
-        ayahRailTipCenterY.isFinite()
+        ayahRailTipHasTarget
     val contextualGuideVisible =
         (bookmarkNoteTipVisible && bookmarkTipHasTarget) || ayahRailTipVisible
     val contextualGuideRendered = bookmarkGuidePresent || railGuidePresent
@@ -1811,18 +1820,17 @@ fun ReaderScreen(
                 title = {
                     if (search.active) {
                         BasicTextField(
-                            value = search.query,
-                            onValueChange = { search.query = it },
-                            singleLine = true,
+                            state = search.queryField,
+                            lineLimits = TextFieldLineLimits.SingleLine,
                             textStyle = MaterialTheme.typography.bodyLarge.copy(
                                 color = MaterialTheme.colorScheme.onSurface,
                             ),
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                            decorationBox = { inner ->
+                            onKeyboardAction = { keyboard?.hide() },
+                            decorator = { inner ->
                                 Box(contentAlignment = Alignment.CenterStart) {
-                                    if (search.query.isEmpty()) {
+                                    if (search.queryField.text.isEmpty()) {
                                         Text(
                                             text = "Find an English word…",
                                             style = MaterialTheme.typography.bodyLarge,
@@ -1930,7 +1938,7 @@ fun ReaderScreen(
                     // and search change its ink or action.
                     Row {
                         if (search.active || mushafMode) {
-                            IconButton(
+                            QuietButton(
                                 onClick = { if (search.active) search.close() else onBack() },
                                 enabled = search.active || !recitingActive,
                                 modifier = Modifier.offset(x = topBarStartShift),
@@ -1959,7 +1967,7 @@ fun ReaderScreen(
                                 )
                             }
                         } else {
-                            IconButton(
+                            QuietButton(
                                 onClick = onBack,
                                 enabled = !recitingActive,
                                 // Ink on the left text rule. Offset, not padding:
@@ -2000,7 +2008,7 @@ fun ReaderScreen(
                                 maxLines = 1,
                                 modifier = Modifier.widthIn(min = 40.dp),
                             )
-                            IconButton(
+                            QuietButton(
                                 onClick = {
                                     if (searchMatches.isNotEmpty()) {
                                         keyboard?.hide()
@@ -2016,7 +2024,7 @@ fun ReaderScreen(
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            IconButton(
+                            QuietButton(
                                 onClick = {
                                     if (searchMatches.isNotEmpty()) {
                                         keyboard?.hide()
@@ -2034,7 +2042,7 @@ fun ReaderScreen(
                         }
                     } else {
                         if (!mushafMode) {
-                            IconButton(
+                            QuietButton(
                                 onClick = { search.active = true },
                                 enabled = !recitingActive,
                                 modifier = Modifier.offset(x = -topBarEndShift),
@@ -2137,13 +2145,22 @@ fun ReaderScreen(
             )
         },
         bottomBar = {
-            AyahWheelDismissHost(
-                // A pinned bar is hosted (and its taps caught) by the root;
-                // this slot only holds its height.
-                expanded = ayahSelectorExpanded && !playbackPinned,
-                onDismiss = { ayahSelectorDismissRequests += 1 },
-                content = readerBottomBar,
-            )
+            // The Mushaf sets its own transport on the paper, so this slot
+            // must stay *empty* there, not hold an empty host: Scaffold takes
+            // any bottom bar it is given — even a zero-height one — as the
+            // thing that clears the navigation bar, and drops the inset. The
+            // reading sheet then ran under the gesture pill (or the three
+            // buttons), and the leaf was a navigation bar taller than the one
+            // MainActivity paginates the English book for.
+            if (!mushafMode) {
+                AyahWheelDismissHost(
+                    // A pinned bar is hosted (and its taps caught) by the root;
+                    // this slot only holds its height.
+                    expanded = ayahSelectorExpanded && !playbackPinned,
+                    onDismiss = { ayahSelectorDismissRequests += 1 },
+                    content = readerBottomBar,
+                )
+            }
         },
     ) { padding ->
         val content = uiState.content
@@ -2627,7 +2644,11 @@ fun ReaderScreen(
                 .padding(bottom = padding.calculateBottomPadding())
                 .fillMaxSize()
                 .clipToBounds()
-                .graphicsLayer { alpha = readerContentAlpha.value }
+                // Cached while it fades in: as plain alpha the whole page was
+                // a fresh offscreen render pass every frame of the entrance —
+                // and those frames are the sheet's own turn, so the turn's
+                // cached sheet re-rendered the page each frame as well.
+                .graphicsLayer { cachedAlpha(readerContentAlpha.value) }
                 .onGloballyPositioned { readerRootY = it.positionInRoot().y },
         ) {
             val selectorSide = settings.ayahSelectorSide
@@ -3767,7 +3788,12 @@ fun ReaderScreen(
         AyahRailTip(
             visible = ayahRailTipVisible && !mushafMode,
             railSide = settings.ayahSelectorSide,
-            targetCenterY = with(density) { ayahRailTipCenterY.toDp() },
+            // Read only while the lesson shows; see ayahRailTipCenterY.
+            targetCenterY = if (ayahRailTipVisible || ayahRailTipRendered) {
+                with(density) { ayahRailTipCenterY.toDp() }
+            } else {
+                Dp.Unspecified
+            },
             onDismiss = {
                 viewModel.dismissAyahRailTip()
                 ayahRailTipOpen = false
@@ -3877,12 +3903,6 @@ fun ReaderScreen(
 private const val REPEAT_BLEED_ORIGIN_X = 0.5f
 private const val REPEAT_BLEED_ORIGIN_Y = 0.88f
 
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
-}
-
 /** Chrome / rail / bookmark fade while recitation starts or stops. */
 private const val ChromeRecedeMs = InkEngine.CHROME_RECEDE_MS
 
@@ -3893,11 +3913,12 @@ private const val ChromeRecedeMs = InkEngine.CHROME_RECEDE_MS
  */
 private class SurahSearchState(
     activeState: MutableState<Boolean>,
-    queryState: MutableState<String>,
+    /** The search field's own text state; typing edits it in place. */
+    val queryField: TextFieldState,
     indexState: MutableState<Int>,
 ) {
     var active by activeState
-    var query by queryState
+    val query: String get() = queryField.text.toString()
     var index by indexState
 
     /** Non-null while a usable query is live (search open, ≥ 2 chars). */
@@ -3906,7 +3927,7 @@ private class SurahSearchState(
 
     fun close() {
         active = false
-        query = ""
+        queryField.clearText()
         index = 0
     }
 }
@@ -3914,7 +3935,7 @@ private class SurahSearchState(
 @Composable
 private fun rememberSurahSearchState(): SurahSearchState {
     val active = rememberSaveable { mutableStateOf(false) }
-    val query = rememberSaveable { mutableStateOf("") }
+    val query = rememberTextFieldState()
     val index = rememberSaveable { mutableIntStateOf(0) }
     return remember { SurahSearchState(active, query, index) }
 }

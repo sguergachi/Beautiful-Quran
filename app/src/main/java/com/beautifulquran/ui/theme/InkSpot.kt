@@ -112,16 +112,12 @@ fun Modifier.inkSpotHighlight(
             shader.setFloatUniform("rimInset", VerseSoakRimInset.toPx())
             val source = verseSoakSource(spreadSource.value, size)
             shader.setFloatUniform("spreadSource", source.x, source.y)
-            shader.setColorUniform(
+            shader.setManagedColorUniform(
                 "inkColor",
-                android.graphics.Color.valueOf(
-                    color.red,
-                    color.green,
-                    color.blue,
-                    // Verse soaks keep the caller's ink; tool-strip drops
-                    // are a concentrated stain and need the 0.38 wash.
-                    if (fillBox) color.alpha else color.alpha * 0.38f,
-                ),
+                color,
+                // Verse soaks keep the caller's ink; tool-strip drops
+                // are a concentrated stain and need the 0.38 wash.
+                alpha = if (fillBox) color.alpha else color.alpha * 0.38f,
             )
             drawRect(brush)
         } else {

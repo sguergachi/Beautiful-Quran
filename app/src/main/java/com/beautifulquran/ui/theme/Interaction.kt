@@ -7,6 +7,14 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -58,6 +66,36 @@ fun Modifier.quietClickable(
             onClick = onClick,
         )
     }
+
+/**
+ * The paper stand-in for Material's `IconButton` / `TextButton`: the same
+ * geometry — a 40 dp box centred in a 48 dp touch target, content centred,
+ * disabled content at 38% of [LocalContentColor] — and the same
+ * `Role.Button` semantics, but tapped through [quietClickable], so there is no
+ * ripple and no circle clip for one to draw in (docs/DESIGN.md: taps have no
+ * ripple). A caller's `size` wins over the 40 dp, as it does for IconButton.
+ */
+@Composable
+fun QuietButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val contentColor = LocalContentColor.current
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .minimumInteractiveComponentSize()
+            .size(40.dp)
+            .quietClickable(enabled = enabled, role = Role.Button, onClick = onClick),
+    ) {
+        CompositionLocalProvider(
+            LocalContentColor provides if (enabled) contentColor else contentColor.copy(alpha = 0.38f),
+            content = content,
+        )
+    }
+}
 
 /**
  * Consumes every touch that lands on this element, so content beneath never

@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import com.beautifulquran.ui.theme.rememberMirroredSliderState
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -924,7 +925,7 @@ private fun TarjiStatusLine() {
     var status by remember { mutableStateOf("…") }
     val idleColor = MaterialTheme.colorScheme.onSurfaceVariant
     var signalColor by remember { mutableStateOf(idleColor) }
-    val gold = Color(0xFFF8E9BE) // the glint's white-gold
+    val gold = com.beautifulquran.ui.theme.GlintWhiteGold
     androidx.compose.runtime.LaunchedEffect(mode) {
         while (true) {
             val v = com.beautifulquran.playback.VoiceEnergy.active
@@ -1088,12 +1089,11 @@ private fun TuningSlider(
             modifier = Modifier.width(112.dp),
         )
         Slider(
-            value = position,
+            state = rememberMirroredSliderState(position),
             onValueChange = { t ->
                 val raw = inkLabPositionToValue(t, range)
                 onChange(if (integer) raw.roundToInt().toFloat() else raw)
             },
-            valueRange = 0f..1f,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary,

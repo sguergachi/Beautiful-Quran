@@ -1,10 +1,8 @@
 package com.beautifulquran.ornamentslab
 
-import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.ContextWrapper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +24,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.filterNotNull
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -36,7 +41,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import com.beautifulquran.ui.theme.LightStatusBarIconsWhileShown
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,14 +50,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.beautifulquran.ui.theme.GeneratedChapterRosette
 import com.beautifulquran.ui.theme.LocalQuranAccents
@@ -87,23 +90,26 @@ fun OrnamentsLabScreen(
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
 
-    var seedText by remember(ui.seed) { mutableStateOf(ui.seed.toString()) }
-    var saveName by remember { mutableStateOf("") }
+    // Typing a minus and digits only; every parseable value becomes the seed,
+    // and a stepper/random seed from the ViewModel replaces the text.
+    val seedField = rememberTextFieldState(ui.seed.toString())
+    LaunchedEffect(ui.seed) {
+        if (seedField.text.toString().toIntOrNull() != ui.seed) {
+            seedField.setTextAndPlaceCursorAtEnd(ui.seed.toString())
+        }
+    }
+    LaunchedEffect(seedField) {
+        snapshotFlow { seedField.text.toString().toIntOrNull() }
+            .filterNotNull()
+            .collect(viewModel::setSeed)
+    }
+    val saveName = rememberTextFieldState()
     var fFold by remember { mutableStateOf<Int?>(null) }
     var fPattern by remember { mutableStateOf<String?>(null) }
 
     // Dark workbench: force light status-bar icons so the clock/battery don't
     // read as black-on-black over royal green. Restored when the Lab closes.
-    val view = LocalView.current
-    DisposableEffect(view) {
-        val window = view.context.findActivity()?.window
-        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
-        val previous = controller?.isAppearanceLightStatusBars
-        controller?.isAppearanceLightStatusBars = false
-        onDispose {
-            if (previous != null) controller.isAppearanceLightStatusBars = previous
-        }
-    }
+    LightStatusBarIconsWhileShown()
 
     fun copySeed() {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -160,15 +166,14 @@ fun OrnamentsLabScreen(
         ) {
             Stepper("‹", onClick = { viewModel.step(-1) })
             BasicTextField(
-                value = seedText,
-                onValueChange = { text ->
-                    // Allow typing a minus and digits only; commit on a parseable int.
-                    if (text.isEmpty() || text == "-" || text.toIntOrNull() != null) {
-                        seedText = text
-                        text.toIntOrNull()?.let(viewModel::setSeed)
+                state = seedField,
+                inputTransformation = {
+                    val text = asCharSequence().toString()
+                    if (text.isNotEmpty() && text != "-" && text.toIntOrNull() == null) {
+                        revertAllChanges()
                     }
                 },
-                singleLine = true,
+                lineLimits = TextFieldLineLimits.SingleLine,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 textStyle = TextStyle(
                     color = colors.onBackground,
@@ -181,7 +186,7 @@ fun OrnamentsLabScreen(
                 modifier = Modifier
                     .widthIn(min = 140.dp, max = 200.dp)
                     .padding(horizontal = 8.dp, vertical = 10.dp),
-                decorationBox = { inner ->
+                decorator = { inner ->
                     Box(contentAlignment = Alignment.Center) {
                         inner()
                     }
@@ -367,9 +372,8 @@ fun OrnamentsLabScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         BasicTextField(
-                            value = saveName,
-                            onValueChange = { saveName = it },
-                            singleLine = true,
+                            state = saveName,
+                            lineLimits = TextFieldLineLimits.SingleLine,
                             textStyle = TextStyle(
                                 color = colors.onSurface,
                                 fontSize = 16.sp,
@@ -379,9 +383,9 @@ fun OrnamentsLabScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .padding(vertical = 8.dp),
-                            decorationBox = { inner ->
+                            decorator = { inner ->
                                 Box {
-                                    if (saveName.isEmpty()) {
+                                    if (saveName.text.isEmpty()) {
                                         Text(
                                             text = "name this seed…",
                                             style = MaterialTheme.typography.bodyLarge,
@@ -398,8 +402,8 @@ fun OrnamentsLabScreen(
                             color = colors.primary,
                             modifier = Modifier
                                 .quietClickable(onClick = {
-                                    viewModel.save(saveName)
-                                    saveName = ""
+                                    viewModel.save(saveName.text.toString())
+                                    saveName.clearText()
                                 })
                                 .padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
                         )
@@ -552,10 +556,4 @@ private fun Stepper(glyph: String, onClick: () -> Unit) {
             .quietClickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 6.dp),
     )
-}
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,18 +23,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Repeat
-import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -55,8 +47,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.media3.common.Player
 import com.beautifulquran.playback.PlayerUiState
+import com.beautifulquran.ui.theme.QuietButton
 import com.beautifulquran.ui.theme.cachedAlpha
 import com.beautifulquran.ui.theme.DisclosureChevron
 import com.beautifulquran.ui.theme.QuranTheme
@@ -182,10 +174,9 @@ fun PlayerBar(
                         bottom = 4.dp,
                     ),
             ) {
-                val repeatActive = state.repeatMode != Player.REPEAT_MODE_OFF || state.repeatRange != null
-                val speedActive = state.speed != 1f
-                val singleAyahRange = state.repeatRange?.let { it.first == it.last } == true
-                IconButton(
+                val repeatActive = state.repeatActive
+                val speedActive = state.speedActive
+                QuietButton(
                     onClick = onRepeatClick,
                     enabled = enabled,
                     modifier = Modifier
@@ -193,11 +184,7 @@ fun PlayerBar(
                         .graphicsLayer { cachedAlpha(if (repeatActive) 1f else chromeAlpha()) },
                 ) {
                     Icon(
-                        imageVector = if (state.repeatMode == Player.REPEAT_MODE_ONE || singleAyahRange) {
-                            Icons.Rounded.RepeatOne
-                        } else {
-                            Icons.Rounded.Repeat
-                        },
+                        imageVector = state.repeatIcon,
                         contentDescription = "Repeat",
                         tint = if (repeatActive) {
                             MaterialTheme.colorScheme.primary
@@ -207,7 +194,7 @@ fun PlayerBar(
                         modifier = Modifier.size(22.dp),
                     )
                 }
-                IconButton(
+                QuietButton(
                     onClick = onFastBackward,
                     enabled = enabled && isThisSurahLoaded,
                     modifier = Modifier.size(48.dp),
@@ -218,31 +205,18 @@ fun PlayerBar(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(
+                QuietButton(
                     onClick = onPlayPause,
                     enabled = enabled,
                     modifier = Modifier.size(56.dp),
                 ) {
-                    if (state.isBuffering && isThisSurahLoaded) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = if (state.isPlaying && isThisSurahLoaded) {
-                                Icons.Rounded.Pause
-                            } else {
-                                Icons.Rounded.PlayArrow
-                            },
-                            contentDescription = if (state.isPlaying) "Pause" else "Play",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(34.dp),
-                        )
-                    }
+                    PlayPauseGlyph(
+                        playing = state.isPlaying && isThisSurahLoaded,
+                        buffering = state.isBuffering && isThisSurahLoaded,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                IconButton(
+                QuietButton(
                     onClick = onFastForward,
                     enabled = enabled && isThisSurahLoaded,
                     modifier = Modifier.size(48.dp),
@@ -253,16 +227,15 @@ fun PlayerBar(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(
+                QuietButton(
                     onClick = onSpeed,
                     enabled = enabled,
-                    contentPadding = PaddingValues(0.dp),
                     modifier = Modifier
                         .size(48.dp)
                         .graphicsLayer { cachedAlpha(if (speedActive) 1f else chromeAlpha()) },
                 ) {
                     Text(
-                        text = "${if (state.speed % 1f == 0f) state.speed.toInt() else state.speed}×",
+                        text = state.speedLabel,
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.SemiBold,
                             fontSize = typeScale(15.sp),
@@ -285,7 +258,7 @@ internal fun InkLabToggleButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    IconButton(onClick = onClick, modifier = modifier.size(40.dp)) {
+    QuietButton(onClick = onClick, modifier = modifier.size(40.dp)) {
         Icon(
             imageVector = Icons.Rounded.Tune,
             contentDescription = if (expanded) "Close Ink Lab" else "Open Ink Lab",

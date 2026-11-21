@@ -18,7 +18,7 @@ import './chapterPull.css'
 
 function chapterWeaveInk(themeMode: string): string {
   return resolveTheme(themeMode) === 'light'
-    ? 'rgba(28, 27, 24, 0.03)'
+    ? 'rgba(28, 27, 24, 0.033)'
     : 'rgba(232, 226, 213, 0.03)'
 }
 

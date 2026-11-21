@@ -28,27 +28,8 @@ class LexiconDatabase(private val context: Context) {
         }.getOrNull()
     }
 
-    private fun ensureExtracted(): File {
-        val file = File(context.noBackupFilesDir, DB_FILE_NAME)
-        if (!file.exists()) {
-            file.parentFile?.mkdirs()
-            val tmp = File(file.parentFile, "$DB_FILE_NAME.tmp")
-            context.assets.open(ASSET_NAME).use { input ->
-                tmp.outputStream().use { output -> input.copyTo(output) }
-            }
-            // Fail on the rename rather than on the open, as QuranDatabase does
-            // — here the failure is swallowed into "no entry", so a legible
-            // message is the only trace left.
-            check(tmp.renameTo(file)) {
-                "Could not install $DB_FILE_NAME from assets (rename failed)"
-            }
-            // Clean up lexicons extracted by older app versions.
-            file.parentFile
-                ?.listFiles { f -> f.name.startsWith("lexicon-v") && f.name != DB_FILE_NAME }
-                ?.forEach { it.delete() }
-        }
-        return file
-    }
+    private fun ensureExtracted(): File =
+        extractVersionedAsset(context, ASSET_NAME, DB_FILE_NAME, oldVersionPrefix = "lexicon-v")
 
     companion object {
         private const val ASSET_NAME = "lexicon.sqlite"

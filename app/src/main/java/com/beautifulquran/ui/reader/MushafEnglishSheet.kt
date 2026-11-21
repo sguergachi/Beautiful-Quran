@@ -38,6 +38,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalLocaleList
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
@@ -309,6 +310,7 @@ internal fun MushafEnglishSheet(
             ?.proseRunsOn(surahsById) == true
         val resolver = LocalFontFamilyResolver.current
         val direction = LocalLayoutDirection.current
+        val locales = LocalLocaleList.current
         val settingKey = remember(blocks, wellPx, measurePx, density, resolver, direction, typePalette, justifyLast) {
             EnglishLeafSettingKey(
                 blocks.map { if (it is EnglishLeafBlockText.Prose) it.copy(verses = emptyList()) else it },
@@ -325,7 +327,7 @@ internal fun MushafEnglishSheet(
             settingState.value = withContext(Dispatchers.Default) {
                 setEnglishLeaf(
                     blocks, wellPx, measurePx, density,
-                    TextMeasurer(resolver, density, direction), typePalette, justifyLast,
+                    TextMeasurer(resolver, locales, density, direction), typePalette, justifyLast,
                 ).also { synchronized(EnglishLeafSettings) { EnglishLeafSettings[settingKey] = it } }
             }
         }
@@ -1904,7 +1906,7 @@ private fun MutableList<ShapedWordBloom>.addEnglishInkLayerBlooms(
                 ),
             )
         }
-        if (glinting && glintInk != null) {
+        if (glinting) {
             val onRepeat = motion.glintIsRepeat
             add(
                 ShapedWordBloom.ColorReveal(

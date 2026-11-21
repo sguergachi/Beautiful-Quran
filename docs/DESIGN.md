@@ -497,7 +497,12 @@ Hard rules:
 - **Edges dissolve.** Scrolling content fades out at the top and bottom of
   every sheet — ink fading off the page, not content clipped by a boundary.
 - **Taps have no ripple.** Touch feedback is the content's own motion
-  (a word lighting, a page turning), never Material ink splash.
+  (a word lighting, a page turning), never Material ink splash. Tap through
+  `quietClickable`; an icon or short text control is a `QuietButton` (Material
+  `IconButton` geometry and semantics, no ripple), never `IconButton` /
+  `TextButton`. `BeautifulQuranTheme` also provides a null
+  `LocalRippleConfiguration`, so a Material component that slips through
+  stays quiet.
 
 ### Contextual teaching
 
@@ -888,19 +893,48 @@ Two themes, both "paper":
 
 - **Paper**: warm sepia off-white `#FAF3E8`, ink `#1C1B18`,
   deep green `#0E5C4A` as the single interactive and current-place accent,
-  muted gold `#B8901C` reserved for Quranic ornament (ayah marks, surah
-  numbers, the ۞).
-- **Nightfall**: near-black charcoal `#0A0B0C`, parchment ink `#E8E2D5`,
-  soft green `#7FB8A4`, warmer gold `#D9B44A`, deep repeat orange `#E06A18`.
-  Nightfall and Royal Green share a **fresh-ink glint** `#F8E9BE`: a newly
-  read word's ink lands white-gold — riding the same letter sweep, never a
-  separate motion — and dries back to parchment over 1 s. A glyph-shaped halo
-  makes it feel lit from within at the peak, then recedes with the tint. It is
-  not a spotlight: no radial field, background glow, box shadow, or clipped
-  word rectangle. See [GLIMMER.md](GLIMMER.md).
-- **Royal green**: deep green `#062C24`, parchment ink `#E8E2D5`,
-  soft green `#7FB8A4`, warmer gold `#D9B44A`, same deep repeat orange and
-  fresh-ink glint as Nightfall.
+  muted gold `#A8831D` reserved for Quranic ornament (ayah marks, surah
+  numbers, the ۞), terracotta repeat `#C25F3B`.
+- **Nightfall**: warm near-black charcoal `#0C0B09`, parchment ink `#F3ECDF`,
+  soft green `#88C0AC`, warmer gold `#CAA547`, deep repeat orange `#FF8948`.
+  Nightfall and Royal Green each carry a **fresh-ink glint** — white gold
+  `#FFF0C7` on Nightfall, `#FFF4D5` on Royal Green (less gold: its lighter
+  sheet leaves little room above the page's ink): a newly read word's ink
+  lands white-gold — riding the same letter sweep, never a separate motion —
+  and dries back to parchment over 1 s. A glyph-shaped halo makes it feel lit
+  from within at the peak, then recedes with the tint. It is not a spotlight:
+  no radial field, background glow, box shadow, or clipped word rectangle. The
+  developer labs show it in `GlintWhiteGold` (Nightfall's). See
+  [GLIMMER.md](GLIMMER.md).
+- **Royal green**: deep green `#062C24`, parchment ink `#F8F2E4`,
+  soft green `#8CC6B1`, warmer gold `#D0AA4D`, the same deep repeat orange
+  `#FF8948`.
+
+Every value lives in `ui/theme/Theme.kt`; the web mirrors them in
+`web/src/ui/theme/styles.css`, overlays included (the ink bleed is Royal Green,
+or Nightfall under Royal Green, with Royal Green's accents either way, as
+`contrastingOverlayColorScheme` / `contrastingOverlayAccents`).
+
+**Wide colour.** On a panel that composes Display P3 at 8 bits — where wide
+colour costs no memory or bandwidth (`ui/theme/WideGamut.kt`) — the window
+runs in wide-gamut mode and the accents that are only ever drawn take a
+purer pigment: the rubies (Paper P3(0.668, 0.089, 0.180), Nightfall
+P3(0.965, 0.399, 0.436), Royal Green P3(0.966, 0.446, 0.472)) and Paper's
+deep gilt `goldDeep` P3(0.471, 0.358, 0.030). Everywhere else they keep their
+sRGB values exactly. Compose clips a Text's colour to sRGB, so accents that
+also colour words stay sRGB until it doesn't: Paper `gold` P3(0.655, 0.513,
+0.074), `goldInk` P3(0.615, 0.483, 0.055), and the dark sheets' repeat orange
+P3(0.976, 0.534, 0.263) are the values to take then. Every gradient passes its stops
+through `oneSpace(...)` (`ui/theme/OneSpace.kt`): Compose 1.13 hands each stop
+to the framework as a colour long in its own space, and the framework throws
+when they differ, so a P3 accent beside an sRGB partner (`goldBright`,
+`Color.Transparent`, a scheme colour) crashed every chapter open on a Pixel
+before it existed. `OneSpaceTest` fails any `Brush.*Gradient` that skips it.
+A colour handed to a
+shader or a framework paint goes through `setManagedColorUniform` /
+`setManagedColor` (`ManagedColor.kt`), which keep its colour space; sRGB
+values reach them bit-for-bit as before. Not wide, on purpose: an HDR glint,
+a brighter dark gold, a more vivid green or green wash, tinted paper.
 
 Gold never marks interaction; green never decorates. Green may identify the
 reader's current place because that mark is wayfinding, not ornament. The
@@ -918,7 +952,7 @@ the swipe for wayfinding. The ink ladder is solved again for that stock
 (`SettingsPaper` in `Theme.kt`, `.sheet[data-name='settings']` on web), since
 a rung is a weight against the sheet it sits on; `ColorSystemTest` holds both.
 
-**Ruby** `#B3122F` (paper) / `#D64358` (nightfall + royal green) is the one
+**Ruby** `#B3122F` (paper) / `#FF6672` (nightfall) / `#FF727B` (royal green) is the one
 deliberate third hue, and it belongs to saved-verse ink: the
 [bookmark ribbon](#bookmark-ribbon) and recolored bars on the ayah selector
 rail that show where marks fall in the chapter. It is walled off from gold
@@ -1324,7 +1358,8 @@ image, so it is crisp at any density and nearly free to render.
   steady. In battery saver or with animations off — both followed live — the
   gilding rests level; with no accelerometer at all the cover keeps its idle
   sweep. The gilding no longer brightens with page scroll. Verse-number marks
-  (`gilded()`) are still a fixed vertical gradient.
+  (`gilded()`) carry the same three stops (deep → bright → deep) on a fixed
+  vertical axis.
 - **Embossing.** Ornament is pressed into the paper: each figure is drawn
   with a dark copy nudged to the lower-right and a light copy to the
   upper-left beneath its face — relief under a top-left light, subtle enough

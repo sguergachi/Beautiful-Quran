@@ -41,7 +41,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.placeCursorAtEnd
+import kotlinx.coroutines.flow.drop
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -71,7 +73,6 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -93,6 +94,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
@@ -145,6 +147,7 @@ import com.beautifulquran.ui.reader.focus.FocusEngine
 import com.beautifulquran.ui.theme.cachedAlpha
 import com.beautifulquran.ui.theme.paperink.PaperInk
 import com.beautifulquran.ui.theme.cachedWhileStill
+import com.beautifulquran.ui.theme.layerPaint
 import com.beautifulquran.ui.theme.quietSuppliedBrackets
 import com.beautifulquran.ui.theme.forCaps
 import com.beautifulquran.ui.theme.liningFigures
@@ -845,7 +848,7 @@ internal fun rememberWaslProgress(
         derivedStateOf {
             entryConnection?.at(
                 if (provisional || entryWindow == null) 0f else timeline.frame()?.takeIf { entryWindow.matches(it) }
-                    ?.let { entryWindow!!.progress(it) } ?: 0f,
+                    ?.let { entryWindow.progress(it) } ?: 0f,
                 entryPrefixStart, entryCompletion,
             ) ?: 0f
         }
@@ -987,17 +990,26 @@ internal fun rememberInkCoverRelease(enabled: Boolean, state: InkEngine.State): 
     val history = remember { InkCoverRelease(read) }
     val releasing = history.releasing(upcoming)
     SideEffect { history.commit(upcoming, read) }
-    val remaining = animateFloatAsState(
+    val remaining = rememberInkDepartureRemaining(upcoming, label = "inkCoverRelease")
+    return remaining.takeIf { releasing }
+}
+
+/**
+ * The ink-departure clock both covers ride: 1 while a word is read, easing to
+ * 0 over [InkEngine.INK_DEPARTURE_MS] once it becomes upcoming again (a seek
+ * or repeat sends it back), and snapping straight to 1 when it is read anew.
+ */
+@Composable
+internal fun rememberInkDepartureRemaining(upcoming: Boolean, label: String): State<Float> =
+    animateFloatAsState(
         targetValue = if (upcoming) 0f else 1f,
         animationSpec = if (upcoming) {
             tween(InkEngine.INK_DEPARTURE_MS, easing = FastOutSlowInEasing)
         } else {
             snap()
         },
-        label = "inkCoverRelease",
+        label = label,
     )
-    return remaining.takeIf { releasing }
-}
 
 internal class InkMotion(
     val ink: InkEngine.Word,
@@ -1202,7 +1214,10 @@ private fun Modifier.tarjiPulseTrace(trace: InkEngine.TarjiTrace, rtl: Boolean, 
     }
 
 /** Draw-phase alpha gate for a glyph layer, padded by [GlintLayerBleed] so the
- * halo's blur is not clipped at the layer edge. */
+ * halo's blur is not clipped at the layer edge. A saveLayer, not a
+ * `graphicsLayer` with outsets: a layer colour filter forces a compositing
+ * RenderNode, rendered at its own resolution and resampled under the reader's
+ * sliding and scaling sheets, softening the glint (see [glyphLayerAlpha]). */
 private fun Modifier.bleedAlphaLayer(alpha: () -> Float, color: () -> Color): Modifier = drawWithContent {
     val a = alpha()
     if (a <= 0f) return@drawWithContent
@@ -1210,10 +1225,7 @@ private fun Modifier.bleedAlphaLayer(alpha: () -> Float, color: () -> Color): Mo
     drawIntoCanvas { canvas ->
         canvas.saveLayer(
             Rect(-bleed, -bleed, size.width + bleed, size.height + bleed),
-            Paint().apply {
-                this.alpha = a
-                colorFilter = ColorFilter.tint(color())
-            },
+            layerPaint(alpha = a, colorFilter = ColorFilter.tint(color())),
         )
     }
     drawContent()
@@ -2954,11 +2966,17 @@ internal fun VerseAnnotationField(
     val noteStyle = verseAnnotationStyle(fontScale = fontScale)
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    // Own the field as TextFieldValue so the caret opens at the end of any
-    // existing note. A plain String value lands the caret at 0, which forces
-    // the reader to arrow through text they already wrote.
-    var fieldValue by remember(isEditing) {
-        mutableStateOf(TextFieldValue(text, selection = TextRange(text.length)))
+    // Own the field's state so the caret opens at the end of any existing
+    // note; landing it at 0 forces the reader to arrow through text they
+    // already wrote.
+    val fieldState = remember(isEditing) {
+        TextFieldState(text, initialSelection = TextRange(text.length))
+    }
+    val latestOnAnnotationChange by rememberUpdatedState(onAnnotationChange)
+    LaunchedEffect(fieldState) {
+        snapshotFlow { fieldState.text.toString() }
+            .drop(1)
+            .collect { latestOnAnnotationChange?.invoke(it) }
     }
     // `onFocusChanged` delivers an initial callback the moment the field
     // attaches, with isFocused = false — *before* the LaunchedEffect below can
@@ -3083,11 +3101,7 @@ internal fun VerseAnnotationField(
         Spacer(Modifier.width(ANNOTATION_RULE_GAP))
         if (isEditing) {
             BasicTextField(
-                value = fieldValue,
-                onValueChange = {
-                    fieldValue = it
-                    onAnnotationChange?.invoke(it.text)
-                },
+                state = fieldState,
                 textStyle = noteStyle.copy(color = noteInk.copy(alpha = VERSE_ANNOTATION_INK_ALPHA)),
                 cursorBrush = SolidColor(markInk),
                 // Notes wrap freely, but the keyboard's Done key is the reader's
@@ -3096,7 +3110,7 @@ internal fun VerseAnnotationField(
                     capitalization = KeyboardCapitalization.Sentences,
                     imeAction = ImeAction.Done,
                 ),
-                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                onKeyboardAction = { focusManager.clearFocus() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester)
@@ -3105,17 +3119,20 @@ internal fun VerseAnnotationField(
                             everFocused = true
                             // Re-assert end caret on focus: the IME can reset
                             // selection when it attaches after requestFocus().
-                            val end = fieldValue.text.length
-                            if (fieldValue.selection != TextRange(end)) {
-                                fieldValue = fieldValue.copy(selection = TextRange(end))
+                            if (fieldState.selection != TextRange(fieldState.text.length)) {
+                                fieldState.edit { placeCursorAtEnd() }
                             }
                         } else if (everFocused) {
+                            // Edits reach the draft asynchronously; hand over the
+                            // final text before committing so a Done pressed
+                            // right after the last keystroke cannot lose it.
+                            onAnnotationChange?.invoke(fieldState.text.toString())
                             onEditDone()
                         }
                     },
-                decorationBox = { field ->
+                decorator = { field ->
                     Box {
-                        if (fieldValue.text.isEmpty()) {
+                        if (fieldState.text.isEmpty()) {
                             Text(
                                 "Write a note…",
                                 style = noteStyle,
@@ -3288,218 +3305,57 @@ fun AyahBlock(
     val activeWord = if (english != null) english.activeWord else activeWord
     val englishClock = english?.clock
 
-    // The letter fade paces itself to how long the reciter dwells on the
-    // word, corrected for the chosen playback speed.
     RequestTarjiPulseLines(ayah, isActiveAyah)
-    val sweepMs = InkEngine.sweepMs(activeWord, playbackSpeed)
-    // Repeat washes share the same audio handoff but must not inherit the
-    // ordinary sweep's visual minimum and continue past the spoken word.
-    val repeatDwellMs = InkEngine.repeatDwellMs(activeWord, playbackSpeed)
-    val activation = activeWord?.activation ?: 0L
-    val activeWordStartMs = activeWord?.startMs ?: Long.MIN_VALUE
-
-    // Letter-level tajweed pacing of that sweep (Ink Lab toggle,
-    // docs/TAJWEED_PACING.md): null keeps the plain constant-rate wash.
-    // Gated on this ayah owning the active word — not the fade-led
-    // isActiveAyah — so a waqf hold is not dropped 500 ms before the audio
-    // boundary (see InkEngine.wordState). The verse-closing word is flagged
-    // so its waqf can be sustained.
-    val pacing = activeWord
-        ?.let { aw ->
-            val idx = ayah.words.indexOfFirst { it.position == aw.wordPosition }
-            ayah.words.getOrNull(idx)?.let { word ->
-                InkEngine.pacing(
-                    arabic = word.arabic,
-                    activeWord = aw,
-                    isAyahFinal = word.position == ayah.words.lastOrNull()?.position,
-                    prevArabic = ayah.words.getOrNull(idx - 1)?.arabic,
-                )
-            }
-        }
-
-    // Each word's ink behaviour, derived once for the whole ayah. All the
-    // policy (upcoming/active/recited/high-water, repeat chain) lives in
-    // InkEngine; the render branches below only draw what it decided.
-    val inks = ayah.words.map { word ->
-        InkEngine.word(
-            position = word.position,
-            activeWord = activeWord,
-            isActiveAyah = isActiveAyah,
-            dimmed = dimmed,
-        )
-    }
-    val activeIndex = inks.indexOfFirst { it.state == InkEngine.State.Active }
-    val incomingConnection = if (activeIndex > 0) {
-        InkEngine.connection(
-            prevArabic = ayah.words[activeIndex - 1].arabic,
-            arabic = ayah.words[activeIndex].arabic,
-        )
-    } else {
-        null
-    }
-    val outgoingConnection = if (activeIndex in 0 until ayah.words.lastIndex) {
-        InkEngine.connection(
-            prevArabic = ayah.words[activeIndex].arabic,
-            arabic = ayah.words[activeIndex + 1].arabic,
-        )
-    } else {
-        null
-    }
-    val outgoingProgress = rememberWaslProgress(
-        connection = outgoingConnection,
-        sweepMs = sweepMs,
-        identity = activeWord?.wordPosition,
-        activation = activation,
+    // The active word's wash and its carry-ins, shared with the mushaf
+    // (rememberAyahInkPack). English Scroll's words lend no short-word lead.
+    val wash = rememberAyahWordWash(
+        ayah = ayah,
         activeWord = activeWord,
         playbackSpeed = playbackSpeed,
-        verse = ayah,
+        isActiveAyah = isActiveAyah,
+        dimmed = dimmed,
+        shortWordLeads = readingMode != ReadingMode.ENGLISH_ONLY,
     )
-    // A short next word borrows its bloom time from this word's tail rather
-    // than trailing past its own end (InkEngine.shortWordLead).
-    val leadNext = ayah.words.getOrNull(activeIndex + 1)
-    val outgoingLead = remember(activeIndex, activation, activeWord?.startMs, activeWord?.reciterId, activeWord?.fromTap, playbackSpeed) {
-        leadNext?.takeIf {
-            readingMode != ReadingMode.ENGLISH_ONLY && activeIndex >= 0 && activeWord?.fromTap != true &&
-                activeWord?.nextWordPosition == it.position
-        }?.let { next ->
-            InkEngine.shortWordLead(
-                activeSweepMs = sweepMs,
-                activePaced = pacing != null,
-                activeRepeat = activeWord?.isRepeat == true,
-                nextArabic = next.arabic,
-                nextSweepMs = InkEngine.nextSweepMs(activeWord, playbackSpeed),
-                nextPaced = InkEngine.paces(
-                    next.arabic,
-                    isAyahFinal = next.position == ayah.words.lastOrNull()?.position,
-                    prevArabic = ayah.words[activeIndex].arabic,
-                ),
-                connected = outgoingConnection != null,
-            )
-        }
-    }
-    val leadWindow = rememberShortWordLead(
-        lead = outgoingLead,
-        sweepMs = sweepMs,
-        activation = activation,
-        activeWord = activeWord,
-        playbackSpeed = playbackSpeed,
-        verse = ayah,
-    )
-    val previousActive = remember { ActiveWordEntry(activeIndex, activation) }
-    val carriedIncoming = remember(activeIndex, activation) {
-        carriedFromPrevious(previousActive, activeIndex, activation, activeWord)
-    }
-    val incomingHandoff = if (carriedIncoming) previousActive.outgoingHandoff else 0f
-    // Captured at entry: the SideEffect below overwrites the entry with this
-    // word's own outgoing lead after the first frame.
-    val incomingLeadReach = remember(activeIndex, activation) {
-        if (carriedIncoming && incomingConnection == null) previousActive.outgoingLeadReach else 0f
-    }
-    SideEffect {
-        previousActive.index = activeIndex
-        previousActive.activation = activation
-        previousActive.generation = activeWord?.playbackActivation ?: 0L
-        previousActive.outgoingHandoff = outgoingProgress.atHandoff
-        previousActive.outgoingLeadReach = outgoingLead?.reach ?: 0f
-    }
-    val waslMainFeather = if (pacing != null) {
-        InkEngine.pacedFeather()
-    } else {
-        InkEngine.tuning.washFeather
-    }
-    val activeRevealStart = if (carriedIncoming && incomingConnection != null) {
-        waslWashProgress(
-            windowProgress = incomingHandoff,
-            endProgress = waslContinuationStart(
-                prefixFraction = incomingConnection.prefixFraction,
-                mainFeather = waslMainFeather,
-            ),
-        )
-    } else {
-        // A short word led in during its predecessor's tail continues from there.
-        incomingLeadReach
-    }
-    // A latched window (1) redraws exactly the partial edge carried across
-    // handoff while the active word's ordinary sweep continues from it.
-    val fullWaslWindow = remember { mutableStateOf(1f) }
-    val waslPrefixes = ayah.words.indices.map { index ->
-        when {
-            // Preserve the outgoing bloom's reached edge only across a natural
-            // adjacent handoff. A seek bumps activation and starts clean.
-            index == activeIndex && carriedIncoming && incomingConnection != null ->
-                WaslPrefix(
-                    windowProgress = fullWaslWindow,
-                    endProgress = activeRevealStart,
-                    feather = waslMainFeather,
-                    letterEndProgress = waslWashProgress(incomingHandoff, incomingConnection.prefixFraction),
-                )
-            index == activeIndex + 1 && outgoingConnection != null ->
-                WaslPrefix(
-                    windowProgress = outgoingProgress.value,
-                    endProgress = waslContinuationStart(
-                        prefixFraction = outgoingConnection.prefixFraction,
-                        mainFeather = waslMainFeather,
-                    ),
-                    feather = waslMainFeather,
-                    letterEndProgress = outgoingConnection.prefixFraction,
-                )
-            index == activeIndex && incomingLeadReach > 0f ->
-                WaslPrefix(
-                    windowProgress = fullWaslWindow,
-                    endProgress = incomingLeadReach,
-                    feather = waslMainFeather,
-                    letterEndProgress = incomingLeadReach,
-                )
-            index == activeIndex + 1 && outgoingLead != null ->
-                WaslPrefix(
-                    windowProgress = leadWindow,
-                    endProgress = outgoingLead.reach,
-                    feather = InkEngine.tuning.washFeather,
-                    letterEndProgress = outgoingLead.reach,
-                )
-            else -> null
-        }
-    }
 
     // One motion owner for every renderer; no text branch creates its own
     // clock or lifecycle state.
     val motions = rememberInkMotions(
         words = ayah.words,
-        inks = inks,
+        inks = wash.inks,
         // English without its verse clock yet (a verse's first frame): the plain
         // eased window, holding at a real pause (EnglishRevealTiming).
         activeSweepMs = when {
             readingMode == ReadingMode.ENGLISH_ONLY && englishClock == null ->
-                englishRevealDurationMs(sweepMs, activeWord?.spokenMs, playbackSpeed)
-            readingMode == ReadingMode.ENGLISH_ONLY -> sweepMs
+                englishRevealDurationMs(wash.sweepMs, activeWord?.spokenMs, playbackSpeed)
+            readingMode == ReadingMode.ENGLISH_ONLY -> wash.sweepMs
             // Arabic ink: short words bloom at the reciter's letter pace,
             // borrowing from the word before when they can.
             else -> InkEngine.visualSweepMs(
-                sweepMs,
-                ayah.words.getOrNull(activeIndex)?.arabic,
-                paced = pacing != null,
-                ledIn = incomingLeadReach > 0f,
-                lending = outgoingLead,
+                wash.sweepMs,
+                ayah.words.getOrNull(wash.activeIndex)?.arabic,
+                paced = wash.pacing != null,
+                ledIn = wash.incomingLeadReach > 0f,
+                lending = wash.outgoingLead,
             )
         },
         activeRepeatDwellMs = if (readingMode == ReadingMode.ENGLISH_ONLY && englishClock == null) {
-            englishRevealDurationMs(repeatDwellMs, activeWord?.spokenMs, playbackSpeed)
-        } else repeatDwellMs,
+            englishRevealDurationMs(wash.repeatDwellMs, activeWord?.spokenMs, playbackSpeed)
+        } else wash.repeatDwellMs,
         // English has no Arabic letter-pacing paint, but shares every other
         // lifecycle rule and the same low-level shaped bloom primitive.
-        pacing = pacing.takeUnless { readingMode == ReadingMode.ENGLISH_ONLY },
+        pacing = wash.pacing.takeUnless { readingMode == ReadingMode.ENGLISH_ONLY },
         activeVoicedSweepMs = if (readingMode == ReadingMode.ENGLISH_ONLY && englishClock == null) {
-            englishRevealDurationMs(sweepMs, activeWord?.spokenMs, playbackSpeed)
-        } else sweepMs,
+            englishRevealDurationMs(wash.sweepMs, activeWord?.spokenMs, playbackSpeed)
+        } else wash.sweepMs,
         englishClock = englishClock,
-        activeRevealStart = activeRevealStart.takeUnless {
+        activeRevealStart = wash.activeRevealStart.takeUnless {
             readingMode == ReadingMode.ENGLISH_ONLY
         } ?: 0f,
         waslPrefixes = if (readingMode == ReadingMode.ENGLISH_ONLY) {
             List(ayah.words.size) { null }
-        } else waslPrefixes,
-        activation = activation,
-        activeWordStartMs = activeWordStartMs,
+        } else wash.waslPrefixes,
+        activation = wash.activation,
+        activeWordStartMs = wash.activeWordStartMs,
         verse = ayah,
         sequentialSweeps = readingMode == ReadingMode.ENGLISH_ONLY,
         animateLyricInk =
@@ -4000,6 +3856,8 @@ fun ChapterOpening(
 ) {
     val accents = LocalQuranAccents.current
     val weaveFade = MaterialTheme.colorScheme.background
+    // Paper carries its header line work a tenth stronger than the dark sheets.
+    val weaveLift = if (weaveFade.luminance() > 0.5f) PAPER_WEAVE_LIFT else 1f
     val ornament = remember(chapterNumber, ayahCount) {
         generateChapterOrnament(chapterOrnamentSeed(chapterNumber, ayahCount))
     }
@@ -4013,8 +3871,8 @@ fun ChapterOpening(
                     .matchParentSize()
                     .generatedFieldWeave(
                         field = ornament.field,
-                        ink = QuranTheme.ink.wash.let { it.copy(alpha = it.alpha * 0.675f) },
-                        embossLight = accents.embossLight.copy(alpha = 0.03375f),
+                        ink = QuranTheme.ink.wash.let { it.copy(alpha = it.alpha * 0.675f * weaveLift) },
+                        embossLight = accents.embossLight.copy(alpha = 0.03375f * weaveLift),
                     )
                     .verticalFadingEdges(color = weaveFade, top = 40.dp, bottom = 32.dp),
             )
@@ -4241,6 +4099,9 @@ fun OrnateSurahTitle(
         }
     }
 }
+
+/** Paper's chapter-header weave, relative to the dark sheets' strength. */
+private const val PAPER_WEAVE_LIFT = 1.1f
 
 /** Air under the name's descenders handed to the paper below the caps line. */
 private val TOP_BAR_NAME_TRIM = 5.dp

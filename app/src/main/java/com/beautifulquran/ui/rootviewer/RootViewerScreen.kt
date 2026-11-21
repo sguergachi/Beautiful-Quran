@@ -34,7 +34,6 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -82,6 +81,7 @@ import androidx.compose.ui.text.withStyle
 import com.beautifulquran.data.model.RootLemmaSummary
 import com.beautifulquran.data.model.RootOccurrence
 import com.beautifulquran.data.model.Word
+import com.beautifulquran.ui.theme.QuietButton
 import com.beautifulquran.ui.theme.lining
 import com.beautifulquran.ui.theme.SmallTitleFontFamily
 import com.beautifulquran.ui.theme.liningFigures
@@ -209,7 +209,7 @@ fun RootViewerScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onBack) {
+                    QuietButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
                             contentDescription = "Close",

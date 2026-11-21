@@ -31,7 +31,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
-import kotlin.math.hypot
 
 /**
  * Optically scatters the live reader only where the vellum is translucent.
@@ -102,7 +101,7 @@ internal fun Modifier.contextualGuideProgressiveBlur(
         val span = abs(direction.x) * size.width + abs(direction.y) * size.height
         val fieldCenter = Offset(size.width / 2f, size.height / 2f)
         val mask = Brush.linearGradient(
-            *maskStops,
+            *oneSpace(*maskStops),
             start = fieldCenter - direction * (span / 2f),
             end = fieldCenter + direction * (span / 2f),
         )
@@ -179,10 +178,7 @@ private fun ShaderInkSpillField(
         shader.setFloatUniform("blurStrength", tuning.blurStrength)
         shader.setFloatUniform("vellumGrain", tuning.vellumGrain)
         shader.setFloatUniform("verticalTaper", tuning.verticalTaper)
-        shader.setColorUniform(
-            "inkColor",
-            android.graphics.Color.valueOf(color.red, color.green, color.blue, color.alpha),
-        )
+        shader.setManagedColorUniform("inkColor", color)
         drawRect(brush)
     }
 }
@@ -218,7 +214,7 @@ private fun GradientInkSpillField(
         val start = fieldCenter - direction * (span / 2f)
         drawRect(
             brush = Brush.linearGradient(
-                *stops,
+                *oneSpace(*stops),
                 start = start,
                 end = start + direction * reach,
             ),
@@ -526,7 +522,3 @@ internal const val VellumSpotShader = """
     }
 """
 
-private fun Offset.normalized(): Offset {
-    val length = hypot(x, y)
-    return if (length > 1e-4f) this / length else Offset(1f, 0f)
-}

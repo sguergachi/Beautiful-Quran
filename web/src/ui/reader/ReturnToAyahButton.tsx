@@ -215,7 +215,7 @@ export function ReturnToAyahButton({ pointUp, onClick, className, style }: Props
     ctx.clearRect(0, 0, css, css)
 
     const paper = cssColor(btn, '--paper', '#faf3e8')
-    const gold = cssColor(btn, '--gold', '#c9a227')
+    const gold = cssColor(btn, '--gold', '#a8831d')
     const goldBright = cssColor(btn, '--gold-bright', '#e9cd7a')
     const goldDeep = cssColor(btn, '--gold-deep', '#8a6b1e')
     const accent = cssColor(btn, '--accent', '#0e5c4a')

@@ -73,7 +73,7 @@ internal fun DrawScope.goldBrush(bright: Color, deep: Color, t: Float): Brush {
     val w = size.width
     val h = size.height
     return Brush.linearGradient(
-        colors = listOf(deep, bright, deep),
+        colors = oneSpace(listOf(deep, bright, deep)),
         start = Offset(0f, h * t),
         end = Offset(w, h * (1f - t)),
     )
@@ -239,15 +239,18 @@ fun MushafCoverFrame(
 /**
  * Gilds the content it wraps: a vertical gold-leaf gradient is composited
  * onto the rendered glyphs (SrcAtop), so text itself reads as leafed gold.
- * The offscreen layer is only the size of the mark — a few dp — so this is
- * reserved for small ornaments like ayah numbers.
+ * The leaf is the same three-stop ramp as every other gilt figure ([goldBrush]:
+ * deep → bright → deep), here on a fixed vertical axis, so the light catches
+ * the middle of the mark rather than only its top. The offscreen layer is
+ * only the size of the mark — a few dp — so this is reserved for small
+ * ornaments like ayah numbers.
  */
 fun Modifier.gilded(bright: Color, deep: Color): Modifier =
     graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
             drawRect(
-                brush = Brush.verticalGradient(listOf(bright, deep)),
+                brush = Brush.verticalGradient(oneSpace(listOf(deep, bright, deep))),
                 blendMode = BlendMode.SrcAtop,
             )
         }
@@ -344,7 +347,7 @@ fun IslamicReturnToAyahButton(
         }
 
         val gold = Brush.linearGradient(
-            colors = listOf(accents.goldBright, accents.gold, accents.goldDeep),
+            colors = oneSpace(listOf(accents.goldBright, accents.gold, accents.goldDeep)),
             start = Offset(c, 0f),
             end = Offset(c, s),
         )
@@ -355,9 +358,11 @@ fun IslamicReturnToAyahButton(
         drawPath(
             corolla,
             Brush.radialGradient(
-                0.0f to colors.background,
-                0.62f to colors.background,
-                1.0f to accents.gold.copy(alpha = 0.14f),
+                *oneSpace(
+                    0.0f to colors.background,
+                    0.62f to colors.background,
+                    1.0f to accents.gold.copy(alpha = 0.14f),
+                ),
                 center = center,
                 radius = tipR,
             ),
@@ -436,7 +441,7 @@ fun IslamicBackToOriginCapsule(
                     )
                 }
                 val gold = Brush.linearGradient(
-                    colors = listOf(accents.goldBright, accents.gold, accents.goldDeep),
+                    colors = oneSpace(listOf(accents.goldBright, accents.gold, accents.goldDeep)),
                     start = Offset(0f, 0f),
                     end = Offset(0f, h),
                 )
@@ -446,9 +451,11 @@ fun IslamicBackToOriginCapsule(
                 drawPath(
                     capsule,
                     Brush.verticalGradient(
-                        0f to accents.gold.copy(alpha = 0.10f),
-                        0.55f to Color.Transparent,
-                        1f to accents.gold.copy(alpha = 0.08f),
+                        *oneSpace(
+                            0f to accents.gold.copy(alpha = 0.10f),
+                            0.55f to Color.Transparent,
+                            1f to accents.gold.copy(alpha = 0.08f),
+                        ),
                     ),
                 )
                 embossed(capsule, edge, accents.embossDark, accents.embossLight)
@@ -580,15 +587,17 @@ private fun DrawScope.inkStroke(
     val pad = 4f
     drawContext.canvas.saveLayer(
         Rect(bounds.left - pad, bounds.top - pad, bounds.right + pad, bounds.bottom + pad),
-        Paint(),
+        layerPaint(),
     )
     drawPath(path, color)
     drawRect(
         brush = Brush.linearGradient(
-            0f to Color.Black,
-            (head - feather).coerceIn(0f, 1f) to Color.Black,
-            head.coerceAtMost(1f) to Color.Transparent,
-            1f to Color.Transparent,
+            *oneSpace(
+                0f to Color.Black,
+                (head - feather).coerceIn(0f, 1f) to Color.Black,
+                head.coerceAtMost(1f) to Color.Transparent,
+                1f to Color.Transparent,
+            ),
             start = from,
             end = to,
         ),

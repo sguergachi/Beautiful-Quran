@@ -57,6 +57,9 @@ journeys:
   It chooses **Mushaf + Arabic + Mishary Rashid Alafasy** explicitly, waits for the
   mushaf reader (`Chapters` plus `Mushaf page N, …`), and plays Al-Fatihah
   from a **pre-cached Alafasy fixture with network off**. It does not stream.
+- `homeSearch` also contributes only to the Baseline Profile: a cold `peace`
+  query (word index, concept asset, ranking, the results' first layout), a
+  fling through the results, then a second, warm query. It needs no fixture.
 
 This keeps reader and scrolling code from bloating the primary DEX. Connect a
 stable API 33+ device, preferably the Android 17 physical device used for
@@ -117,6 +120,44 @@ warms the compact concept asset, but the full word index remains cold.
 
 Page turns and dial jumps size the swipe from the display (no 400 px
 constants). They never click a guessed pixel for the return roundel.
+
+How the journeys find things (`Journeys.kt`), so a UI change can be matched:
+
+- **Cover.** A fresh install holds the cover until its first content fill
+  lands; the board's description names the download until it reads
+  `The Noble Quran — touch to open`. The harness waits for that (up to 3 min),
+  taps it, and waits for the cover to leave. It never taps into the splash.
+- **Settled taps.** The paper stack keeps neighbouring sheets composed, so a
+  sheet's rows are in the tree while it still turns. Every tap first waits for
+  its target's bounds to hold still (`waitForStable`), and a node the UI
+  replaces meanwhile (search results arriving) is looked up again.
+- **Section labels** are set in small caps (`SectionLabel` uppercases the
+  string), so `RECITER` / `LAYOUT` / `VIEW` are matched case-insensitively.
+- **Choices are confirmed.** Reciter rows and the Customize choice words carry
+  `selected` semantics (reported to accessibility as checked); each pick waits
+  for it. View's `Arabic` is found below the `VIEW` label, scrolling Customize.
+- **Search field.** `Search` is a contentDescription on a field that merges its
+  descendants, so Compose reports it on a child node of the EditText, not on
+  the EditText itself (true before and after the state-based field migration).
+  The harness sets text on the EditText that holds the label.
+- **Dial.** The mushaf dial's grab strip carries test tag `mushafPageDial`,
+  surfaced as a resource id (`testTagsAsResourceId` on the activity root); the
+  swipe runs along its centre line.
+
+Every measured and collected journey takes an iteration override. For a quick
+end-to-end check of the harness itself (emulator numbers are not evidence):
+
+```bash
+./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest \
+  -Pandroidx.benchmark.enabledRules=Macrobenchmark \
+  -Pandroid.testInstrumentationRunnerArguments.iterations=1 \
+  -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.suppressErrors=EMULATOR
+```
+
+Gradle uninstalls the app after a run, which drops any recitation cache. To
+smoke-test `longAyahRecitation` on an emulator, install both APKs and drive it
+with `adb shell am instrument -e iterations 1 -e offlineRecitationFixture true …`
+so the 2:282 cache from a first, online play survives to the measured run.
 
 ```bash
 ./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest \

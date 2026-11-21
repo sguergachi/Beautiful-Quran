@@ -51,6 +51,7 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.sin
+import com.beautifulquran.ui.theme.oneSpace
 
 /**
  * Gather is entered by holding a verse's `﴿N﴾`, and the hold is drawn as an
@@ -686,9 +687,11 @@ internal fun DrawScope.drawMarkHold(
     val inner = maxOf(frame.rx, frame.ry) + 2.5.dp.toPx()
     val outer = inner + lerp(5f, EXPANDED_LONG_RAY_DP, expansion) * dpPx * 1.2f
     val gilt = Brush.radialGradient(
-        0f to gold.base,
-        (inner / outer).coerceIn(0f, 0.99f) to gold.base,
-        1f to gold.tip,
+        *oneSpace(
+            0f to gold.base,
+            (inner / outer).coerceIn(0f, 0.99f) to gold.base,
+            1f to gold.tip,
+        ),
         center = Offset(frame.cx, frame.cy),
         radius = outer,
     )

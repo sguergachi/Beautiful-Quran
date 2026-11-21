@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -27,13 +26,13 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import com.beautifulquran.ui.theme.rememberMirroredSliderState
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,7 +51,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -103,11 +103,13 @@ import com.beautifulquran.ui.theme.paperSelectHaptic
 import com.beautifulquran.ui.theme.paperToggleHaptic
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shippedCheckParams
+import com.beautifulquran.ui.theme.themePreviewAccents
 import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.typeScale
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.QuranTheme
+import com.beautifulquran.ui.theme.oneSpace
 
 // Text size runs the same discrete stops the reader honours: 0.8× … 1.6×.
 private const val FONT_SCALE_MIN = 0.8f
@@ -976,9 +978,8 @@ internal fun BrushTuningSlider(
             modifier = Modifier.width(104.dp),
         )
         Slider(
-            value = value,
+            state = rememberMirroredSliderState(value, range),
             onValueChange = onChange,
-            valueRange = range,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -1242,26 +1243,29 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
     }
 }
 
-/** Theme preview: main paper fill in a round rect with a gilded gold rim. */
+/**
+ * Theme preview: a slip of the theme's paper with one gilt dot on it — the
+ * paper and gold the theme really draws (`Theme.kt`), deep → bright → deep
+ * like every gilt figure. No rim: the paper's own step off this sheet is the
+ * edge.
+ */
 @Composable
 internal fun ThemeColorPreview(mode: ThemeMode) {
-    val colors = themePreviewColors(mode)
-    val fill = colors.first()
-    // Paper gilt on light surfaces; warmer gilt on dark (matches Theme.kt accents).
-    val gilt = when (mode) {
-        ThemeMode.DARK, ThemeMode.ROYAL_GREEN -> Color(0xFFD9B44A)
-        ThemeMode.LIGHT -> Color(0xFFC9A227)
-        ThemeMode.SYSTEM -> {
-            val c = colors.first()
-            if (c.red + c.green + c.blue < 1.5f) Color(0xFFD9B44A) else Color(0xFFC9A227)
-        }
+    val fill = themePreviewColors(mode).first()
+    val accents = themePreviewAccents(mode)
+    Canvas(Modifier.size(width = 64.dp, height = 22.dp)) {
+        val corner = CornerRadius(6.dp.toPx())
+        drawRoundRect(fill, cornerRadius = corner)
+        val r = 3.5.dp.toPx()
+        drawCircle(
+            brush = Brush.verticalGradient(
+                oneSpace(listOf(accents.goldDeep, accents.goldBright, accents.goldDeep)),
+                startY = center.y - r,
+                endY = center.y + r,
+            ),
+            radius = r,
+        )
     }
-    Box(
-        modifier = Modifier
-            .size(width = 64.dp, height = 22.dp)
-            .border(1.5.dp, gilt, RoundedCornerShape(6.dp))
-            .background(fill, RoundedCornerShape(6.dp)),
-    )
 }
 
 internal val ThemeMode.label: String

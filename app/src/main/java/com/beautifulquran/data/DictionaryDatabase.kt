@@ -25,23 +25,8 @@ class DictionaryDatabase(private val context: Context) {
         }.getOrNull()
     }
 
-    private fun ensureExtracted(): File {
-        val file = File(context.noBackupFilesDir, DB_FILE_NAME)
-        if (!file.exists()) {
-            file.parentFile?.mkdirs()
-            val tmp = File(file.parentFile, "$DB_FILE_NAME.tmp")
-            context.assets.open(ASSET_NAME).use { input ->
-                tmp.outputStream().use { output -> input.copyTo(output) }
-            }
-            check(tmp.renameTo(file)) {
-                "Could not install $DB_FILE_NAME from assets (rename failed)"
-            }
-            file.parentFile
-                ?.listFiles { f -> f.name.startsWith("dictionary-v") && f.name != DB_FILE_NAME }
-                ?.forEach { it.delete() }
-        }
-        return file
-    }
+    private fun ensureExtracted(): File =
+        extractVersionedAsset(context, ASSET_NAME, DB_FILE_NAME, oldVersionPrefix = "dictionary-v")
 
     companion object {
         private const val ASSET_NAME = "dictionary.sqlite"

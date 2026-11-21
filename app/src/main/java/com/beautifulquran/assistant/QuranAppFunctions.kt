@@ -1,6 +1,6 @@
 package com.beautifulquran.assistant
 
-import androidx.appfunctions.AppFunction
+import androidx.appfunctions.AppFunctionDeclaration
 import androidx.appfunctions.AppFunctionInvalidArgumentException
 import androidx.appfunctions.AppFunctionService
 import androidx.appfunctions.AppFunctionServiceEntryPoint
@@ -33,7 +33,7 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
      * @throws AppFunctionInvalidArgumentException If the chapter or verse is
      * outside the Quran; ask the user for a valid chapter or verse number.
      */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun playChapter(chapterNumber: Int, verseNumber: Int? = null): String {
         val app = quranApp
         val (surah, ayah) = app.resolveVerse(chapterNumber, verseNumber ?: 1)
@@ -47,7 +47,7 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
      *
      * @return A short description of the resumed recitation.
      */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun resumeRecitation(): String {
         val app = quranApp
         if (app.player.state.value.nowPlaying != null) {
@@ -60,28 +60,28 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
     }
 
     /** Pause the current recitation without losing its position. */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun pauseRecitation(): String {
         quranApp.player.pause()
         return "Paused Quran recitation"
     }
 
     /** Stop recitation and clear the active playback queue. */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun stopRecitation(): String {
         quranApp.player.stop()
         return "Stopped Quran recitation"
     }
 
     /** Move playback to the next verse in the loaded chapter. */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun nextVerse(): String {
         quranApp.player.next()
         return "Moved to the next verse"
     }
 
     /** Move playback to the previous verse in the loaded chapter. */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun previousVerse(): String {
         quranApp.player.previous()
         return "Moved to the previous verse"
@@ -95,7 +95,7 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
      * @throws AppFunctionInvalidArgumentException If the speed is unsupported;
      * ask the user to choose one of the supported multipliers.
      */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun setPlaybackSpeed(speed: Float): String {
         val selected = PLAYBACK_SPEEDS.firstOrNull { abs(it - speed) < 0.01f }
             ?: throw AppFunctionInvalidArgumentException(
@@ -115,7 +115,7 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
      * @throws AppFunctionInvalidArgumentException If the chapter or range is
      * invalid; ask the user for verses that exist in the same chapter.
      */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun repeatVerses(
         chapterNumber: Int,
         firstVerse: Int,
@@ -135,7 +135,7 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
     }
 
     /** Disable verse, range, and chapter repeat while preserving playback. */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun disableRepeat(): String {
         quranApp.player.run {
             clearRepeatRange()
@@ -154,7 +154,7 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
      * @throws AppFunctionInvalidArgumentException If no unique reciter matches;
      * ask the user to choose from the names in the error.
      */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun selectReciter(reciterName: String): String {
         val app = quranApp
         val reciters = app.repository.reciters()
@@ -196,7 +196,7 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
      * @param verseNumber Verse or ayah number within that chapter.
      * @return Whether the verse was newly saved or already bookmarked.
      */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun bookmarkVerse(chapterNumber: Int, verseNumber: Int): String {
         val app = quranApp
         app.resolveVerse(chapterNumber, verseNumber)
@@ -215,7 +215,7 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
      * @param verseNumber Verse or ayah number within that chapter.
      * @return Whether an existing bookmark was removed.
      */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun removeBookmark(chapterNumber: Int, verseNumber: Int): String {
         val app = quranApp
         app.resolveVerse(chapterNumber, verseNumber)
@@ -242,7 +242,7 @@ abstract class BaseQuranAppFunctionService : AppFunctionService() {
      * @throws AppFunctionInvalidArgumentException If a supplied value is not
      * supported; ask the user to choose a value documented on that parameter.
      */
-    @AppFunction(isDescribedByKDoc = true)
+    @AppFunctionDeclaration(isDescribedByKDoc = true)
     suspend fun configureReader(
         readingMode: String? = null,
         fontScale: Float? = null,

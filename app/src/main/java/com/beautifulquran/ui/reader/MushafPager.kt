@@ -95,7 +95,6 @@ import androidx.core.content.res.ResourcesCompat
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import com.beautifulquran.R
 import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_INK_MID_EM
 import com.beautifulquran.ui.theme.MUSHAF_BASMALAH_GLYPH
@@ -105,6 +104,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.core.snap
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.quietClickable
+import com.beautifulquran.ui.theme.setManagedColor
+import com.beautifulquran.ui.theme.oneSpace
 
 /**
  * What the leaf needs to know about playback, in one place so it can be handed
@@ -689,11 +690,13 @@ private fun Modifier.mushafForeEdgeFade(paper: Color, band: Dp): Modifier = draw
         drawRect(
             brush = Brush.horizontalGradient(
                 // Solid at the very edge, gone by the time the measure begins.
-                colorStops = if (fromLeft) {
-                    arrayOf(0f to paper, 0.45f to paper.copy(alpha = 0.70f), 1f to Color.Transparent)
-                } else {
-                    arrayOf(0f to Color.Transparent, 0.55f to paper.copy(alpha = 0.70f), 1f to paper)
-                },
+                colorStops = oneSpace(
+                    *if (fromLeft) {
+                        arrayOf(0f to paper, 0.45f to paper.copy(alpha = 0.70f), 1f to Color.Transparent)
+                    } else {
+                        arrayOf(0f to Color.Transparent, 0.55f to paper.copy(alpha = 0.70f), 1f to paper)
+                    },
+                ),
                 startX = if (fromLeft) 0f else size.width - bandPx,
                 endX = if (fromLeft) bandPx else size.width,
             ),
@@ -2070,7 +2073,7 @@ private fun MushafBasmalahLine(
         android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             typeface = face
             textSize = fontPx
-            color = ink.toArgb()
+            setManagedColor(ink)
             textAlign = android.graphics.Paint.Align.CENTER
         }
     }

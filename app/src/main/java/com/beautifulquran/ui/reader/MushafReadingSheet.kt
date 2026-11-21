@@ -1,5 +1,6 @@
 package com.beautifulquran.ui.reader
 
+import com.beautifulquran.ui.theme.QuietButton
 import com.beautifulquran.ui.theme.mixedCaseTrackingEm
 import com.beautifulquran.ui.theme.HafsFontFamily
 import com.beautifulquran.ui.theme.quietClickable
@@ -27,13 +28,7 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Repeat
-import androidx.compose.material.icons.rounded.RepeatOne
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -52,7 +47,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import androidx.media3.common.Player
 import com.beautifulquran.data.PageNumberScript
 import com.beautifulquran.domain.MushafGrid
 import com.beautifulquran.domain.MushafType
@@ -321,17 +315,12 @@ internal fun MushafReadingSheet(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val repeatActive = playerState.repeatMode != Player.REPEAT_MODE_OFF || playerState.repeatRange != null
-                val speedActive = playerState.speed != 1f
-                val singleAyah = playerState.repeatRange?.let { it.first == it.last } == true
+                val repeatActive = playerState.repeatActive
+                val speedActive = playerState.speedActive
                 GutterIcon(
                     onClick = onRepeatClick,
                     enabled = enabled && (!reciting || repeatActive),
-                    image = if (playerState.repeatMode == Player.REPEAT_MODE_ONE || singleAyah) {
-                        Icons.Rounded.RepeatOne
-                    } else {
-                        Icons.Rounded.Repeat
-                    },
+                    image = playerState.repeatIcon,
                     label = "Repeat",
                     buttonSize = controlSize,
                     iconSize = 22.dp,
@@ -351,32 +340,12 @@ internal fun MushafReadingSheet(
                     iconSize = 24.dp,
                     tint = primary,
                 )
-                IconButton(onClick = onPlayPause, enabled = enabled, modifier = Modifier.size(MushafTransportRow)) {
-                    if (playerState.isBuffering && isThisSurahLoaded) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp,
-                            color = primary,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = if (playerState.isPlaying && isThisSurahLoaded) {
-                                Icons.Rounded.Pause
-                            } else {
-                                Icons.Rounded.PlayArrow
-                            },
-                            // The same condition the icon is drawn from: while
-                            // another chapter plays this button shows Play, and
-                            // used to be announced as Pause.
-                            contentDescription = if (playerState.isPlaying && isThisSurahLoaded) {
-                                "Pause"
-                            } else {
-                                "Play"
-                            },
-                            tint = primary,
-                            modifier = Modifier.size(34.dp),
-                        )
-                    }
+                QuietButton(onClick = onPlayPause, enabled = enabled, modifier = Modifier.size(MushafTransportRow)) {
+                    PlayPauseGlyph(
+                        playing = playerState.isPlaying && isThisSurahLoaded,
+                        buffering = playerState.isBuffering && isThisSurahLoaded,
+                        tint = primary,
+                    )
                 }
                 GutterIcon(
                     onClick = onFastForward,
@@ -403,7 +372,7 @@ internal fun MushafReadingSheet(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "${if (playerState.speed % 1f == 0f) playerState.speed.toInt() else playerState.speed}×",
+                        text = playerState.speedLabel,
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.SemiBold,
                             fontSize = typeScale(15.sp),
@@ -657,7 +626,7 @@ private fun GutterIcon(
     buttonSize: Dp = 40.dp,
     iconSize: Dp = 20.dp,
 ) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(buttonSize)) {
+    QuietButton(onClick = onClick, enabled = enabled, modifier = modifier.size(buttonSize)) {
         Icon(image, contentDescription = label, tint = tint, modifier = Modifier.size(iconSize))
     }
 }

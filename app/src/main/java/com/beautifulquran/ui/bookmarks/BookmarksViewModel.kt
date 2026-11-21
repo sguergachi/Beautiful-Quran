@@ -1,6 +1,9 @@
 package com.beautifulquran.ui.bookmarks
 
 import com.beautifulquran.domain.EnglishTypography
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.launch
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.beautifulquran.data.BookmarkRepository
@@ -96,6 +99,9 @@ class BookmarksViewModel(
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
+
+    /** The search pill's text; the field edits it and [query] mirrors it. */
+    val queryField = TextFieldState()
     private val resolved = bookmarks.bookmarks.flatMapLatest { saved ->
         flow { emit(saved to repository.bookmarkedAyahs(saved)) }
     }
@@ -133,8 +139,10 @@ class BookmarksViewModel(
         initialValue = BookmarksUiState(),
     )
 
-    fun onQueryChange(value: String) {
-        query.value = value
+    init {
+        viewModelScope.launch {
+            snapshotFlow { queryField.text.toString() }.collect { query.value = it }
+        }
     }
 
     fun removeBookmark(surahId: Int, ayah: Int) {
