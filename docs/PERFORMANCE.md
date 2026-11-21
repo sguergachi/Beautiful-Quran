@@ -817,6 +817,38 @@ Until a physical trace shows a stall, leave the wash and startup order alone.
   mushaf mode).
 - Gapless surah-file playback (single MediaItem + absolute-offset segments)
   to remove inter-ayah stream startup entirely.
+- Mushaf glyph-atlas uploads (2026-11-21, not fixed). Every Madinah page has
+  its own face, so a leaf's first visible frames rasterise and upload its
+  glyphs. One page-turn run spent 1.4 s in `glTexSubImage2D`; a dial landing
+  frame took 80 ms, ~25 ms of it uploads. One attempt warmed each held
+  neighbour while the reader sat still: once a band per frame, the neighbour
+  was drawn into a small `Offscreen` `GraphicsLayer`, off screen, with
+  `drawContent()` recorded a second time. Traces showed no layer render
+  ("flush layers") for it. With it enabled, the page-turn journey twice
+  stuck on page 3, and passed with it disabled. It was dropped; the cause was
+  not found. A future attempt needs on-device proof that HWUI renders an
+  off-screen layer, and must not draw a leaf's content layer into a second
+  parent.
+- Neighbour leaf composition. Bringing a leaf into the pager's window still
+  composes ~150 word nodes in one frame (16–44 ms of composition on the
+  emulator, on top of first-visit measure). Splitting it with pausable
+  composition needs a pager prefetch hook that `HorizontalPager` does not
+  expose. Drawing a line's static words from one node would cut the node
+  count. However, it would rebuild every word node when ink packs arrive at
+  playback start, which is an animated moment.
+- The surah band's ground is two `generatedFieldWeave` layers, the second a
+  mirror of the first. A new chapter opening tessellates both
+  (`AAHairlineOp`, 1–7 ms each, ~19 ms of an 80 ms dial-landing frame).
+  Recording once and drawing the texture mirrored would halve that, but a
+  mirrored texture is not guaranteed to match mirrored rasterisation pixel
+  for pixel, so it was left alone.
+- Cold start's first frame (391 ms UI on the emulator): ~38 ms composition,
+  of which 15 ms is one `StaticLayout`, two ~8 ms first text measures (font
+  loads), and ~35 ms recording the cover. The rest of the doFrame is untraced
+  first-use cost: class init, JIT and HWUI/EGL setup. All of it draws the
+  closed cover's first frame, and the stack already mounts only after two
+  cover frames. Nothing was found that could move later without changing
+  that frame.
 
 ---
 
