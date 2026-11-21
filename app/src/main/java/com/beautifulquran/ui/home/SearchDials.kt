@@ -54,6 +54,7 @@ import com.beautifulquran.ui.theme.quietClickable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.abs
 import com.beautifulquran.ui.theme.QuranTheme
+import com.beautifulquran.ui.theme.oneSpace
 
 private val SurahWheelHorizontalPadding = 8.dp
 private val SurahNumberColumnWidth = 22.dp
@@ -349,10 +350,12 @@ internal fun SearchDialWheel(
                 drawContent()
                 drawRect(
                     brush = Brush.verticalGradient(
-                        0f to fadeColor,
-                        0.22f to clearColor,
-                        0.78f to clearColor,
-                        1f to fadeColor,
+                        *oneSpace(
+                            0f to fadeColor,
+                            0.22f to clearColor,
+                            0.78f to clearColor,
+                            1f to fadeColor,
+                        ),
                     ),
                 )
             },

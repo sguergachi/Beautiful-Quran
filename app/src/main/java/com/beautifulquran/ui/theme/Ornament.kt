@@ -73,7 +73,7 @@ internal fun DrawScope.goldBrush(bright: Color, deep: Color, t: Float): Brush {
     val w = size.width
     val h = size.height
     return Brush.linearGradient(
-        colors = listOf(deep, bright, deep),
+        colors = oneSpace(listOf(deep, bright, deep)),
         start = Offset(0f, h * t),
         end = Offset(w, h * (1f - t)),
     )
@@ -250,7 +250,7 @@ fun Modifier.gilded(bright: Color, deep: Color): Modifier =
         .drawWithContent {
             drawContent()
             drawRect(
-                brush = Brush.verticalGradient(listOf(deep, bright, deep)),
+                brush = Brush.verticalGradient(oneSpace(listOf(deep, bright, deep))),
                 blendMode = BlendMode.SrcAtop,
             )
         }
@@ -347,7 +347,7 @@ fun IslamicReturnToAyahButton(
         }
 
         val gold = Brush.linearGradient(
-            colors = listOf(accents.goldBright, accents.gold, accents.goldDeep),
+            colors = oneSpace(listOf(accents.goldBright, accents.gold, accents.goldDeep)),
             start = Offset(c, 0f),
             end = Offset(c, s),
         )
@@ -358,9 +358,11 @@ fun IslamicReturnToAyahButton(
         drawPath(
             corolla,
             Brush.radialGradient(
-                0.0f to colors.background,
-                0.62f to colors.background,
-                1.0f to accents.gold.copy(alpha = 0.14f),
+                *oneSpace(
+                    0.0f to colors.background,
+                    0.62f to colors.background,
+                    1.0f to accents.gold.copy(alpha = 0.14f),
+                ),
                 center = center,
                 radius = tipR,
             ),
@@ -439,7 +441,7 @@ fun IslamicBackToOriginCapsule(
                     )
                 }
                 val gold = Brush.linearGradient(
-                    colors = listOf(accents.goldBright, accents.gold, accents.goldDeep),
+                    colors = oneSpace(listOf(accents.goldBright, accents.gold, accents.goldDeep)),
                     start = Offset(0f, 0f),
                     end = Offset(0f, h),
                 )
@@ -449,9 +451,11 @@ fun IslamicBackToOriginCapsule(
                 drawPath(
                     capsule,
                     Brush.verticalGradient(
-                        0f to accents.gold.copy(alpha = 0.10f),
-                        0.55f to Color.Transparent,
-                        1f to accents.gold.copy(alpha = 0.08f),
+                        *oneSpace(
+                            0f to accents.gold.copy(alpha = 0.10f),
+                            0.55f to Color.Transparent,
+                            1f to accents.gold.copy(alpha = 0.08f),
+                        ),
                     ),
                 )
                 embossed(capsule, edge, accents.embossDark, accents.embossLight)
@@ -588,10 +592,12 @@ private fun DrawScope.inkStroke(
     drawPath(path, color)
     drawRect(
         brush = Brush.linearGradient(
-            0f to Color.Black,
-            (head - feather).coerceIn(0f, 1f) to Color.Black,
-            head.coerceAtMost(1f) to Color.Transparent,
-            1f to Color.Transparent,
+            *oneSpace(
+                0f to Color.Black,
+                (head - feather).coerceIn(0f, 1f) to Color.Black,
+                head.coerceAtMost(1f) to Color.Transparent,
+                1f to Color.Transparent,
+            ),
             start = from,
             end = to,
         ),

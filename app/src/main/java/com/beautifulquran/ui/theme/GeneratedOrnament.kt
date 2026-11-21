@@ -266,7 +266,7 @@ internal fun TooledGold(
                     // spanning the width — goldBrush at rest), built once per
                     // size; only its rotation moves.
                     val ramp = Brush.linearGradient(
-                        colors = listOf(deepGold, brightGold, deepGold),
+                        colors = oneSpace(listOf(deepGold, brightGold, deepGold)),
                         start = Offset(0f, size.height / 2f),
                         end = Offset(size.width, size.height / 2f),
                     )

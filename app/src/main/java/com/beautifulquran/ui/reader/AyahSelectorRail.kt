@@ -76,6 +76,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
+import com.beautifulquran.ui.theme.oneSpace
 
 /*
  * The ayah selector rail: a collapsed stack of bars flush with the screen edge
@@ -493,7 +494,7 @@ internal fun AyahSelectorRail(
                 }
                 drawRect(
                     brush = Brush.horizontalGradient(
-                        colorStops = arrayOf(0f to paper.copy(alpha = wash)) + stops,
+                        colorStops = oneSpace(*(arrayOf(0f to paper.copy(alpha = wash)) + stops)),
                         startX = edgeX,
                         endX = farX,
                     ),

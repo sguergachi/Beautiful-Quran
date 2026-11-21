@@ -41,6 +41,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.sin
+import com.beautifulquran.ui.theme.oneSpace
 
 /*
  * A verse's own bookmark ribbon — ink that belongs to the ayah block, not a
@@ -377,9 +378,11 @@ internal fun VerseBookmarkRibbon(
             if (placeMarked && placeProgress > 0.001f) {
                 val placeWidth = placeRibbonWidthDp(ribbonWidth.value).dp.toPx()
                 val fill = Brush.verticalGradient(
-                    0f to currentPlaceGreen,
-                    0.55f to currentPlaceGreen,
-                    1f to currentPlaceGreen.copy(alpha = 0.82f),
+                    *oneSpace(
+                        0f to currentPlaceGreen,
+                        0.55f to currentPlaceGreen,
+                        1f to currentPlaceGreen.copy(alpha = 0.82f),
+                    ),
                     startY = topInsetPx,
                     endY = fullLen.coerceAtLeast(1f),
                 )
@@ -404,9 +407,11 @@ internal fun VerseBookmarkRibbon(
 
             if (showingRibbon) {
                 val fill = Brush.verticalGradient(
-                    0f to ruby,
-                    0.55f to ruby,
-                    1f to ruby.copy(alpha = 0.82f),
+                    *oneSpace(
+                        0f to ruby,
+                        0.55f to ruby,
+                        1f to ruby.copy(alpha = 0.82f),
+                    ),
                     startY = topInsetPx,
                     endY = tipY.coerceAtLeast(1f),
                 )

@@ -915,19 +915,23 @@ Every value lives in `ui/theme/Theme.kt`; the web mirrors them in
 or Nightfall under Royal Green, with Royal Green's accents either way, as
 `contrastingOverlayColorScheme` / `contrastingOverlayAccents`).
 
-**Wide colour: not yet.** Every accent is sRGB, and the window stays sRGB.
-Display P3 rubies and deep gilt were tried (Paper ruby P3(0.668, 0.089,
-0.180), Nightfall P3(0.965, 0.399, 0.436), Royal Green P3(0.966, 0.446,
-0.472), Paper `goldDeep` P3(0.471, 0.358, 0.030); `gold` P3(0.655, 0.513,
-0.074), `goldInk` P3(0.615, 0.483, 0.055), dark repeat P3(0.976, 0.534,
-0.263)) and crashed every chapter open on a Pixel: Compose 1.13 hands each
-gradient stop to the framework as a colour long in its own space, and
-`LinearGradient`/`RadialGradient` throw when the stops' spaces differ — a
-P3 `goldDeep` beside an sRGB `goldBright`, `Color.Transparent` or a Material
-scheme colour. The emulator's sRGB panel never takes that path. Going wide
-needs every colour that can meet in a gradient moved to one space together
-(and Compose text, which clips to sRGB, colour-managed). A colour handed to a
-shader or a framework paint already goes through `setManagedColorUniform` /
+**Wide colour.** On a panel that composes Display P3 at 8 bits — where wide
+colour costs no memory or bandwidth (`ui/theme/WideGamut.kt`) — the window
+runs in wide-gamut mode and the accents that are only ever drawn take a
+purer pigment: the rubies (Paper P3(0.668, 0.089, 0.180), Nightfall
+P3(0.965, 0.399, 0.436), Royal Green P3(0.966, 0.446, 0.472)) and Paper's
+deep gilt `goldDeep` P3(0.471, 0.358, 0.030). Everywhere else they keep their
+sRGB values exactly. Compose clips a Text's colour to sRGB, so accents that
+also colour words stay sRGB until it doesn't: Paper `gold` P3(0.655, 0.513,
+0.074), `goldInk` P3(0.615, 0.483, 0.055), and the dark sheets' repeat orange
+P3(0.976, 0.534, 0.263) are the values to take then. Every gradient passes its stops
+through `oneSpace(...)` (`ui/theme/OneSpace.kt`): Compose 1.13 hands each stop
+to the framework as a colour long in its own space, and the framework throws
+when they differ, so a P3 accent beside an sRGB partner (`goldBright`,
+`Color.Transparent`, a scheme colour) crashed every chapter open on a Pixel
+before it existed. `OneSpaceTest` fails any `Brush.*Gradient` that skips it.
+A colour handed to a
+shader or a framework paint goes through `setManagedColorUniform` /
 `setManagedColor` (`ManagedColor.kt`), which keep its colour space; sRGB
 values reach them bit-for-bit as before. Not wide, on purpose: an HDR glint,
 a brighter dark gold, a more vivid green or green wash, tinted paper.

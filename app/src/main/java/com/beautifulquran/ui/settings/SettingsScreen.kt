@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -104,12 +103,13 @@ import com.beautifulquran.ui.theme.paperSelectHaptic
 import com.beautifulquran.ui.theme.paperToggleHaptic
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shippedCheckParams
-import com.beautifulquran.ui.theme.quranThemeParts
+import com.beautifulquran.ui.theme.themePreviewAccents
 import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.typeScale
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.QuranTheme
+import com.beautifulquran.ui.theme.oneSpace
 
 // Text size runs the same discrete stops the reader honours: 0.8× … 1.6×.
 private const val FONT_SCALE_MIN = 0.8f
@@ -1252,14 +1252,14 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
 @Composable
 internal fun ThemeColorPreview(mode: ThemeMode) {
     val fill = themePreviewColors(mode).first()
-    val accents = quranThemeParts(mode, isSystemInDarkTheme()).third
+    val accents = themePreviewAccents(mode)
     Canvas(Modifier.size(width = 64.dp, height = 22.dp)) {
         val corner = CornerRadius(6.dp.toPx())
         drawRoundRect(fill, cornerRadius = corner)
         val r = 3.5.dp.toPx()
         drawCircle(
             brush = Brush.verticalGradient(
-                listOf(accents.goldDeep, accents.goldBright, accents.goldDeep),
+                oneSpace(listOf(accents.goldDeep, accents.goldBright, accents.goldDeep)),
                 startY = center.y - r,
                 endY = center.y + r,
             ),

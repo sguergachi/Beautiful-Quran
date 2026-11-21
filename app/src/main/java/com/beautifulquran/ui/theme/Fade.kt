@@ -121,11 +121,11 @@ fun Modifier.letterFadeIn(
             val head = p * (w * revealFraction.coerceIn(0f, 1f) + edge)
             val brush = cachedBrush?.takeIf { cachedEdge == edge && cachedReveal == revealed }
                 ?: Brush.horizontalGradient(
-                    colors = if (revealed == 1f) washColors else stops.map { t ->
+                    colors = oneSpace(if (revealed == 1f) washColors else stops.map { t ->
                         val a = restingAlpha + (revealed - restingAlpha) *
                             (if (rtl) inkSmootherstep(t) else 1f - inkSmootherstep(t))
                         Color.White.copy(alpha = a)
-                    },
+                    }),
                     startX = 0f,
                     endX = edge,
                 ).also {
@@ -1560,7 +1560,7 @@ private class WashBrushCache(private val rtl: Boolean, private val stops: FloatA
                 paper.copy(alpha = (1f - glyphAlpha).coerceIn(0f, 1f))
             }
         }
-        return Brush.horizontalGradient(colors = colors, startX = 0f, endX = edge)
+        return Brush.horizontalGradient(colors = oneSpace(colors), startX = 0f, endX = edge)
             .also { byKey[key] = it }
     }
 }
@@ -2149,7 +2149,7 @@ fun Modifier.verticalFadingEdges(
     val fadeBottom = size.height - bottomInsetPx
     val topBrush = if (topPx > 0f) {
         Brush.verticalGradient(
-            colors = listOf(color, color.copy(alpha = 0f)),
+            colors = oneSpace(listOf(color, color.copy(alpha = 0f))),
             startY = topInsetPx,
             endY = topInsetPx + topPx,
         )
@@ -2158,7 +2158,7 @@ fun Modifier.verticalFadingEdges(
     }
     val bottomBrush = if (bottomPx > 0f) {
         Brush.verticalGradient(
-            colors = listOf(color.copy(alpha = 0f), color),
+            colors = oneSpace(listOf(color.copy(alpha = 0f), color)),
             startY = fadeBottom - bottomPx,
             endY = fadeBottom,
         )
@@ -2202,7 +2202,7 @@ fun Modifier.verticalFadingEdges(
 fun Modifier.paperBottomFeather(color: Color): Modifier = drawBehind {
     drawRect(
         brush = Brush.verticalGradient(
-            colors = listOf(color, color.copy(alpha = 0f)),
+            colors = oneSpace(listOf(color, color.copy(alpha = 0f))),
         ),
     )
 }

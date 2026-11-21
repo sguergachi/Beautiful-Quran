@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import com.beautifulquran.ui.theme.CoverLeatherCenter
 import com.beautifulquran.ui.theme.CoverLeatherEdge
 import com.beautifulquran.ui.theme.setManagedColorUniform
+import com.beautifulquran.ui.theme.oneSpace
 
 /**
  * The cover's leather: a radial falloff from [CoverLeatherCenter] to
@@ -53,8 +54,10 @@ internal class CoverLeather {
             shader.setFloatUniform("radius", radius)
         } else {
             fallback = Brush.radialGradient(
-                0f to CoverLeatherCenter,
-                1f to CoverLeatherEdge,
+                *oneSpace(
+                    0f to CoverLeatherCenter,
+                    1f to CoverLeatherEdge,
+                ),
                 center = center,
                 radius = radius,
             )

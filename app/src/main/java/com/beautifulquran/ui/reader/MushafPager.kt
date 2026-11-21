@@ -105,6 +105,7 @@ import androidx.compose.animation.core.snap
 import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.setManagedColor
+import com.beautifulquran.ui.theme.oneSpace
 
 /**
  * What the leaf needs to know about playback, in one place so it can be handed
@@ -689,11 +690,13 @@ private fun Modifier.mushafForeEdgeFade(paper: Color, band: Dp): Modifier = draw
         drawRect(
             brush = Brush.horizontalGradient(
                 // Solid at the very edge, gone by the time the measure begins.
-                colorStops = if (fromLeft) {
-                    arrayOf(0f to paper, 0.45f to paper.copy(alpha = 0.70f), 1f to Color.Transparent)
-                } else {
-                    arrayOf(0f to Color.Transparent, 0.55f to paper.copy(alpha = 0.70f), 1f to paper)
-                },
+                colorStops = oneSpace(
+                    *if (fromLeft) {
+                        arrayOf(0f to paper, 0.45f to paper.copy(alpha = 0.70f), 1f to Color.Transparent)
+                    } else {
+                        arrayOf(0f to Color.Transparent, 0.55f to paper.copy(alpha = 0.70f), 1f to paper)
+                    },
+                ),
                 startX = if (fromLeft) 0f else size.width - bandPx,
                 endX = if (fromLeft) bandPx else size.width,
             ),

@@ -89,6 +89,7 @@ import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.roundToInt
 import kotlin.math.sign
+import com.beautifulquran.ui.theme.oneSpace
 
 /*
  * The page dial: the hairline under the leaf, made drivable.
@@ -1790,8 +1791,10 @@ internal fun MushafPageDial(
                         // where the ramp ends.
                         val feather = MushafDialHudFeather.toPx()
                         val verticalBrush = Brush.verticalGradient(
-                            0f to paper.copy(alpha = 0f),
-                            1f to paper,
+                            *oneSpace(
+                                0f to paper.copy(alpha = 0f),
+                                1f to paper,
+                            ),
                             startY = 0f,
                             endY = feather,
                         )

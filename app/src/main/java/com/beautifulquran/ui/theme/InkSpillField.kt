@@ -101,7 +101,7 @@ internal fun Modifier.contextualGuideProgressiveBlur(
         val span = abs(direction.x) * size.width + abs(direction.y) * size.height
         val fieldCenter = Offset(size.width / 2f, size.height / 2f)
         val mask = Brush.linearGradient(
-            *maskStops,
+            *oneSpace(*maskStops),
             start = fieldCenter - direction * (span / 2f),
             end = fieldCenter + direction * (span / 2f),
         )
@@ -214,7 +214,7 @@ private fun GradientInkSpillField(
         val start = fieldCenter - direction * (span / 2f)
         drawRect(
             brush = Brush.linearGradient(
-                *stops,
+                *oneSpace(*stops),
                 start = start,
                 end = start + direction * reach,
             ),
