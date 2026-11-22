@@ -50,6 +50,16 @@ class DeveloperModeSettingsTest {
     }
 
     @Test
+    fun `AI English mappings require both developer mode and explicit opt in`() {
+        assertFalse(Settings().useAiEnglishAlignment)
+        assertFalse(Settings(aiEnglishAlignmentEnabled = true).useAiEnglishAlignment)
+        assertFalse(Settings(developerModeEnabled = true).useAiEnglishAlignment)
+        val enabled = Settings(developerModeEnabled = true, aiEnglishAlignmentEnabled = true)
+        assertTrue(enabled.useAiEnglishAlignment)
+        assertFalse(enabled.copy(developerModeEnabled = false).useAiEnglishAlignment)
+    }
+
+    @Test
     fun `contextual guides are an independent developer toggle`() {
         val enabled = Settings().copy(
             developerModeEnabled = true,
