@@ -1756,7 +1756,6 @@ private fun WordUnit(
     paperNode: PaperInkNode = rememberPaperInkNode(),
 ) {
     val repeatInk = LocalQuranAccents.current.repeatInk
-    val glossWeight = if (searchHit) FontWeight.Bold else null
     val searching = searchHitWash != null || recessedForSearch
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1782,7 +1781,8 @@ private fun WordUnit(
             rtl = true,
             // A word the in-surah search marks is inked in the search ink, the
             // orange a chapter-screen search hit flashes in, and so is its gloss;
-            // the karaoke layers play over it.
+            // the karaoke layers play over it. Colour only: a bolder gloss
+            // widened the tile and shifted the words around it.
             color = if (searchHit) repeatInk else MaterialTheme.colorScheme.onBackground,
             style = LocalScrollArabicType.current.let { face ->
                 ArabicWordStyle.copy(
@@ -1802,7 +1802,6 @@ private fun WordUnit(
                     text = word.translation,
                     fontSize = typeScale(12.sp) * fontScale,
                     lineHeight = 15.sp * fontScale,
-                    fontWeight = glossWeight,
                     color = if (searchHit) {
                         repeatInk
                     } else {

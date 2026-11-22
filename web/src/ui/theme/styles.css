@@ -2699,11 +2699,11 @@ button.ayah-mark {
   transition: opacity var(--chrome-recede-ms) var(--recede-ease);
 }
 
-/* In-surah search marks take the chapter-screen search hit's orange. */
+/* In-surah search marks take the chapter-screen search hit's orange. Colour
+   only: a bolder gloss widens its word and shifts the line around it. */
 .ayah-translation[data-search-hit='true'],
 .word-gloss[data-search-hit='true'] {
   color: var(--repeat);
-  font-weight: 600;
 }
 
 .translation-search-term {
