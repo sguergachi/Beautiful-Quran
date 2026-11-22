@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -101,6 +102,10 @@ fun OrnamentsLabScreen(
     LaunchedEffect(seedField) {
         snapshotFlow { seedField.text.toString().toIntOrNull() }
             .filterNotNull()
+            // Only what the reader typed. The field also echoes every seed the
+            // ViewModel sets (stepper, random, trait search); setting that back
+            // would regenerate it and wipe the search's "Found after N tries".
+            .filter { it != viewModel.ui.value.seed }
             .collect(viewModel::setSeed)
     }
     val saveName = rememberTextFieldState()

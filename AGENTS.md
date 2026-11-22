@@ -399,6 +399,12 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 - KDoc on every non-obvious public type/function; inline comments only where
   the code cannot say it (the *why*, never the *what*).
 - UI state flows down as immutable data classes; events flow up as lambdas.
+  The one exception is a text field's own `TextFieldState`: a ViewModel that
+  acts on the text (Home and Bookmarks search, Tarji Lab notes) owns it and
+  observes it with `snapshotFlow`, and the field edits it in place. That is
+  how state-based text fields are meant to be hoisted. Round-tripping each
+  keystroke through a lambda brings back the async value/IME desync they
+  replace (cursor jumps, lost characters).
 - Tests live where logic lives: pure logic (engine, parsers, mappers) gets JVM
   unit tests in `app/src/test/`; composables are kept small and stateless so
   UI stays reviewable instead of UI-tested.

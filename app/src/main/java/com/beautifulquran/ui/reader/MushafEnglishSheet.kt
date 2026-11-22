@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalLocaleList
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
@@ -311,10 +312,10 @@ internal fun MushafEnglishSheet(
         val resolver = LocalFontFamilyResolver.current
         val direction = LocalLayoutDirection.current
         val locales = LocalLocaleList.current
-        val settingKey = remember(blocks, wellPx, measurePx, density, resolver, direction, typePalette, justifyLast) {
+        val settingKey = remember(blocks, wellPx, measurePx, density, resolver, direction, locales, typePalette, justifyLast) {
             EnglishLeafSettingKey(
                 blocks.map { if (it is EnglishLeafBlockText.Prose) it.copy(verses = emptyList()) else it },
-                wellPx, measurePx, density, resolver, direction, typePalette, justifyLast,
+                wellPx, measurePx, density, resolver, direction, locales, typePalette, justifyLast,
             )
         }
         val settingState = remember(settingKey) {
@@ -791,6 +792,8 @@ private data class EnglishLeafSettingKey(
     val density: Density,
     val resolver: FontFamily.Resolver,
     val direction: LayoutDirection,
+    /** The fit is set with these locales' line breaking; another locale is another fit. */
+    val locales: LocaleList,
     val typePalette: QuranTypePalette,
     val justifyLast: Boolean,
 )

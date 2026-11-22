@@ -2651,6 +2651,10 @@ fun ReaderScreen(
                 // a fresh offscreen render pass every frame of the entrance —
                 // and those frames are the sheet's own turn, so the turn's
                 // cached sheet re-rendered the page each frame as well.
+                // No softer for it: while the sheet turns, its whole content is
+                // already one texture under the turn's scale and slide
+                // (MainActivity's cachedWhileMoving), and this layer is drawn
+                // into that texture 1:1; at rest the sheet has no transform.
                 .graphicsLayer { cachedAlpha(readerContentAlpha.value) }
                 .onGloballyPositioned { readerRootY = it.positionInRoot().y },
         ) {
@@ -3793,15 +3797,18 @@ fun ReaderScreen(
             )
         }
 
+        // Read only while the lesson shows; see ayahRailTipCenterY. Otherwise
+        // the last centre it showed at: the tip starts drawing a frame before
+        // onRenderedChange reports it, and a NaN target (Dp.Unspecified) would
+        // reach its lane's offset and fail to round in layout.
+        val railTipTargetY = remember { FloatArray(1) }
+        if ((ayahRailTipVisible || ayahRailTipRendered) && ayahRailTipCenterY.isFinite()) {
+            railTipTargetY[0] = ayahRailTipCenterY
+        }
         AyahRailTip(
             visible = ayahRailTipVisible && !mushafMode,
             railSide = settings.ayahSelectorSide,
-            // Read only while the lesson shows; see ayahRailTipCenterY.
-            targetCenterY = if (ayahRailTipVisible || ayahRailTipRendered) {
-                with(density) { ayahRailTipCenterY.toDp() }
-            } else {
-                Dp.Unspecified
-            },
+            targetCenterY = with(density) { railTipTargetY[0].toDp() },
             onDismiss = {
                 viewModel.dismissAyahRailTip()
                 ayahRailTipOpen = false
