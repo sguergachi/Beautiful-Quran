@@ -4,14 +4,14 @@ import type { ThemeMode } from '../../data/settings'
 const PAPER = '#FAF3E8'
 const NIGHTFALL = '#0C0B09'
 const ROYAL_GREEN = '#062C24'
-/** Each theme's gilding stops, deep and bright (Android Theme.kt goldDeep/goldBright). */
-const GILT_PAPER = { deep: '#7A5B05', bright: '#C9AE67' }
-const GILT_NIGHTFALL = { deep: '#9A7B32', bright: '#ECD189' }
-const GILT_ROYAL = { deep: '#A07F38', bright: '#F2D68F' }
+/** Each theme's gold (Android Theme.kt `gold`). */
+const GILT_PAPER = '#A8831D'
+const GILT_NIGHTFALL = '#CAA547'
+const GILT_ROYAL = '#D0AA4D'
 
-type Swatch = { fill: string; gilt: { deep: string; bright: string } }
+type Swatch = { fill: string; gilt: string }
 
-/** Main paper colour and gilding for each theme (Android `ThemeColorPreview`). */
+/** Main paper colour and gold for each theme (Android `ThemeColorPreview`). */
 export function themeSwatch(mode: ThemeMode, systemDark: boolean): Swatch {
   switch (mode) {
     case 'light':
@@ -27,7 +27,7 @@ export function themeSwatch(mode: ThemeMode, systemDark: boolean): Swatch {
   }
 }
 
-/** A small sample of the theme's paper with one gilt dot, no rim. */
+/** A small sample of the theme's paper edged with a hairline of its gold. */
 export function ThemeSwatches({ mode }: { mode: ThemeMode }) {
   const [systemDark, setSystemDark] = useState(() =>
     typeof window !== 'undefined'
@@ -50,8 +50,7 @@ export function ThemeSwatches({ mode }: { mode: ThemeMode }) {
       style={
         {
           background: fill,
-          '--swatch-gilt-deep': gilt.deep,
-          '--swatch-gilt-bright': gilt.bright,
+          '--swatch-gilt': gilt,
         } as CSSProperties
       }
     />

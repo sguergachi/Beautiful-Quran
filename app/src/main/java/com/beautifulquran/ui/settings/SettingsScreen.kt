@@ -52,7 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -109,7 +109,6 @@ import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.typeScale
 import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.QuranTheme
-import com.beautifulquran.ui.theme.oneSpace
 
 // Text size runs the same discrete stops the reader honours: 0.8× … 1.6×.
 private const val FONT_SCALE_MIN = 0.8f
@@ -1244,29 +1243,31 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
 }
 
 /**
- * Theme preview: a slip of the theme's paper with one gilt dot on it — the
- * paper and gold the theme really draws (`Theme.kt`), deep → bright → deep
- * like every gilt figure. No rim: the paper's own step off this sheet is the
- * edge.
+ * Theme preview: a slip of the theme's paper edged with the same gold hairline
+ * as the Customize preview leaf (0.5dp, gold at 0.28) — in the theme's own
+ * gold (`Theme.kt`), so each slip carries the paper and gilt it will draw.
  */
 @Composable
 internal fun ThemeColorPreview(mode: ThemeMode) {
     val fill = themePreviewColors(mode).first()
-    val accents = themePreviewAccents(mode)
+    val gold = themePreviewAccents(mode).gold
     Canvas(Modifier.size(width = 64.dp, height = 22.dp)) {
         val corner = CornerRadius(6.dp.toPx())
         drawRoundRect(fill, cornerRadius = corner)
-        val r = 3.5.dp.toPx()
-        drawCircle(
-            brush = Brush.verticalGradient(
-                oneSpace(listOf(accents.goldDeep, accents.goldBright, accents.goldDeep)),
-                startY = center.y - r,
-                endY = center.y + r,
-            ),
-            radius = r,
+        val hairline = 0.5.dp.toPx()
+        val inset = hairline / 2f
+        drawRoundRect(
+            color = gold.copy(alpha = ThemeSwatchHairlineAlpha),
+            topLeft = Offset(inset, inset),
+            size = Size(size.width - hairline, size.height - hairline),
+            cornerRadius = CornerRadius(corner.x - inset),
+            style = Stroke(width = hairline),
         )
     }
 }
+
+/** The Customize preview leaf's hairline weight (CustomizeScreen `ReadingPreview`). */
+private const val ThemeSwatchHairlineAlpha = 0.28f
 
 internal val ThemeMode.label: String
     get() = themeLabel(this)

@@ -71,29 +71,14 @@
 
 /* ── Customize (Android CustomizeScreen) ─────────────────────────────── */
 
-/* Theme preview: 64×22, radius 6, the paper with one gilt dot (r 3.5) gilded
-   deep → bright → deep, no rim (Android ThemeColorPreview). */
+/* Theme preview: 64×22, radius 6, the paper edged with the Customize preview
+   leaf's hairline (0.5px, gold at 0.28) in the theme's own gold (Android
+   ThemeColorPreview). */
 .sheet[data-name='settings'] .theme-paint {
-  position: relative;
   width: 64px;
   height: 22px;
   border-radius: 6px;
-}
-
-.sheet[data-name='settings'] .theme-paint::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 7px;
-  height: 7px;
-  margin: -3.5px 0 0 -3.5px;
-  border-radius: 50%;
-  background: linear-gradient(
-    var(--swatch-gilt-deep),
-    var(--swatch-gilt-bright),
-    var(--swatch-gilt-deep)
-  );
+  border: 0.5px solid color-mix(in srgb, var(--swatch-gilt) 28%, transparent);
 }
 
 /* ToggleRow: 8px padding, even 12px between rows, 20px before the group.
