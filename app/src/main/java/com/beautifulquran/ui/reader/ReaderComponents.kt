@@ -1780,9 +1780,10 @@ private fun WordUnit(
             text = word.arabic,
             motion = motion,
             rtl = true,
-            // A word the in-surah search marks is inked in the gloss's gold, so
-            // the match reads in both, and the karaoke layers play over it.
-            color = if (searchHit) LocalQuranAccents.current.gold else MaterialTheme.colorScheme.onBackground,
+            // A word the in-surah search marks is inked in the search ink, the
+            // orange a chapter-screen search hit flashes in, and so is its gloss;
+            // the karaoke layers play over it.
+            color = if (searchHit) repeatInk else MaterialTheme.colorScheme.onBackground,
             style = LocalScrollArabicType.current.let { face ->
                 ArabicWordStyle.copy(
                     fontFamily = face.fontFamily,
@@ -1803,7 +1804,7 @@ private fun WordUnit(
                     lineHeight = 15.sp * fontScale,
                     fontWeight = glossWeight,
                     color = if (searchHit) {
-                        LocalQuranAccents.current.gold
+                        repeatInk
                     } else {
                         MaterialTheme.colorScheme.onBackground
                     },
@@ -2282,6 +2283,8 @@ private fun ResponsiveEnglishAyah(
     val palette = rememberWordInkPalette()
     val translationFontFamily = TranslationFontFamily
     val gold = LocalQuranAccents.current.gold
+    /** The chapter-screen search hit's orange, for words the in-surah search marks. */
+    val searchInk = LocalQuranAccents.current.repeatInk
     val glintInk = LocalQuranAccents.current.glintInk
     val activeIndex = motions.indexOfFirst { it.isActive }
     val style = MaterialTheme.typography.bodyLarge.copy(
@@ -2318,6 +2321,7 @@ private fun ResponsiveEnglishAyah(
         ayah,
         palette.fullInkColor,
         gold,
+        searchInk,
         visibleSearchMarks,
         fontScale,
         lyricGlosses,
@@ -2338,7 +2342,7 @@ private fun ResponsiveEnglishAyah(
                 withStyle(
                     SpanStyle(
                         color = if (word.position in visibleSearchMarks) {
-                            gold
+                            searchInk
                         } else {
                             palette.fullInkColor
                         },
@@ -2557,7 +2561,7 @@ private fun ResponsiveHafsAyah(
     /** 0..1 opacity for the trailing ﴿N﴾ mark — fades to full when focused. */
     markAlpha: () -> Float,
     fontSize: TextUnit,
-    /** Words the in-surah search marks: gold full ink ([InSurahSearch]). */
+    /** Words the in-surah search marks: search-ink full ink ([InSurahSearch]). */
     searchMarks: Set<Int> = emptySet(),
     flashWordPositions: Set<Int> = emptySet(),
     searchHitWash: RepeatWash,
@@ -2580,6 +2584,7 @@ private fun ResponsiveHafsAyah(
     val palette = rememberWordInkPalette()
     val translationFontFamily = TranslationFontFamily
     val ayahMarkInk = LocalQuranAccents.current.gold
+    val searchInk = LocalQuranAccents.current.repeatInk
     val glintInk = LocalQuranAccents.current.glintInk
     val activeIndex = motions.indexOfFirst { it.isActive }
     val arabicType = LocalScrollArabicType.current
@@ -2601,12 +2606,14 @@ private fun ResponsiveHafsAyah(
     // Full-ink spans only — never bake upcoming/active into the annotated
     // string. Dim, bloom, and orange are draw-phase overlays, so word and
     // ayah boundaries do not reshape or flash the run. A word the in-surah
-    // search marks takes gold as its full ink, as the English line does, so
-    // the karaoke wash and the covers still play over it unchanged.
+    // search marks takes the search ink — the orange a chapter-screen search
+    // hit flashes in — as its full ink, as the English line does, so the
+    // karaoke wash and the covers still play over it unchanged.
     val rendered = remember(
         ayah,
         palette.fullInkColor,
         ayahMarkInk,
+        searchInk,
         searchMarks,
         fontSize,
         useArabicIndicDigits,
@@ -2620,7 +2627,7 @@ private fun ResponsiveHafsAyah(
                 // One contiguous colour span per word keeps Uthmanic Hafs
                 // joining/ligatures intact. Per-glyph spans split shaping runs
                 // and caused a visible font flip (#133).
-                val ink = if (word.position in searchMarks) ayahMarkInk else palette.fullInkColor
+                val ink = if (word.position in searchMarks) searchInk else palette.fullInkColor
                 withStyle(SpanStyle(color = ink)) {
                     append(word.arabic)
                 }
@@ -2706,17 +2713,18 @@ private fun ResponsiveHafsAyah(
     )
 }
 
-/** Marks every occurrence of [query] in [text] with a soft gold wash. */
+/**
+ * Inks every word of [text] that [query] matches in [mark], the search ink:
+ * whole words, as a chapter-screen hit marks them ([SearchHitFlash.textRanges]),
+ * so "sata" inks all of "Satan", not its first four letters.
+ */
 private fun highlightMatches(text: String, query: String?, mark: Color, ink: Color): AnnotatedString =
     buildAnnotatedString {
         append(text)
         quietSuppliedBrackets(text, 0, ink)
         if (query.isNullOrEmpty()) return@buildAnnotatedString
-        val folded = EnglishTypography.fold(text)
-        var i = folded.indexOf(query, ignoreCase = true)
-        while (i >= 0) {
-            addStyle(SpanStyle(background = mark), i, i + query.length)
-            i = folded.indexOf(query, i + query.length, ignoreCase = true)
+        for (range in SearchHitFlash.textRanges(text, query)) {
+            addStyle(SpanStyle(color = mark), range.first, range.last + 1)
         }
     }
 
@@ -3602,7 +3610,7 @@ fun AyahBlock(
                     text = highlightMatches(
                         text = ayah.translation,
                         query = searchQuery,
-                        mark = LocalQuranAccents.current.gold.copy(alpha = 0.28f),
+                        mark = searchInk,
                         ink = QuranTheme.ink.secondary,
                     ),
                     style = MaterialTheme.typography.bodyLarge.copy(
