@@ -76,6 +76,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -701,28 +702,23 @@ fun ReaderScreen(
     }
 
     // In-surah search: matches are ayahs whose translation contains the query,
-    // or whose words it marks (English glosses, or the Arabic for an Arabic
-    // query). The marked words are marked on the page in every view.
+    // or whose words it marks (English glosses and the words the translation's
+    // match aligns to, or the Arabic for an Arabic query). The marked words are
+    // marked on the page in every view. Aligning translations is real work on
+    // a long chapter, so it runs off the main thread; a result only counts for
+    // the query it was found for, so nothing navigates to a stale match.
     val search = rememberSurahSearchState()
     val activeQuery = search.activeQuery
-    val searchMarks = remember(uiState.content, activeQuery) {
+    val searchResult by produceState(InSurahSearchResult.None, uiState.content, activeQuery) {
         val content = uiState.content
-        if (activeQuery == null || content == null) {
-            emptyMap()
+        value = if (activeQuery == null || content == null) {
+            InSurahSearchResult.None
         } else {
-            content.ayahs.associate { it.number to InSurahSearch.markedWords(it, activeQuery) }
+            withContext(Dispatchers.Default) { InSurahSearch.find(content.ayahs, activeQuery) }
         }
     }
-    val searchMatches = remember(uiState.content, activeQuery, searchMarks) {
-        val content = uiState.content
-        if (activeQuery == null || content == null) {
-            emptyList()
-        } else {
-            content.ayahs.filter { a ->
-                InSurahSearch.matches(a, activeQuery, searchMarks[a.number].orEmpty())
-            }.map { it.number }
-        }
-    }
+    val searchMarks = searchResult.takeIf { it.query == activeQuery }?.marks.orEmpty()
+    val searchMatches = searchResult.takeIf { it.query == activeQuery }?.matches.orEmpty()
     val currentMatch = search.index.coerceIn(0, (searchMatches.size - 1).coerceAtLeast(0))
 
     // The chapter actually on the page, which is not always the navigation

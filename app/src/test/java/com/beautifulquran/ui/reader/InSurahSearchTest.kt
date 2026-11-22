@@ -37,6 +37,26 @@ class InSurahSearchTest {
     }
 
     @Test
+    fun `a match only in the translation marks the word that says it`() {
+        // 2:36: the translation says Satan, the gloss says Shaitaan.
+        val ayah = Ayah(
+            surahId = 2,
+            number = 36,
+            text = "فَأَزَلَّهُمَا ٱلشَّيْطَٰنُ عَنْهَا",
+            translation = "But Satan caused them to slip out of it",
+            words = listOf(
+                Word(1, "فَأَزَلَّهُمَا", "Then made [both of] them slip", ""),
+                Word(2, "ٱلشَّيْطَٰنُ", "the Shaitaan", ""),
+                Word(3, "عَنْهَا", "from it", ""),
+            ),
+        )
+        assertEquals(setOf(2), InSurahSearch.markedWords(ayah, "sata"))
+        assertEquals(setOf(2), InSurahSearch.markedWords(ayah, "Satan"))
+        // Found in both: the gloss and the translation agree on the word.
+        assertEquals(setOf(1), InSurahSearch.markedWords(ayah, "slip"))
+    }
+
+    @Test
     fun `typed Arabic without tashkeel marks the Uthmani word`() {
         assertEquals(setOf(4), InSurahSearch.markedWords(basmala, "الرحيم"))
         // Hamza-less alef and the wasla alef both fold to a bare alef.
