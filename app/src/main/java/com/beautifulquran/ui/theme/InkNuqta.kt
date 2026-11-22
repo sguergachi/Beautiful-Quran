@@ -106,9 +106,11 @@ internal fun DrawScope.drawInkNuqta(
     // One density field paints both the ink and the outline it stains, so
     // the outline is only ever as dark as the ink beside it.
     fun inkField(strength: Float) = Brush.radialGradient(
-        *Array(NuqtaInkStopCount) { k ->
+        *oneSpace(
+            *Array(NuqtaInkStopCount) { k ->
             stops[k * 2] to ink.copy(alpha = (lift * stops[k * 2 + 1] * strength).coerceIn(0f, 1f))
-        },
+            },
+        ),
         center = origin,
         radius = (full * edge).coerceAtLeast(0.5f),
     )

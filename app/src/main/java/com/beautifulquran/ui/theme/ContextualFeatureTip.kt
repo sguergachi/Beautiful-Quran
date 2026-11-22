@@ -255,7 +255,8 @@ private fun Offset.coerceTo(surface: Size): Offset = Offset(
     y.coerceIn(0f, surface.height),
 )
 
-private fun Offset.normalized(): Offset {
+/** Unit vector along this offset; a zero offset points right. */
+internal fun Offset.normalized(): Offset {
     val length = hypot(x, y)
     return if (length > 1e-4f) this / length else Offset(1f, 0f)
 }

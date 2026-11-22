@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -510,12 +509,9 @@ private fun MushafQcfPageLine(
                         val pack = packs[token.surahId to token.ayah]
                         mushafAyahMarkInkAlpha(liveInk, pack?.markAlpha?.value)
                     }
-                    BasicText(
+                    MushafWordText(
                         text = mark,
                         style = markStyle,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Visible,
                         modifier = if (liveInk) {
                             Modifier.graphicsLayer {
                                 alpha = markInkAlpha()
@@ -1014,16 +1010,15 @@ private fun MushafQcfWord(
             }
         }
     }
-    BasicText(
+    // Set as BasicText(maxLines = 1, softWrap = false, overflow = Visible),
+    // through the process-wide layout cache (see [MushafWordLayouts]). Never
+    // slice a glyph at its box: the circled ayah mark is the last glyph of a
+    // verse-closing word and its medallion inks wider than its advance, so
+    // clipping to the measured box cuts the number in half — which is exactly
+    // what the line end showed.
+    MushafWordText(
         text = word,
         style = style,
-        maxLines = 1,
-        softWrap = false,
-        // Never slice a glyph at its box. The circled ayah mark is the last
-        // glyph of a verse-closing word and its medallion inks wider than its
-        // advance, so clipping to the measured box cuts the number in half —
-        // which is exactly what the line end showed.
-        overflow = TextOverflow.Visible,
         modifier = Modifier
             .then(
                 if (hasMotionInk && palette.paperInk != null) {

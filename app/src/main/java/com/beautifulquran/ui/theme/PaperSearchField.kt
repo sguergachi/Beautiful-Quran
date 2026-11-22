@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
@@ -43,11 +46,14 @@ private const val HINT_STEP_SP = 0.5f
 /**
  * Shared paper search pill used on Home and Bookmarks — same height, radius,
  * wash, icon, and clear treatment so the two sheets feel like one product.
+ *
+ * The query lives in [state], owned by the sheet's ViewModel: typing edits it
+ * in place (no async round trip through UI state, so no dropped keystrokes or
+ * cursor jumps), and the ViewModel observes it to drive search.
  */
 @Composable
 fun PaperSearchField(
-    value: String,
-    onValueChange: (String) -> Unit,
+    state: TextFieldState,
     placeholder: String,
     modifier: Modifier = Modifier,
     onFocusChanged: (Boolean) -> Unit = {},
@@ -60,9 +66,8 @@ fun PaperSearchField(
     val ink = MaterialTheme.colorScheme.onBackground
     val mutedInk = MaterialTheme.colorScheme.onSurfaceVariant
     BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        singleLine = true,
+        state = state,
+        lineLimits = TextFieldLineLimits.SingleLine,
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = ink),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         modifier = modifier
@@ -85,7 +90,7 @@ fun PaperSearchField(
                     Modifier
                 },
             ),
-        decorationBox = { field ->
+        decorator = { field ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -100,7 +105,7 @@ fun PaperSearchField(
                 )
                 Spacer(Modifier.width(12.dp))
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty()) {
+                    if (state.text.isEmpty()) {
                         // The pill is one line tall: the hint steps its size
                         // down until it fits (narrow phone, large font scale)
                         // rather than wrapping. Ellipsis is the last resort
@@ -132,7 +137,7 @@ fun PaperSearchField(
                     }
                     field()
                 }
-                if (value.isNotEmpty()) {
+                if (state.text.isNotEmpty()) {
                     // Own the tap on Initial so BasicTextField cannot steal it
                     // while focused (plain quietClickable loses to the field).
                     Box(
@@ -140,7 +145,7 @@ fun PaperSearchField(
                         modifier = Modifier
                             .size(44.dp)
                             .ownedQuietClickable(role = Role.Button) {
-                                onValueChange("")
+                                state.clearText()
                                 focusRequester.requestFocus()
                                 keyboard?.show()
                             }

@@ -56,6 +56,7 @@ import androidx.core.view.WindowCompat
 import com.beautifulquran.QuranApp
 import com.beautifulquran.R
 import com.beautifulquran.data.ThemeMode
+import com.beautifulquran.ui.theme.setManagedColorUniform
 import com.beautifulquran.data.model.Reciter
 import com.beautifulquran.domain.TajweedPacing
 import com.beautifulquran.domain.HighlightClock
@@ -322,7 +323,7 @@ private fun PaperInkStudyPage(app: QuranApp, study: PaperInkStudy) {
                         word.shader.setFloatUniform("lead", leadFade.floatValue * 2f)
                         word.shader.setFloatUniform("retained", if (repeat) 1f else 0f)
                         word.shader.setFloatUniform("repeatPass", if (repeat) 1f else 0f)
-                        word.shader.setFloatUniform("repeatColor", repeatColor.red, repeatColor.green, repeatColor.blue)
+                        word.shader.setManagedColorUniform("repeatColor", repeatColor)
                         word.shader.setFloatUniform("weight", poolingWeight)
                         word.shader.setFloatUniform("aa", .9f / scale)
                         if (!english.value) x -= word.width * scale

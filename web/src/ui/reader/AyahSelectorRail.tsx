@@ -248,7 +248,7 @@ export const AyahSelectorRail = forwardRef<AyahSelectorRailHandle, Props>(functi
     ctx.clearRect(0, 0, cssW, cssH)
 
     const ink = readCssVar(root, '--ink', '#1c1b18')
-    const gold = readCssVar(root, '--gold', '#c9a227')
+    const gold = readCssVar(root, '--gold', '#a8831d')
     const ruby = readCssVar(root, '--bookmark', '#b3122f')
     const green = readCssVar(root, '--accent', '#0e5c4a')
     const paper = readCssVar(root, '--reading-paper', readCssVar(root, '--paper', '#faf3e8'))

@@ -47,9 +47,10 @@
 }
 
 /* —— In-chapter search: a soft gold marker behind the match only —— */
+/* In-surah search: the chapter-screen search hit's orange ink, as on Android. */
 .translation-search-marker {
-  background: rgb(from var(--gold) r g b / 0.28);
-  color: inherit;
+  background: none;
+  color: var(--repeat);
   padding: 0;
 }
 

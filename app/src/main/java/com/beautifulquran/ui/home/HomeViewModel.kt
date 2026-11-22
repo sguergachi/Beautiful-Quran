@@ -1,5 +1,8 @@
 package com.beautifulquran.ui.home
 
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
@@ -162,6 +165,13 @@ class HomeViewModel(
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
+
+    /**
+     * The search pill's text. The field edits it directly; [onQueryChange]
+     * (the assistant's search) writes it too. Every change, from either side,
+     * reaches [applyQuery] through the snapshot observer in `init`.
+     */
+    val queryField = TextFieldState()
     private val allSurahs = MutableStateFlow<List<Surah>>(emptyList())
     private val reciterNames = MutableStateFlow<Map<Int, String>>(emptyMap())
     private val wordHits = MutableStateFlow<List<WordSearchHit>>(emptyList())
@@ -229,6 +239,9 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch {
+            snapshotFlow { queryField.text.toString() }.collect(::applyQuery)
+        }
+        viewModelScope.launch {
             allSurahs.value = repository.surahs()
             reciterNames.value = repository.reciters().associate { it.id to it.name }
         }
@@ -260,7 +273,12 @@ class HomeViewModel(
         }
     }
 
+    /** Replaces the query from outside the field (the assistant's search). */
     fun onQueryChange(value: String) {
+        queryField.setTextAndPlaceCursorAtEnd(value)
+    }
+
+    private fun applyQuery(value: String) {
         val changed = value != query.value
         if (changed) {
             expandedSurahIds.value = emptySet()

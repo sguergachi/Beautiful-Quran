@@ -71,12 +71,14 @@
 
 /* ── Customize (Android CustomizeScreen) ─────────────────────────────── */
 
-/* Theme preview: 64×22, radius 6, 1.5px gilt rim (Android ThemeColorPreview). */
+/* Theme preview: 64×22, radius 6, the paper edged with the Customize preview
+   leaf's hairline (0.5px, gold at 0.28) in the theme's own gold (Android
+   ThemeColorPreview). */
 .sheet[data-name='settings'] .theme-paint {
   width: 64px;
   height: 22px;
   border-radius: 6px;
-  border: 1.5px solid var(--swatch-gilt, #c9a227);
+  border: 0.5px solid color-mix(in srgb, var(--swatch-gilt) 28%, transparent);
 }
 
 /* ToggleRow: 8px padding, even 12px between rows, 20px before the group.

@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
@@ -63,6 +64,8 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
@@ -106,10 +109,8 @@ import com.beautifulquran.ui.reader.pinnedBarReveal
 import com.beautifulquran.ui.reader.pinnedChapterBarZIndex
 import com.beautifulquran.ui.reader.showPinnedChapterBar
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFontFamilyResolver
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.rememberTextMeasurer
 import com.beautifulquran.ui.reader.MushafBelowLeaf
 import com.beautifulquran.ui.reader.LocalMushafBannerStyle
 import com.beautifulquran.ui.reader.MushafPageMargin
@@ -163,7 +164,9 @@ import kotlin.math.roundToInt
 import com.beautifulquran.ui.theme.LocalQuranInk
 import com.beautifulquran.ui.theme.LocalQuranTypePalette
 import com.beautifulquran.ui.theme.contrastingOverlayInk
+import com.beautifulquran.ui.theme.applyWideGamutIfFree
 import com.beautifulquran.ui.theme.contrastingOverlayAccents
+import com.beautifulquran.ui.theme.oneSpace
 
 /** Grace after a concordance jump so the programmatic settle / page turn
  *  that lands the jump does not arm the "Back to …" dismiss timer. */
@@ -178,6 +181,19 @@ class MainActivity : ComponentActivity() {
     /** Assistant / deep-link / Routine actions waiting for the paper stack. */
     private val pendingAssistantAction = MutableStateFlow<AssistantAction?>(null)
     private var foregroundAppFunctions: ForegroundAppFunctions? = null
+
+    /**
+     * Whether this window draws the Display P3 accents (ui/theme/WideGamut.kt).
+     * State, not a launch-time constant: it is asked again on every
+     * configuration change, so a window that lands on an sRGB display falls
+     * back to the sRGB accents instead of drawing P3 ones clipped.
+     */
+    private var wideGamut by mutableStateOf(false)
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        wideGamut = applyWideGamutIfFree(this)
+    }
 
     override fun onStart() {
         super.onStart()
@@ -197,15 +213,20 @@ class MainActivity : ComponentActivity() {
         // deep-link launch has both drawn its sheets and warmed the Quran DB.
         var splashPending = true
         installSplashScreen().setKeepOnScreenCondition { splashPending }
-        enableEdgeToEdge()
-        // 3-button navigation: without this Android lays a grey contrast scrim
-        // over the bar. Drop it so the bar is transparent and the theme's
-        // paper (colorScheme.background) shows straight through.
-        window.isNavigationBarContrastEnforced = false
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        // 3-button navigation: the default (auto) style lets Android lay a grey
+        // contrast scrim over the bar. A fixed-dark style with a transparent
+        // scrim turns contrast enforcement off, so the theme's paper
+        // (colorScheme.background) shows straight through. Icons start light
+        // for the dark entrance cover; the sheet theme sets them afterwards.
+        enableEdgeToEdge(
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
         // Frame timings for the log export: the launch window, and any recording.
         FrameLog.attach(window)
+        // Display P3 accents on a panel that composes P3 at 8 bits (free);
+        // sRGB everywhere else. See ui/theme/WideGamut.kt.
+        wideGamut = applyWideGamutIfFree(this)
         // The entrance cover is always dark. The sheet theme sets its own icon
         // appearance once Compose has its persisted settings.
         WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -339,6 +360,7 @@ class MainActivity : ComponentActivity() {
                     themeMode = settings.themeMode,
                     typeface = settings.activeBookTypeface,
                     scrollArabicFace = settings.activeScrollArabicFace,
+                    wideGamut = wideGamut,
                 ) {
                     // Cold start paints the closed mushaf first; the paper stack
                     // mounts under it after two board frames (onWarmStack),
@@ -348,7 +370,10 @@ class MainActivity : ComponentActivity() {
                     DisposableEffect(Unit) {
                         onDispose { coverSounds?.release() }
                     }
-                    Box(Modifier.fillMaxSize()) {
+                    // Test tags surface as resource ids, so the :baselineprofile
+                    // journeys can find controls that carry no text of their
+                    // own (the mushaf dial) without inventing a spoken label.
+                    Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
                         if (stackMounted) {
                             PaperStackApp(
                                 themeMode = settings.themeMode,
@@ -488,11 +513,7 @@ private fun PaperStackApp(
     // fresh install — put the whole pagination back on the door of the mushaf,
     // where it is a wait the reader watches instead of one nobody sees.
     val leafDensity = LocalDensity.current
-    val leafResolver = LocalFontFamilyResolver.current
-    val leafLayoutDirection = LocalLayoutDirection.current
-    val leafMeasurer = remember(leafResolver, leafDensity, leafLayoutDirection) {
-        TextMeasurer(leafResolver, leafDensity, leafLayoutDirection)
-    }
+    val leafMeasurer = rememberTextMeasurer()
     val windowSize = LocalWindowInfo.current.containerSize
     // The paper the system bars take out of the window. The reader's body pads
     // by the status bar itself (ReaderScreen's topInset) and the scaffold holds
@@ -1432,66 +1453,45 @@ private fun PaperStackApp(
                 // Root lexicon + hold chooser live ON this sheet — ink soaks
                 // the reader paper, not a full-screen layer above the stack.
                 // (Timings Lab stays stack-level: it can also open from Settings.)
-                val overlayColors = contrastingOverlayColorScheme(themeMode)
-                InkRevealOverlay(
+                ContrastingOverlay(
                     visible = chooserVisible,
-                    backgroundColor = overlayColors.background,
-                    modifier = Modifier.zIndex(3f),
+                    themeMode = themeMode,
+                    zIndex = 3f,
                     onRenderedChange = { chooserRendered = it },
                 ) {
-                    MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
-                        CompositionLocalProvider(
-                            LocalQuranAccents provides contrastingOverlayAccents(),
-                            LocalQuranInk provides contrastingOverlayInk(themeMode),
-                        ) {
-                            Box(Modifier.fillMaxSize()) {
-                                Box(Modifier.matchParentSize().absorbPointerEvents())
-                                WordHoldChooser(
-                                    onOpenRootViewer = {
-                                        val target = pendingWord ?: return@WordHoldChooser
-                                        pendingWord = null
-                                        openRootViewer(target.first, target.second, target.third)
-                                    },
-                                    onOpenTimingsLab = {
-                                        val target = pendingWord ?: return@WordHoldChooser
-                                        pendingWord = null
-                                        openTimingsLab(target.first, target.second, target.third)
-                                    },
-                                    onOpenTarjiLab = {
-                                        val target = pendingWord ?: return@WordHoldChooser
-                                        pendingWord = null
-                                        openTarjiLab(target.first, target.second, target.third)
-                                    },
-                                    onDismiss = {
-                                        chooserVisible = false
-                                        pendingWord = null
-                                    },
-                                )
-                            }
-                        }
-                    }
+                    WordHoldChooser(
+                        onOpenRootViewer = {
+                            val target = pendingWord ?: return@WordHoldChooser
+                            pendingWord = null
+                            openRootViewer(target.first, target.second, target.third)
+                        },
+                        onOpenTimingsLab = {
+                            val target = pendingWord ?: return@WordHoldChooser
+                            pendingWord = null
+                            openTimingsLab(target.first, target.second, target.third)
+                        },
+                        onOpenTarjiLab = {
+                            val target = pendingWord ?: return@WordHoldChooser
+                            pendingWord = null
+                            openTarjiLab(target.first, target.second, target.third)
+                        },
+                        onDismiss = {
+                            chooserVisible = false
+                            pendingWord = null
+                        },
+                    )
                 }
-                InkRevealOverlay(
+                ContrastingOverlay(
                     visible = rootVisible,
-                    backgroundColor = overlayColors.background,
-                    modifier = Modifier.zIndex(4f),
+                    themeMode = themeMode,
+                    zIndex = 4f,
                     onRenderedChange = { rootRendered = it },
                 ) {
-                    MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
-                        CompositionLocalProvider(
-                            LocalQuranAccents provides contrastingOverlayAccents(),
-                            LocalQuranInk provides contrastingOverlayInk(themeMode),
-                        ) {
-                            Box(Modifier.fillMaxSize()) {
-                                Box(Modifier.matchParentSize().absorbPointerEvents())
-                                RootViewerScreen(
-                                    viewModel = rootViewerViewModel,
-                                    onBack = ::closeRootViewer,
-                                    onJumpToOccurrence = ::jumpFromConcordance,
-                                )
-                            }
-                        }
-                    }
+                    RootViewerScreen(
+                        viewModel = rootViewerViewModel,
+                        onBack = ::closeRootViewer,
+                        onJumpToOccurrence = ::jumpFromConcordance,
+                    )
                 }
             }
         }
@@ -1623,82 +1623,87 @@ private fun PaperStackApp(
         // same ink-bleed language as the notification prompt — and closes by
         // opening a hole back to the exact page it came from. Hosted above
         // the sheets because Settings can open it too (not only the reader).
-        val overlayColors = contrastingOverlayColorScheme(themeMode)
-        InkRevealOverlay(
+        ContrastingOverlay(
             visible = labVisible,
-            backgroundColor = overlayColors.background,
-            modifier = Modifier.zIndex(5f),
+            themeMode = themeMode,
+            zIndex = 5f,
             onRenderedChange = { labRendered = it },
         ) {
-            MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
-                CompositionLocalProvider(
-                    LocalQuranAccents provides contrastingOverlayAccents(),
-                    LocalQuranInk provides contrastingOverlayInk(themeMode),
-                ) {
-                    Box(Modifier.fillMaxSize()) {
-                        Box(Modifier.matchParentSize().absorbPointerEvents())
-                        TimingsLabScreen(
-                            viewModel = timingsLabViewModel,
-                            onBack = ::closeTimingsLab,
-                        )
-                    }
-                }
-            }
+            TimingsLabScreen(
+                viewModel = timingsLabViewModel,
+                onBack = ::closeTimingsLab,
+            )
         }
 
         // The Ornaments Lab — same ink-bleed language, its own overlay slot
         // since it can rise independently of the Timings Lab (both are
         // Settings-only entry points, never simultaneous, but kept distinct
         // so each closes back to exactly the page it bloomed from).
-        InkRevealOverlay(
+        ContrastingOverlay(
             visible = ornamentsLabVisible,
-            backgroundColor = overlayColors.background,
-            modifier = Modifier.zIndex(5f),
+            themeMode = themeMode,
+            zIndex = 5f,
             onRenderedChange = { ornamentsLabRendered = it },
         ) {
-            MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
-                CompositionLocalProvider(
-                    LocalQuranAccents provides contrastingOverlayAccents(),
-                    LocalQuranInk provides contrastingOverlayInk(themeMode),
-                ) {
-                    Box(Modifier.fillMaxSize()) {
-                        Box(Modifier.matchParentSize().absorbPointerEvents())
-                        OrnamentsLabScreen(
-                            viewModel = ornamentsLabViewModel,
-                            onBack = ::closeOrnamentsLab,
-                        )
-                    }
-                }
-            }
+            OrnamentsLabScreen(
+                viewModel = ornamentsLabViewModel,
+                onBack = ::closeOrnamentsLab,
+            )
         }
 
         // The Tarjīʿ Lab — the same ink-bleed language, its own slot: it can
         // rise from a word hold or Settings and owns its audio while open
         // (the captured word loops on its own track), so it must be able to
         // close back to exactly the page it bloomed from.
-        InkRevealOverlay(
+        ContrastingOverlay(
             visible = tarjiLabVisible,
-            backgroundColor = overlayColors.background,
-            modifier = Modifier.zIndex(5f),
+            themeMode = themeMode,
+            zIndex = 5f,
             onRenderedChange = { tarjiLabRendered = it },
         ) {
-            MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
-                CompositionLocalProvider(
-                    LocalQuranAccents provides contrastingOverlayAccents(),
-                    LocalQuranInk provides contrastingOverlayInk(themeMode),
-                ) {
-                    Box(Modifier.fillMaxSize()) {
-                        Box(Modifier.matchParentSize().absorbPointerEvents())
-                        TarjiLabScreen(
-                            viewModel = tarjiLabViewModel,
-                            onBack = ::closeTarjiLab,
-                        )
-                    }
+            TarjiLabScreen(
+                viewModel = tarjiLabViewModel,
+                onBack = ::closeTarjiLab,
+            )
+        }
+    }
+
+}
+
+/**
+ * A full-screen sheet that blooms in as a contrasting ink spot over the paper
+ * stack (the ink-bleed language of the labs, the root viewer and the word-hold
+ * chooser) and closes by opening a hole back to the page beneath. It wears the
+ * theme's contrasting overlay palette and swallows touches so nothing reaches
+ * the sheets under it.
+ */
+@Composable
+private fun ContrastingOverlay(
+    visible: Boolean,
+    themeMode: ThemeMode,
+    zIndex: Float,
+    onRenderedChange: (Boolean) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val overlayColors = contrastingOverlayColorScheme(themeMode)
+    InkRevealOverlay(
+        visible = visible,
+        backgroundColor = overlayColors.background,
+        modifier = Modifier.zIndex(zIndex),
+        onRenderedChange = onRenderedChange,
+    ) {
+        MaterialTheme(colorScheme = overlayColors, typography = MaterialTheme.typography) {
+            CompositionLocalProvider(
+                LocalQuranAccents provides contrastingOverlayAccents(),
+                LocalQuranInk provides contrastingOverlayInk(themeMode),
+            ) {
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.matchParentSize().absorbPointerEvents())
+                    content()
                 }
             }
         }
     }
-
 }
 
 @Composable
@@ -1975,11 +1980,11 @@ private fun Modifier.paperDropShadow(
 }.drawWithCache {
     val shadowWidth = 24.dp.toPx()
     val cast = Brush.horizontalGradient(
-        colors = listOf(
+        colors = oneSpace(listOf(
             ComposeColor.Black.copy(alpha = 0.26f),
             ComposeColor.Black.copy(alpha = 0.09f),
             ComposeColor.Transparent,
-        ),
+        )),
         startX = size.width,
         endX = size.width + shadowWidth,
     )

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -23,9 +22,27 @@ import androidx.compose.ui.unit.dp
 import com.beautifulquran.data.AyahSelectorSide
 import com.beautifulquran.ui.theme.ContextualFeatureTip
 import com.beautifulquran.ui.theme.ContextualTipPlacement
-import com.beautifulquran.ui.theme.LocalQuranInk
-import com.beautifulquran.ui.theme.royalGreenOverlayColorScheme
-import com.beautifulquran.ui.theme.royalGreenOverlayInk
+import com.beautifulquran.ui.theme.RoyalGreenOverlay
+
+/** First-chapter lesson, written around the live collapsed ayah rail. */
+@Composable
+internal fun AyahRailTip(
+    visible: Boolean,
+    railSide: AyahSelectorSide,
+    targetCenterY: Dp,
+    onDismiss: () -> Unit,
+    onRenderedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) = ReaderEdgeTip(
+    visible = visible,
+    title = "Find any ayah",
+    body = "Tap, or drag up and down on this rail.",
+    side = railSide,
+    targetCenterY = targetCenterY,
+    onDismiss = onDismiss,
+    onRenderedChange = onRenderedChange,
+    modifier = modifier,
+)
 
 /** First-bookmark lesson, composed across the reader sheet around the live ribbon. */
 @Composable
@@ -36,52 +53,68 @@ internal fun BookmarkNoteTip(
     onRenderedChange: (Boolean) -> Unit,
     targetCenterY: Dp,
     modifier: Modifier = Modifier,
+) = ReaderEdgeTip(
+    visible = visible,
+    title = "Add a note",
+    body = "Press and hold this ribbon.",
+    side = ribbonSide,
+    targetCenterY = targetCenterY,
+    onDismiss = onDismiss,
+    onRenderedChange = onRenderedChange,
+    modifier = modifier,
+)
+
+/**
+ * A reader lesson written around a live control on the sheet's [side] edge
+ * (the ayah rail, the bookmark ribbon): the spotlight sits on the edge at
+ * [targetCenterY], the copy runs away from it, and Got it waits in the
+ * opposite bottom corner.
+ */
+@Composable
+private fun ReaderEdgeTip(
+    visible: Boolean,
+    title: String,
+    body: String,
+    side: AyahSelectorSide,
+    targetCenterY: Dp,
+    onDismiss: () -> Unit,
+    onRenderedChange: (Boolean) -> Unit,
+    modifier: Modifier,
 ) {
     val readerPaper = MaterialTheme.colorScheme.background
     val readerInk = MaterialTheme.colorScheme.onSurface
-    val typography = MaterialTheme.typography
-    // The overlay swaps the sheet out from under its content, so it has
-    // to swap the ink ladder too: the reader's rungs are solved against
-    // the reader's paper and land on the wrong weights here.
-    CompositionLocalProvider(LocalQuranInk provides royalGreenOverlayInk()) {
-        MaterialTheme(
-            colorScheme = royalGreenOverlayColorScheme(),
-            typography = typography,
-        ) {
-            val ribbonOnLeft = ribbonSide == AyahSelectorSide.LEFT
-            ContextualFeatureTip(
-                visible = visible,
-                title = "Add a note",
-                body = "Press and hold this ribbon.",
-                onDismiss = onDismiss,
-                spotlightCenter = {
-                    DpOffset(
-                        x = if (ribbonOnLeft) 14.dp else maxWidth - 14.dp,
-                        y = targetCenterY,
-                    )
-                },
-                placement = ContextualTipPlacement(
-                    bodyAngleDegrees = if (ribbonOnLeft) 0f else 180f,
-                ),
-                actionCenter = {
-                    DpOffset(
-                        x = if (ribbonOnLeft) maxWidth - 68.dp else 68.dp,
-                        y = maxHeight - 72.dp,
-                    )
-                },
-                dismissPaperColor = readerPaper,
-                dismissInkColor = readerInk,
-                onRenderedChange = onRenderedChange,
-                contentPadding = PaddingValues(
-                    start = if (ribbonOnLeft) 18.dp else 32.dp,
-                    end = if (ribbonOnLeft) 32.dp else 18.dp,
-                    top = 0.dp,
-                    bottom = 0.dp,
-                ),
-                mark = { ContextualPulseMark() },
-                modifier = modifier.fillMaxSize(),
-            )
-        }
+    RoyalGreenOverlay {
+        val onLeft = side == AyahSelectorSide.LEFT
+        ContextualFeatureTip(
+            visible = visible,
+            title = title,
+            body = body,
+            onDismiss = onDismiss,
+            spotlightCenter = {
+                DpOffset(
+                    x = if (onLeft) 14.dp else maxWidth - 14.dp,
+                    y = targetCenterY,
+                )
+            },
+            placement = ContextualTipPlacement(
+                bodyAngleDegrees = if (onLeft) 0f else 180f,
+            ),
+            actionCenter = {
+                DpOffset(
+                    x = if (onLeft) maxWidth - 68.dp else 68.dp,
+                    y = maxHeight - 72.dp,
+                )
+            },
+            dismissPaperColor = readerPaper,
+            dismissInkColor = readerInk,
+            onRenderedChange = onRenderedChange,
+            contentPadding = PaddingValues(
+                start = if (onLeft) 18.dp else 32.dp,
+                end = if (onLeft) 32.dp else 18.dp,
+            ),
+            mark = { ContextualPulseMark() },
+            modifier = modifier.fillMaxSize(),
+        )
     }
 }
 

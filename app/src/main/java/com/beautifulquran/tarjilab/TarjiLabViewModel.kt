@@ -9,6 +9,9 @@ import android.net.Uri
 import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.runtime.snapshotFlow
 import com.beautifulquran.data.QuranRepository
 import com.beautifulquran.data.SettingsRepository
 import com.beautifulquran.data.model.Reciter
@@ -431,6 +434,7 @@ class TarjiLabViewModel(
             previewPositionMs = 0f,
             view = TarjiViewWindow.fit(captureMs),
         )
+        setSampleNotes("")
         reanalyze()
     }
 
@@ -661,8 +665,26 @@ class TarjiLabViewModel(
         _ui.value = _ui.value.copy(holdEditing = false)
     }
 
-    fun updateSampleNotes(notes: String) {
-        _ui.value = _ui.value.copy(sampleNotes = notes.take(MAX_NOTES_LENGTH))
+    /**
+     * The sample-note field's text. The field edits it in place; [ui]'s
+     * `sampleNotes` mirrors it for export, and a new capture or loaded sample
+     * replaces it through [setSampleNotes].
+     */
+    val sampleNotesField = TextFieldState()
+
+    /** Field length cap, applied as the reader types. */
+    val sampleNotesLimit = MAX_NOTES_LENGTH
+
+    private fun setSampleNotes(notes: String) {
+        sampleNotesField.setTextAndPlaceCursorAtEnd(notes.take(MAX_NOTES_LENGTH))
+    }
+
+    init {
+        viewModelScope.launch {
+            snapshotFlow { sampleNotesField.text.toString() }.collect { notes ->
+                if (notes != _ui.value.sampleNotes) _ui.value = _ui.value.copy(sampleNotes = notes)
+            }
+        }
     }
 
     private fun knobsForReciter(reciterId: Int): TarjiLabKnobs =
@@ -1031,6 +1053,7 @@ class TarjiLabViewModel(
             note = "Loaded ${sample.label}",
             view = TarjiViewWindow.fit(capture.hopCount * capture.hopContentDurationMs()),
         )
+        setSampleNotes(sample.notes)
         reanalyze()
     }
 

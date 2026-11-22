@@ -27,7 +27,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.input.TextFieldState
+import kotlinx.coroutines.flow.drop
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
@@ -65,7 +66,6 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -181,8 +181,7 @@ fun BookmarksScreen(
                 }
                 item(key = "search") {
                     PaperSearchField(
-                        value = uiState.query,
-                        onValueChange = viewModel::onQueryChange,
+                        state = viewModel.queryField,
                         placeholder = "Search bookmarks, text, or 2:255",
                         contentDescription = "Search bookmarked verses",
                         clearContentDescription = "Clear bookmark search",
@@ -254,7 +253,13 @@ fun BookmarksScreen(
                                     uiState.annotations["${bookmark.surah.id}:${bookmark.ayahNumber}"],
                                 )
                             },
-                            onAnnotationChange = { annotationDraft = it },
+                            // Guarded like the commit: a note losing focus after
+                            // another opened hands over its stale final text.
+                            onAnnotationChange = {
+                                if (editingSurah == key.surahId && editingAyah == key.ayahNumber) {
+                                    annotationDraft = it
+                                }
+                            },
                             onAnnotationEditDone = {
                                 if (editingSurah == key.surahId && editingAyah == key.ayahNumber) {
                                     commitAnnotation()
@@ -528,25 +533,27 @@ private fun BookmarkAnnotationField(
 
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    var fieldValue by remember {
+    val fieldState = remember {
         val initial = text.orEmpty()
-        mutableStateOf(TextFieldValue(initial, selection = TextRange(initial.length)))
+        TextFieldState(initial, initialSelection = TextRange(initial.length))
+    }
+    val latestOnTextChange by rememberUpdatedState(onTextChange)
+    LaunchedEffect(fieldState) {
+        snapshotFlow { fieldState.text.toString() }
+            .drop(1)
+            .collect { latestOnTextChange(it) }
     }
     var everFocused by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     BasicTextField(
-        value = fieldValue,
-        onValueChange = {
-            fieldValue = it
-            onTextChange(it.text)
-        },
+        state = fieldState,
         textStyle = style.copy(color = color),
         cursorBrush = SolidColor(LocalQuranAccents.current.bookmarkRibbon),
         keyboardOptions = KeyboardOptions(
             capitalization = KeyboardCapitalization.Sentences,
             imeAction = ImeAction.Done,
         ),
-        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+        onKeyboardAction = { focusManager.clearFocus() },
         modifier = Modifier
             .fillMaxWidth()
             .focusRequester(focusRequester)
@@ -554,12 +561,15 @@ private fun BookmarkAnnotationField(
                 if (state.isFocused) {
                     everFocused = true
                 } else if (everFocused) {
+                    // Edits reach the draft asynchronously; hand over the final
+                    // text before committing so a quick Done cannot lose it.
+                    onTextChange(fieldState.text.toString())
                     onEditDone()
                 }
             },
-        decorationBox = { field ->
+        decorator = { field ->
             Box {
-                if (fieldValue.text.isEmpty()) {
+                if (fieldState.text.isEmpty()) {
                     Text("Write a note…", style = style, color = color.copy(alpha = 0.5f))
                 }
                 field()

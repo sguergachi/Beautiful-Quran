@@ -28,7 +28,9 @@ import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -49,6 +51,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorProducer
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -56,6 +60,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -84,6 +89,7 @@ import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.roundToInt
 import kotlin.math.sign
+import com.beautifulquran.ui.theme.oneSpace
 
 /*
  * The page dial: the hairline under the leaf, made drivable.
@@ -1091,6 +1097,9 @@ private val MushafDialPageTick = 7.dp
  */
 internal val MushafDialBelowGrab = 8.dp
 
+/** The grab strip's test tag; the :baselineprofile dial journeys aim their swipe at it. */
+internal const val MushafPageDialTag = "mushafPageDial"
+
 /** The undo target is generous along the rule while its visible dot stays furniture-sized. */
 private val MushafDialReturnHitWidth = 44.dp
 private val MushafDialReturnDot = 26.dp
@@ -1782,8 +1791,10 @@ internal fun MushafPageDial(
                         // where the ramp ends.
                         val feather = MushafDialHudFeather.toPx()
                         val verticalBrush = Brush.verticalGradient(
-                            0f to paper.copy(alpha = 0f),
-                            1f to paper,
+                            *oneSpace(
+                                0f to paper.copy(alpha = 0f),
+                                1f to paper,
+                            ),
                             startY = 0f,
                             endY = feather,
                         )
@@ -1816,11 +1827,16 @@ internal fun MushafPageDial(
                 // and the second lines likewise, with no blank row between
                 // them. Both alphas are read in the draw phase, so the whole
                 // transition costs no recomposition at all.
-                val hudPulse = pulse.value
-                // One orange for both warnings, whichever speaks louder:
-                // the pulse before the trough opens, and the ripening band
-                // as the hand pulls toward the pop.
-                val orange = maxOf(hudPulse, hudRipe.floatValue)
+                //
+                // So is the warning ink. One orange for both warnings,
+                // whichever speaks louder: the pulse before the trough opens,
+                // and the ripening band as the hand pulls toward the pop. The
+                // pulse runs every frame for its 300 ms; read here in
+                // composition it recomposed the whole label per frame, so the
+                // type takes its colour as a ColorProducer at draw instead.
+                val hudInk = remember(ink, accents.repeatInk) {
+                    MushafDialHudInk(ink, accents.repeatInk, pulse, hudRipe)
+                }
                 val hudDockAlignment = when (hudDock) {
                     -1 -> Alignment.Start
                     1 -> Alignment.End
@@ -1835,10 +1851,21 @@ internal fun MushafPageDial(
                         // re-measure the label on every frame the hand moves
                         // along the wall.
                         .layout { measurable, constraints ->
+                            // A label that already fits is set exactly as it
+                            // would be at any wider clamp, so it is measured
+                            // against the slot instead: every 16 px step of a
+                            // clamp it never reaches would otherwise throw
+                            // away all four lines' paragraphs and lay them
+                            // out again. Only a label the clamp actually cuts
+                            // follows it.
                             val placeable = measurable.measure(
                                 Constraints(
                                     minWidth = 0,
-                                    maxWidth = hudMaxWidthPx.coerceAtMost(constraints.maxWidth),
+                                    maxWidth = mushafDialHudMeasureWidth(
+                                        clampPx = hudMaxWidthPx,
+                                        slotPx = constraints.maxWidth,
+                                        naturalPx = measurable.maxIntrinsicWidth(constraints.maxHeight),
+                                    ),
                                     minHeight = 0,
                                     maxHeight = constraints.maxHeight,
                                 ),
@@ -1865,12 +1892,10 @@ internal fun MushafPageDial(
                     },
                 ) {
                     Column(horizontalAlignment = hudDockAlignment) {
-                        Text(
+                        BasicText(
                             text = mushafDialLabelHead(hud, zoomed = false, page = hudPage),
                             style = hudType,
-                            color = androidx.compose.ui.graphics
-                                .lerp(ink, accents.repeatInk, orange)
-                                .copy(alpha = 0.72f + 0.18f * hudPulse),
+                            color = hudInk.head,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.graphicsLayer {
@@ -1885,16 +1910,14 @@ internal fun MushafPageDial(
                         // Opening leaf, in the same grey the trough's ayah
                         // range takes — subordinate to the chapter, the thing
                         // a reader aiming by chapters still needs to land.
-                        Text(
+                        BasicText(
                             text = mushafDialLabelFoot(
                                 hud,
                                 zoomed = false,
                                 startPage = chapterStartPage,
                             ).ifEmpty { " " },
                             style = hudType,
-                            color = androidx.compose.ui.graphics
-                                .lerp(ink.copy(alpha = 0.48f), accents.repeatInk, orange)
-                                .copy(alpha = 0.48f + 0.22f * orange),
+                            color = hudInk.foot,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.graphicsLayer {
@@ -1909,32 +1932,15 @@ internal fun MushafPageDial(
                         // trough; chapterLabel would stay 1..286 for the whole
                         // chapter.
                         val th = troughHud ?: hud
-                        val troughHeadInk = androidx.compose.ui.graphics
-                            .lerp(ink, accents.repeatInk, orange)
-                            .copy(alpha = 0.72f + 0.18f * hudPulse)
-                        val troughHead = mushafDialLabelHead(th, zoomed = true, page = hudPage)
-                        // The chapter is the figure and the folio its aside, so the
-                        // folio ("· p. 42") is set a step quieter than the name it
-                        // trails, as the verse rail's annotations are.
-                        val troughHeadText = remember(troughHead, troughHeadInk) {
-                            val split = troughHead.indexOf("  ·  ")
-                            buildAnnotatedString {
-                                if (split < 0) {
-                                    append(troughHead)
-                                } else {
-                                    append(troughHead.substring(0, split))
-                                    withStyle(
-                                        SpanStyle(color = troughHeadInk.copy(alpha = troughHeadInk.alpha * 0.78f)),
-                                    ) { append(troughHead.substring(split)) }
-                                }
-                            }
-                        }
-                        Text(
-                            text = troughHeadText,
+                        // The head alone keeps its ink in composition: its
+                        // folio is a span a step quieter than the name, and a
+                        // span's colour cannot be produced at draw. Held in
+                        // its own scope, so the pulse recomposes this one
+                        // line and not the whole label.
+                        MushafDialTroughHead(
+                            text = mushafDialLabelHead(th, zoomed = true, page = hudPage),
                             style = hudType,
-                            color = troughHeadInk,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            hudInk = hudInk,
                             modifier = Modifier.graphicsLayer {
                                 alpha = zoom.value
                                 translationY = hudPopDir.floatValue *
@@ -1950,12 +1956,10 @@ internal fun MushafPageDial(
                         // hard space: an empty string measures to no line, and
                         // this row must hold its height whether or not words
                         // arrive, or the head would step as they came in.
-                        Text(
+                        BasicText(
                             text = mushafDialLabelFoot(th, zoomed = true).ifEmpty { " " },
                             style = hudType,
-                            color = androidx.compose.ui.graphics
-                                .lerp(ink.copy(alpha = 0.48f), accents.repeatInk, orange)
-                                .copy(alpha = 0.48f + 0.22f * orange),
+                            color = hudInk.foot,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.graphicsLayer {
@@ -1983,6 +1987,7 @@ internal fun MushafPageDial(
                 .fillMaxWidth()
                 .height(MushafDialSlot + MushafDialBelowGrab)
                 .systemGestureExclusion()
+                .testTag(MushafPageDialTag)
                 .pointerInput(pages) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -2686,3 +2691,83 @@ private val MushafDialHudPop = spring<Float>(dampingRatio = 0.5f, stiffness = 38
 
 /** How far the two HUD readings slide apart along the pull as the pop swaps them. */
 private val MushafDialHudSwap = 10.dp
+
+/** The HUD's head ink: orange as either warning speaks, brightened by the pulse. */
+internal fun mushafDialHudHeadInk(ink: Color, repeatInk: Color, pulse: Float, orange: Float): Color =
+    androidx.compose.ui.graphics.lerp(ink, repeatInk, orange).copy(alpha = 0.72f + 0.18f * pulse)
+
+/** The HUD's subordinate line, in the running head's lighter ink until it warns. */
+internal fun mushafDialHudFootInk(ink: Color, repeatInk: Color, orange: Float): Color =
+    androidx.compose.ui.graphics.lerp(ink.copy(alpha = 0.48f), repeatInk, orange)
+        .copy(alpha = 0.48f + 0.22f * orange)
+
+/**
+ * The HUD's warning ink, read where the type draws. [pulse] runs every frame
+ * of its flash and [ripe] steps as the band ripens; neither is read in the
+ * label's composition, so neither recomposes or re-measures it.
+ */
+internal class MushafDialHudInk(
+    private val ink: Color,
+    private val repeatInk: Color,
+    private val pulse: () -> Float,
+    private val ripe: () -> Float,
+) {
+    constructor(ink: Color, repeatInk: Color, pulse: Animatable<Float, *>, ripe: MutableFloatState) :
+        this(ink, repeatInk, { pulse.value }, { ripe.floatValue })
+
+    /** One orange for both warnings, whichever speaks louder. */
+    fun orange(): Float = maxOf(pulse(), ripe())
+
+    fun headInk(): Color = mushafDialHudHeadInk(ink, repeatInk, pulse(), orange())
+
+    val head = ColorProducer { headInk() }
+    val foot = ColorProducer { mushafDialHudFootInk(ink, repeatInk, orange()) }
+}
+
+/**
+ * The width the HUD label is measured against. A label narrower than the
+ * docked clamp sets exactly as it would at any wider clamp, so it takes the
+ * slot's width and keeps its paragraphs as the clamp steps along the wall;
+ * only a label the clamp actually cuts follows it.
+ */
+internal fun mushafDialHudMeasureWidth(clampPx: Int, slotPx: Int, naturalPx: Int): Int {
+    val clamp = clampPx.coerceAtMost(slotPx)
+    return if (naturalPx <= clamp) slotPx else clamp
+}
+
+/**
+ * The trough's head line. The folio is a span a step quieter than the name it
+ * trails, as the verse rail's annotations are, and a span's colour is fixed
+ * when the text is built: so this one line reads the warning ink, in a scope
+ * of its own.
+ */
+@Composable
+private fun MushafDialTroughHead(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+    hudInk: MushafDialHudInk,
+    modifier: Modifier = Modifier,
+) {
+    val headInk = hudInk.headInk()
+    val annotated = remember(text, headInk) {
+        val split = text.indexOf("  ·  ")
+        buildAnnotatedString {
+            if (split < 0) {
+                append(text)
+            } else {
+                append(text.substring(0, split))
+                withStyle(
+                    SpanStyle(color = headInk.copy(alpha = headInk.alpha * 0.78f)),
+                ) { append(text.substring(split)) }
+            }
+        }
+    }
+    Text(
+        text = annotated,
+        style = style,
+        color = headInk,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
+}

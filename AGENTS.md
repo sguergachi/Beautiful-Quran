@@ -399,6 +399,12 @@ this document combined: `ReaderComponents.kt` (~36k tokens),
 - KDoc on every non-obvious public type/function; inline comments only where
   the code cannot say it (the *why*, never the *what*).
 - UI state flows down as immutable data classes; events flow up as lambdas.
+  The one exception is a text field's own `TextFieldState`: a ViewModel that
+  acts on the text (Home and Bookmarks search, Tarji Lab notes) owns it and
+  observes it with `snapshotFlow`, and the field edits it in place. That is
+  how state-based text fields are meant to be hoisted. Round-tripping each
+  keystroke through a lambda brings back the async value/IME desync they
+  replace (cursor jumps, lost characters).
 - Tests live where logic lives: pure logic (engine, parsers, mappers) gets JVM
   unit tests in `app/src/test/`; composables are kept small and stateless so
   UI stays reviewable instead of UI-tested.
@@ -501,8 +507,8 @@ exported from `~/.bashrc`, so **login shells are already set up** — standard
 build/test commands from the "Build, test, run" section above work as-is.
 
 - The startup update script re-creates `local.properties`, so a fresh checkout
-  builds. Install `platforms;android-37.0` and `build-tools;36.0.0` if missing
-  (`compileSdk` uses API 37.0).
+  builds. Install `platforms;android-37.1` and `build-tools;36.0.0` if missing
+  (`compileSdk` uses API 37.1; Compose 1.13 requires it).
 - **Emulator / GUI run works here** (KVM available): `scripts/run_android_app.sh`
   after a one-time `scripts/setup_android_emulator.sh`. Still verify with
   `./gradlew testDebugUnitTest` before committing — the signature word-sync

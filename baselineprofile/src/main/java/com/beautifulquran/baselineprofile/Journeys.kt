@@ -2,12 +2,18 @@ package com.beautifulquran.baselineprofile
 
 import android.os.SystemClock
 import android.util.Log
+import android.widget.EditText
 import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.Direction
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import androidx.test.uiautomator.waitForStable
+import java.util.regex.Pattern
 
 internal const val PackageName = "com.beautifulquran"
 internal const val UiTimeoutMs = 15_000L
@@ -15,6 +21,50 @@ internal const val RecitationTimeoutMs = 20_000L
 internal const val BenchmarkLog = "BeautifulQuranBenchmark"
 internal const val AlafasyName = "Mishary Rashid Alafasy"
 internal const val OfflineFixtureArg = "offlineRecitationFixture"
+internal const val IterationsArg = "iterations"
+
+/**
+ * Iteration count for a measured or collected journey: [default] unless the run
+ * passes `-Pandroid.testInstrumentationRunnerArguments.iterations=N` — a quick
+ * end-to-end check of the harness (N = 1) without editing the benchmarks.
+ */
+internal fun iterations(default: Int): Int =
+    InstrumentationRegistry.getArguments().getString(IterationsArg)
+        ?.toIntOrNull()
+        ?.takeIf { it > 0 }
+        ?: default
+
+/**
+ * A fresh install holds the cover until its first timing (and, for Mushaf, page)
+ * fill lands over the network; the board says so in its own description.
+ */
+private const val CoverReadyTimeoutMs = 180_000L
+private const val CoverReadyDescription = "The Noble Quran — touch to open"
+
+/** The board in any state: ready, or naming the first fill it is waiting on. */
+private val CoverAnyState: BySelector =
+    By.desc(Pattern.compile("(?s).*(Quran|recitation timings).*"))
+
+/** A Mushaf leaf can still be filling its glyph fonts the first time a chapter opens. */
+private const val MushafLeafTimeoutMs = 60_000L
+
+/** Mirrors `MushafPageDialTag` in the app (surfaced via `testTagsAsResourceId`). */
+private const val MushafPageDialTag = "mushafPageDial"
+
+/**
+ * The paper stack keeps neighbouring sheets composed, and a turning sheet's rows
+ * are already in the accessibility tree while it slides. A tap aimed at a row
+ * still in motion lands where the row *was*; wait for its bounds to hold first.
+ */
+private const val SettleTimeoutMs = 5_000L
+private const val SettleIntervalMs = 300L
+
+/** Section labels are set in small caps, so match them whatever their case. */
+private fun sectionLabel(name: String): BySelector =
+    By.text(Pattern.compile(Pattern.quote(name), Pattern.CASE_INSENSITIVE))
+
+private val SettingsGate = sectionLabel("Reciter")
+private val CustomizeGate = sectionLabel("Layout")
 
 internal fun requireOfflineRecitationFixture() {
     val value = InstrumentationRegistry.getArguments().getString(OfflineFixtureArg)
@@ -34,13 +84,32 @@ internal fun MacrobenchmarkScope.launchPastCover() {
     device.skipCover()
 }
 
+/**
+ * Opens the cover once it is ready to open. Until its first content fill lands
+ * the board describes the download instead, and a tap behind the system splash
+ * is lost, so wait for the ready description rather than tapping into it. The
+ * ceremony also opens on its own, so a cover that is already gone is fine.
+ */
 internal fun UiDevice.skipCover() {
-    click(displayWidth / 2, displayHeight / 2)
+    val ready = By.desc(CoverReadyDescription)
+    val deadline = SystemClock.elapsedRealtime() + CoverReadyTimeoutMs
+    while (SystemClock.elapsedRealtime() < deadline) {
+        val cover = findObject(ready)
+        if (cover != null) {
+            cover.click()
+            break
+        }
+        if (!hasObject(CoverAnyState) && hasObject(By.desc("Open settings"))) break
+        SystemClock.sleep(250)
+    }
+    check(wait(Until.gone(CoverAnyState), UiTimeoutMs)) {
+        "Cover did not open: ${findObject(CoverAnyState)?.contentDescription}"
+    }
     waitForChapters()
 }
 
 internal fun UiDevice.waitForChapters() {
-    waitFor(By.text("Al-Fatihah"), "Chapter list")
+    waitForSettled(By.text("Al-Fatihah"), "Chapter list")
 }
 
 internal fun UiDevice.waitForScrollReader() {
@@ -49,57 +118,149 @@ internal fun UiDevice.waitForScrollReader() {
 
 internal fun UiDevice.waitForMushafReader() {
     waitFor(By.desc("Chapters"), "Mushaf reader")
-    waitFor(By.descStartsWith("Mushaf page "), "Mushaf page")
+    waitFor(By.descStartsWith("Mushaf page "), "Mushaf page", MushafLeafTimeoutMs)
 }
 
 internal fun UiDevice.waitForSettings() {
-    waitFor(By.text("Reciter"), "Settings")
+    waitForSettled(SettingsGate, "Settings")
+}
+
+internal fun UiDevice.openSettings() {
+    waitForSettled(By.desc("Open settings"), "Settings control").click()
+    waitForSettings()
 }
 
 /**
- * Settings → Mishary Rashid Alafasy, Customize → [layout] + Arabic, back via Reciter
- * (Customize's own title is also "Customize", so Reciter is the Settings gate).
+ * Settings → Mishary Rashid Alafasy, Customize → [layout] + Arabic, back via the
+ * Reciter section (Customize's own title is also "Customize", so Reciter is the
+ * Settings gate). Each choice is confirmed by its selected state, not assumed.
  */
 internal fun UiDevice.chooseReaderSettings(layout: String) {
-    waitFor(By.desc("Open settings"), "Settings control")
-    findObject(By.desc("Open settings")).click()
-    waitForSettings()
-    waitFor(By.text(AlafasyName), "Alafasy row")
-    findObject(By.text(AlafasyName)).click()
-    findObject(By.text("Customize")).click()
-    waitFor(By.text("Layout"), "Customize")
-    waitFor(By.text(layout), "Layout $layout").click()
-    // View is the first "Arabic" on Customize; verse/page scripts repeat the word later.
-    waitFor(By.text("Arabic"), "Arabic view")
-    val arabic = findObjects(By.text("Arabic")).firstOrNull()
-        ?: error("Arabic view missing")
-    arabic.click()
+    openSettings()
+    chooseAndConfirm(waitForChoice(AlafasyName), AlafasyName)
+    waitForSettled(By.text("Customize"), "Customize row").click()
+    waitForSettled(CustomizeGate, "Customize")
+    chooseAndConfirm(waitForChoice(layout), "Layout $layout")
+    chooseAndConfirm(arabicViewChoice(), "Arabic view")
     pressBack()
     waitForSettings()
-    check(wait(Until.gone(By.text("Layout")), UiTimeoutMs)) {
+    check(wait(Until.gone(CustomizeGate), UiTimeoutMs)) {
         "Customize still showing after back"
     }
     pressBack()
     waitForChapters()
 }
 
+/**
+ * The "Arabic" under Customize's View section. Verse and page numbers offer an
+ * "Arabic" script further down, and View itself sits below the fold, so scroll
+ * until a choice set directly under the View label is on screen.
+ */
+private fun UiDevice.arabicViewChoice(): UiObject2 {
+    val viewLabel = sectionLabel("View")
+    val page = waitFor(By.scrollable(true).hasDescendant(CustomizeGate), "Customize scroll")
+    repeat(8) {
+        val label = findObject(viewLabel)
+        if (label != null) {
+            val below = label.visibleBounds.bottom
+            val arabic = findObjects(By.checkable(true).text("Arabic"))
+                .filter { it.visibleBounds.top >= below }
+                .minByOrNull { it.visibleBounds.top }
+            if (arabic != null && arabic.visibleBounds.height() > 0) {
+                arabic.waitForStable(SettleTimeoutMs, SettleIntervalMs, requireStableScreenshot = false)
+                return arabic
+            }
+        }
+        if (!page.scroll(Direction.DOWN, 0.5f)) return@repeat
+    }
+    error("Arabic view choice not found under View")
+}
+
+/**
+ * A selectable choice named [name]. The selected state lives on the clickable
+ * node: a choice word is that node itself, while a reciter row is a clickable
+ * row holding its name as a child text.
+ */
+private fun UiDevice.waitForChoice(name: String): UiObject2 {
+    val itself = By.checkable(true).text(name)
+    val holder = By.checkable(true).hasChild(By.text(name))
+    val deadline = SystemClock.elapsedRealtime() + UiTimeoutMs
+    while (true) {
+        val found = findObject(itself) ?: findObject(holder)
+        if (found != null) {
+            found.waitForStable(SettleTimeoutMs, SettleIntervalMs, requireStableScreenshot = false)
+            return found
+        }
+        check(SystemClock.elapsedRealtime() < deadline) { "Choice $name did not become ready" }
+        SystemClock.sleep(50)
+    }
+}
+
+/** Taps a choice and waits until it reports itself selected. */
+private fun UiDevice.chooseAndConfirm(choice: UiObject2, what: String) {
+    if (!choice.isChosen()) choice.click()
+    val deadline = SystemClock.elapsedRealtime() + UiTimeoutMs
+    while (!choice.isChosen()) {
+        check(SystemClock.elapsedRealtime() < deadline) { "$what was not selected" }
+        SystemClock.sleep(50)
+    }
+    waitForIdle()
+}
+
+/**
+ * Compose reports `Modifier.semantics { selected = … }` as checkable + checked
+ * on every role except Tab, where it is `isSelected`; accept either.
+ */
+private fun UiObject2.isChosen(): Boolean = isChecked || isSelected
+
 internal fun UiDevice.openChapter(name: String) {
-    waitFor(By.text(name), "Chapter $name").click()
+    clickSettled(By.text(name), "Chapter $name")
+}
+
+/**
+ * The Home search field. Its "Search" label is a contentDescription on a field
+ * that merges its descendants, so Compose reports the label as a child node of
+ * the EditText rather than on it; only the EditText takes text. Accept either
+ * shape so the journey keeps working if Compose moves the label onto the field.
+ */
+internal fun UiDevice.searchField(): UiObject2 {
+    val labelled = By.clazz(EditText::class.java).desc("Search")
+    val parentOfLabel = By.clazz(EditText::class.java).hasChild(By.desc("Search"))
+    check(wait(Until.hasObject(By.desc("Search")), UiTimeoutMs)) { "Search field did not become ready" }
+    return findObject(labelled) ?: findObject(parentOfLabel) ?: error("Search field is not editable")
 }
 
 internal fun UiDevice.search(query: String) {
-    val field = waitFor(By.desc("Search"), "Search field")
-    field.click()
+    searchField().click()
+    // Focus lifts the field as the masthead recedes; let it land first.
+    searchField().waitForStable(SettleTimeoutMs, SettleIntervalMs, requireStableScreenshot = false)
+    setSearchText(query)
+}
+
+/** Sets the query and checks that it reached the field. */
+internal fun UiDevice.setSearchText(query: String) {
+    val field = searchField()
     field.text = query
+    check(field.wait(Until.textEquals(query), UiTimeoutMs) == true || query.isEmpty()) {
+        "Search field did not take \"$query\""
+    }
 }
 
 internal fun UiDevice.waitForSearchResults() {
     waitFor(By.textContains("In the Quran"), "Search results")
 }
 
+internal fun UiDevice.waitForSearchResultsGone() {
+    check(wait(Until.gone(By.textContains("In the Quran")), UiTimeoutMs)) { "Search results did not clear" }
+}
+
+/** The list the results are laid out in, once they are in. */
+internal fun UiDevice.searchResultsList(): UiObject2 =
+    waitFor(By.scrollable(true).hasDescendant(By.textContains("In the Quran")), "Search results list")
+
 /** Pause is the playing control, so it is a valid ready check for recitation. */
 internal fun UiDevice.playUntilStarted() {
-    waitFor(By.desc("Play"), "Play").click()
+    waitForSettled(By.desc("Play"), "Play").click()
     waitFor(By.desc("Pause"), "Playing recitation (offline Alafasy fixture)", RecitationTimeoutMs)
 }
 
@@ -142,10 +303,14 @@ internal fun UiDevice.turnMushafTowardLaterPages() {
     waitForIdle()
 }
 
+/**
+ * A leftward stroke along the dial's own grab strip (21 dp tall), aimed at its
+ * centre line. The strip's bounds come from its test tag, not from the
+ * transport row, which moves with playback and layout.
+ */
 internal fun UiDevice.swipeMushafDialTowardLaterPages() {
-    val play = findObject(By.desc("Play")) ?: error("Play missing — cannot aim the dial")
-    val dialY = play.visibleBounds.top - play.visibleBounds.height() * 3 / 2
-    swipeAcross(fromX = 0.80f, toX = 0.20f, y = dialY, steps = 30)
+    val dial = waitForSettled(By.res(MushafPageDialTag), "Mushaf page dial")
+    swipeAcross(fromX = 0.80f, toX = 0.20f, y = dial.visibleBounds.centerY(), steps = 30)
     waitForIdle()
 }
 
@@ -172,6 +337,44 @@ private fun UiDevice.waitFor(
     selector: BySelector,
     what: String,
     timeoutMs: Long = UiTimeoutMs,
-) = checkNotNull(wait(Until.findObject(selector), timeoutMs)) {
+): UiObject2 = checkNotNull(wait(Until.findObject(selector), timeoutMs)) {
     "$what did not become ready"
+}
+
+/** [waitFor], then holds until the object stops moving (a sheet has finished turning). */
+private fun UiDevice.waitForSettled(
+    selector: BySelector,
+    what: String,
+    timeoutMs: Long = UiTimeoutMs,
+): UiObject2 = settled(selector, what, timeoutMs) { it }
+
+/** [waitForSettled] and click, as one step that survives the node being replaced. */
+private fun UiDevice.clickSettled(selector: BySelector, what: String) {
+    settled(selector, what, UiTimeoutMs) { it.click() }
+}
+
+/**
+ * Finds [selector], waits for it to stop moving, then runs [use] on it. A list
+ * that re-renders (search results arriving, a sheet's rows recomposing) swaps
+ * the node for a new one; that is a real change in the UI, so look it up again
+ * rather than fail, until [timeoutMs].
+ */
+private fun <T> UiDevice.settled(
+    selector: BySelector,
+    what: String,
+    timeoutMs: Long,
+    use: (UiObject2) -> T,
+): T {
+    val deadline = SystemClock.elapsedRealtime() + timeoutMs
+    while (true) {
+        val remaining = (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(1L)
+        val found = waitFor(selector, what, remaining)
+        try {
+            val stable = found.waitForStable(SettleTimeoutMs, SettleIntervalMs, requireStableScreenshot = false)
+            check(!stable.isTimeout) { "$what kept moving" }
+            return use(found)
+        } catch (replaced: StaleObjectException) {
+            if (SystemClock.elapsedRealtime() >= deadline) throw replaced
+        }
+    }
 }

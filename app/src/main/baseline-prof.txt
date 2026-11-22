@@ -28,6 +28,16 @@ HSPLcom/beautifulquran/playback/PlayerController;->**(**)**
 HSPLcom/beautifulquran/playback/PlaybackService;->**(**)**
 HSPLcom/beautifulquran/playback/AudioPrefetcher;->**(**)**
 
+# Home search: concept asset, word index, ranking, results layout. An emulator
+# trace showed these interpreted (JIT + GC) through the first results; the
+# homeSearch generator journey exercises them.
+HSPLcom/beautifulquran/data/SearchConceptRepository;->**(**)**
+HSPLcom/beautifulquran/data/WordSearchIndexQueryKt;->**(**)**
+HSPLcom/beautifulquran/domain/WordSearchKt;->**(**)**
+HSPLcom/beautifulquran/domain/SearchRankingKt;->**(**)**
+HSPLcom/beautifulquran/ui/home/SearchDialsKt;->**(**)**
+HSPLcom/beautifulquran/ui/theme/PaperSearchFieldKt;->**(**)**
+
 # Mushaf pager: page fonts, 15-line layout, leaf swipe.
 HSPLcom/beautifulquran/ui/reader/MushafPagerKt;->**(**)**
 HSPLcom/beautifulquran/ui/reader/MushafHafsLineKt;->**(**)**

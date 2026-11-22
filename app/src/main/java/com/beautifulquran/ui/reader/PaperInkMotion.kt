@@ -4,10 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
@@ -45,15 +41,7 @@ internal fun rememberPaperInkDeparture(enabled: Boolean, state: InkEngine.State)
     val read = state == InkEngine.State.Active || state == InkEngine.State.Recited
     val history = remember { PaperInkEvaporation(upcoming, read) }
     SideEffect { history.transition(upcoming, read) }
-    val remaining = animateFloatAsState(
-        targetValue = if (upcoming) 0f else 1f,
-        animationSpec = if (upcoming) {
-            tween(InkEngine.INK_DEPARTURE_MS, easing = FastOutSlowInEasing)
-        } else {
-            snap()
-        },
-        label = "paperInkEvaporation",
-    )
+    val remaining = rememberInkDepartureRemaining(upcoming, label = "paperInkEvaporation")
     return remember(history, remaining) { PaperInkDeparture(history, remaining) }
 }
 

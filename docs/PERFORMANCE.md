@@ -173,6 +173,13 @@ invisible anyway. The tilt sensor's demand is kept alive by an explicit
 `GildingDemand(liveSheen)` in the ceremony, since the renderers' own demands
 see the frozen wrapper.
 
+The leather under all of it (`CoverLeather`) is a radial ramp between two
+greens only a few eight-bit steps apart, so on Android 13+ it is an AGSL copy
+of the gradient with ±1 step of triangular noise (paint dither off, so it does
+not stack with Skia's). The shader and paint are built once; a board resize
+rewrites two uniforms, and no frame allocates. Below 13 it is the plain
+gradient it always was.
+
 The QF SQLite cache opens and migrates lazily on the first background read.
 The application launches its checkpoint/refresh decision on `Dispatchers.IO`,
 so these disk operations do not delay the first cover composition. The bundled
@@ -403,6 +410,45 @@ sheet's edge, which an offscreen layer on the sheet would clip. The remaining
 first-open compiles are not perspective draws (path-atlas, mesh and rect
 programs on the main framebuffer) and were not chased further.
 
+The texture only helps while nothing on the sheet changes, and in a 2026-11-21
+macrobenchmark of Home↔reader↔Settings turns (emulator, release) both cached
+sheets re-rendered on almost every frame: 487 recompositions in ~357 frames,
+two 1080 × 2400 layer renders a frame, 41% of frames over the 8.3 ms budget.
+A composition tracer and `CompositionObserver.onScopeInvalidated` named the
+states. Each was a layout position read in composition. The sheet's
+`graphicsLayer` transform moves the window and root bounds of everything on it
+every frame, so any `onGloballyPositioned` that writes a position is written
+every frame of a turn:
+
+- Home keyed its search-dismiss `pointerInput` on the search field's and dials
+  pane's root bounds, so the Scaffold content and every visible chapter row
+  recomposed per frame. Only the two gate booleans are keys now. The gesture
+  reads the bounds when it runs, which always gives the latest value. The
+  dials pane's height is computed in its layout lambda, not in composition.
+- The reader keyed the ayah-rail lesson on the rail's root centre
+  (`ayahRailTipCenterY`) and read it to size the tip, so `ReaderScreen` and
+  all its Scaffold slots recomposed every frame the sheet moved. Composition
+  now reads a `derivedStateOf` of whether a centre exists. It reads the value
+  itself only while the lesson is up. The lesson's wait still restarts on
+  every move of the rail, through `snapshotFlow` + `collectLatest`.
+- The reader's entrance fade (`readerContentAlpha`, which runs during the
+  opening turn) was plain layer alpha. That is a fresh full-page "alpha caused
+  saveLayer" pass every frame, inside the turning sheet's texture. It now uses
+  `cachedAlpha`, so the page renders once and the fade only modulates it.
+
+The same journey (same emulator, release, two iterations) was measured after
+all three fixes. Full-sheet layer renders per iteration fell 384 → 190.
+Render-thread work fell from p50 8.4 → 6.3 ms and p90 11.9 → 10.4 ms. Frames
+whose UI + render-thread work exceeded 8.3 ms fell 42.7% → 31.9%. With a
+composition tracer on, Home's rows recomposed 2,080 → 300 times per
+iteration, and `ReaderScreen` 179 → under 5. The ~190 renders left were not
+attributed. One of them is a persistent 932 × 485 "alpha caused saveLayer"
+present in every frame, even at rest, whose owner was not found. Emulator
+only, not a Pixel measurement.
+**Rule:** never read a position from `onGloballyPositioned` (or a
+`boundsInWindow`/`positionInRoot`) in composition on a sheet. Read it in a
+layout/draw lambda, a gesture or a coroutine, or derive the boolean you need.
+
 ### 4a″. Opening onto a verse lays it out once
 
 Continue, a bookmark or a search hit opens the reader mid-chapter. The list
@@ -549,6 +595,32 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   Arabic instead of hundreds of private-use glyphs.
 - Chrome (`MushafReadingSheet`) keys the gilt seed on `settledPage`, not
   `currentPage`, so a fling does not regenerate ornaments mid-turn.
+- QCF word and verse-mark cells are `MushafWordText` nodes. They are laid out
+  as `BasicText(maxLines = 1, softWrap = false, overflow = Visible)` would lay
+  them out, and drawn the way foundation's text node draws. The layouts come
+  from `MushafWordLayouts`, a process-wide LRU of 2,048 `TextLayoutResult`s
+  keyed by glyphs, exact style (the page face, size, narrowing and colour),
+  density, direction, font resolver and constraints. In the page-turn
+  benchmark, per-word `TextAnnotatedStringNode` measures were ~55 ms of the
+  three slowest frames (145 ms together; 283 layouts, ~0.2 ms each). A leaf
+  that comes back (the one
+  just turned from, or a dial landing on a visited page) now reuses its cells.
+  A leaf's first composition still measures each cell once. The forward-only
+  page-turn benchmark only visits new pages, so it is unchanged within noise
+  (UI + render-thread frames over 8.3 ms: 17.7% before, 20.4% after, two
+  iterations each). The revisit gain was not measured.
+- The dial HUD's warning ink (the 300 ms pre-pop pulse and the ripening band)
+  is a `ColorProducer` read at draw (`MushafDialHudInk`). Read in
+  composition, the pulse recomposed the whole label every frame. The trough
+  head's folio span still needs its colour in composition, so that one line
+  reads it in a scope of its own. A docked label is measured against the slot
+  whenever it already fits the 16 px-quantised clamp
+  (`mushafDialHudMeasureWidth`), so each clamp step along the wall no longer
+  throws away all four lines' paragraphs. A label the clamp actually cuts
+  still follows the clamp. In the distant-dial benchmark (emulator, two
+  iterations), UI frames over 8.3 ms fell 4.8% → 1.4% and UI p90 fell
+  5.5 → 3.2 ms. The landing frame is still dominated by the new leaf's glyph
+  uploads (see Future headroom).
 
 The 2026-10-08 emulator comparison used release APKs, AOT compilation, a
 settled page 5, and twelve rightward swipes to page 17 with 600 ms pauses.
@@ -642,6 +714,17 @@ debug emulator were **525 ms** for `peace` and **876 ms** for the multi-word con
 debounce. The complete rank then replaces it. App startup stays free of a
 full-Quran scan.
 
+The results list lays out only what is on screen. Every section header, hit,
+and expand/collapse row is its own keyed `LazyColumn` item; the keys come from
+`wordSearchRowKey`, which is positional so two hits on one verse cannot
+collide. The results used to sit in one item holding a `Column` of every row
+of every section. That item's first layout composed and measured all of them
+in one frame: 35–43 ms on the emulator for `peace`, however few rows were
+visible. The list has no item spacing, so the rows stack exactly as the
+Column stacked them. In the cold-search macrobenchmark (emulator, release, two
+iterations each), the worst UI frame fell 43 → 24 ms. Frames whose UI +
+render-thread work exceeded 8.3 ms fell 18.2% → 8.9%.
+
 The candidate query may use the longest token from a phrase even when that
 token is short. This preserves the sub-second first-result path for literal
 phrases such as `if he`; single short tokens still skip the broad SQL fallback.
@@ -734,6 +817,38 @@ Until a physical trace shows a stall, leave the wash and startup order alone.
   mushaf mode).
 - Gapless surah-file playback (single MediaItem + absolute-offset segments)
   to remove inter-ayah stream startup entirely.
+- Mushaf glyph-atlas uploads (2026-11-21, not fixed). Every Madinah page has
+  its own face, so a leaf's first visible frames rasterise and upload its
+  glyphs. One page-turn run spent 1.4 s in `glTexSubImage2D`; a dial landing
+  frame took 80 ms, ~25 ms of it uploads. One attempt warmed each held
+  neighbour while the reader sat still: once a band per frame, the neighbour
+  was drawn into a small `Offscreen` `GraphicsLayer`, off screen, with
+  `drawContent()` recorded a second time. Traces showed no layer render
+  ("flush layers") for it. With it enabled, the page-turn journey twice
+  stuck on page 3, and passed with it disabled. It was dropped; the cause was
+  not found. A future attempt needs on-device proof that HWUI renders an
+  off-screen layer, and must not draw a leaf's content layer into a second
+  parent.
+- Neighbour leaf composition. Bringing a leaf into the pager's window still
+  composes ~150 word nodes in one frame (16–44 ms of composition on the
+  emulator, on top of first-visit measure). Splitting it with pausable
+  composition needs a pager prefetch hook that `HorizontalPager` does not
+  expose. Drawing a line's static words from one node would cut the node
+  count. However, it would rebuild every word node when ink packs arrive at
+  playback start, which is an animated moment.
+- The surah band's ground is two `generatedFieldWeave` layers, the second a
+  mirror of the first. A new chapter opening tessellates both
+  (`AAHairlineOp`, 1–7 ms each, ~19 ms of an 80 ms dial-landing frame).
+  Recording once and drawing the texture mirrored would halve that, but a
+  mirrored texture is not guaranteed to match mirrored rasterisation pixel
+  for pixel, so it was left alone.
+- Cold start's first frame (391 ms UI on the emulator): ~38 ms composition,
+  of which 15 ms is one `StaticLayout`, two ~8 ms first text measures (font
+  loads), and ~35 ms recording the cover. The rest of the doFrame is untraced
+  first-use cost: class init, JIT and HWUI/EGL setup. All of it draws the
+  closed cover's first frame, and the stack already mounts only after two
+  cover frames. Nothing was found that could move later without changing
+  that frame.
 
 ---
 

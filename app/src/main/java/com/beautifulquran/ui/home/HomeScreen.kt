@@ -70,7 +70,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.withTimeoutOrNull
-import androidx.compose.ui.composed
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -97,6 +97,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
@@ -109,7 +110,6 @@ import kotlin.math.roundToInt
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
-import android.os.Build
 import android.os.SystemClock
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.runtime.DisposableEffect
@@ -318,7 +318,10 @@ fun HomeScreen(
     val searchPaneBottomGap = 10.dp
     val searchPaneTopGapPx = with(density) { searchPaneTopGap.toPx() }
     val searchPaneBottomGapPx = with(density) { searchPaneBottomGap.toPx() }
-    val searchPaneHeight = with(density) {
+    // Read where the pane is measured, not here: the field's and the box's
+    // window bounds move with the sheet on every frame of a page turn, and
+    // read in composition they recomposed the whole of Chapters each time.
+    val searchPaneHeight: Density.() -> Dp = {
         val paneTop = searchBottom - boxTop + searchPaneTopGapPx
         val paneBottom = boxHeight - imeBottom - searchPaneBottomGapPx
         (paneBottom - paneTop).coerceAtLeast(0f).toDp()
@@ -777,7 +780,12 @@ fun HomeScreen(
                     end = padding.calculateEndPadding(layoutDirection),
                 )
                 .fillMaxSize()
-                .pointerInput(searchFocused, searchPaneVisible, searchBounds, searchPaneBounds) {
+                // Keyed on the two gates only. The bounds are read inside the
+                // gesture, which always sees their latest value: as keys they
+                // were read here in composition, and a page turn moves them on
+                // every frame — Chapters and every visible row recomposed for
+                // each frame of every turn.
+                .pointerInput(searchFocused, searchPaneVisible) {
                     // Empty-query dials only: an outside tap dismisses without
                     // activating the list under the pane. Once a query is up,
                     // result rows must receive the gesture (they clear focus
@@ -838,8 +846,7 @@ fun HomeScreen(
                         Spacer(Modifier.height(SearchBottomBreath))
                     }
                     PaperSearchField(
-                        value = uiState.query,
-                        onValueChange = viewModel::onQueryChange,
+                        state = viewModel.queryField,
                         placeholder = "Concept, “exact phrase”, or 2:255",
                         contentDescription = "Search",
                         onFocusChanged = { focused ->
@@ -1145,7 +1152,7 @@ fun HomeScreen(
                                         )
                                     },
                                 )
-                                .then(if (pinned) Modifier.pinnedBand() else Modifier)
+                                .then(if (pinned) Modifier.pinnedBand(QuranTheme.accents.greenWash) else Modifier)
                                 // The band closes with its own air before the
                                 // full list resumes.
                                 .then(
@@ -1160,7 +1167,13 @@ fun HomeScreen(
                     }
 
                     if (showWordSections) {
-                        item(key = "word-results") {
+                        // One lazy item per row, not one item holding them all:
+                        // as a single Column, the first results composed and
+                        // measured every hit of every section in one frame
+                        // (~35–43 ms on the emulator), however few were on
+                        // screen. The rows stack exactly as the Column did —
+                        // the list has no item spacing of its own.
+                        item(key = "word-results", contentType = "word-results-label") {
                             Column(Modifier.fillMaxWidth()) {
                                 if (correctedQuery != null) {
                                     SearchCorrectionLabel(
@@ -1187,31 +1200,52 @@ fun HomeScreen(
                                         8.dp
                                     },
                                 )
-                                uiState.wordSections.forEach { section ->
-                                    WordSearchSurahHeader(section = section)
-                                    section.hits.forEach { hit ->
-                                        WordSearchHitRow(
-                                            hit = hit,
-                                            query = uiState.query,
-                                            onClick = {
-                                                focusManager.clearFocus()
-                                                onOpenSearchHit(hit, uiState.query)
-                                            },
-                                        )
-                                    }
-                                    if (section.hiddenCount > 0) {
-                                        WordSearchExpandRow(
-                                            section = section,
-                                            onClick = { viewModel.toggleWordSearchSection(section.surahId) },
-                                        )
-                                    } else if (
-                                        section.expanded &&
-                                        section.totalCount > WORD_SEARCH_PREVIEW_LIMIT
-                                    ) {
-                                        WordSearchCollapseRow(
-                                            onClick = { viewModel.toggleWordSearchSection(section.surahId) },
-                                        )
-                                    }
+                            }
+                        }
+                        uiState.wordSections.forEachIndexed { sectionIndex, section ->
+                            item(
+                                key = wordSearchRowKey(WordSearchRow.Header, sectionIndex, section.surahId),
+                                contentType = "word-search-header",
+                            ) {
+                                WordSearchSurahHeader(section = section)
+                            }
+                            itemsIndexed(
+                                section.hits,
+                                key = { hitIndex, _ ->
+                                    wordSearchRowKey(WordSearchRow.Hit, sectionIndex, section.surahId, hitIndex)
+                                },
+                                contentType = { _, _ -> "word-search-hit" },
+                            ) { _, hit ->
+                                WordSearchHitRow(
+                                    hit = hit,
+                                    query = uiState.query,
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        onOpenSearchHit(hit, uiState.query)
+                                    },
+                                )
+                            }
+                            if (section.hiddenCount > 0) {
+                                item(
+                                    key = wordSearchRowKey(WordSearchRow.Expand, sectionIndex, section.surahId),
+                                    contentType = "word-search-toggle",
+                                ) {
+                                    WordSearchExpandRow(
+                                        section = section,
+                                        onClick = { viewModel.toggleWordSearchSection(section.surahId) },
+                                    )
+                                }
+                            } else if (
+                                section.expanded &&
+                                section.totalCount > WORD_SEARCH_PREVIEW_LIMIT
+                            ) {
+                                item(
+                                    key = wordSearchRowKey(WordSearchRow.Collapse, sectionIndex, section.surahId),
+                                    contentType = "word-search-toggle",
+                                ) {
+                                    WordSearchCollapseRow(
+                                        onClick = { viewModel.toggleWordSearchSection(section.surahId) },
+                                    )
                                 }
                             }
                         }
@@ -1266,7 +1300,15 @@ fun HomeScreen(
                         IntOffset(0, (searchBottom - boxTop + searchPaneTopGapPx).roundToInt())
                     }
                     .padding(start = HomeStartInset, end = HomeEndInset)
-                    .height(searchPaneHeight)
+                    // As .height(searchPaneHeight) did, measured in layout.
+                    .layout { measurable, constraints ->
+                        val height = searchPaneHeight().roundToPx()
+                            .coerceIn(constraints.minHeight, constraints.maxHeight)
+                        val placeable = measurable.measure(
+                            constraints.copy(minHeight = height, maxHeight = height),
+                        )
+                        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                    }
                     .onGloballyPositioned { searchPaneBounds = it.boundsInRoot() },
             )
 
@@ -1591,9 +1633,7 @@ internal fun continueLazyIndex(
  * however many chapters are pinned. The place ribbon hangs in the sheet-edge
  * lane on top of it.
  */
-private fun Modifier.pinnedBand(): Modifier = composed {
-    background(QuranTheme.accents.greenWash)
-}
+private fun Modifier.pinnedBand(greenWash: Color): Modifier = background(greenWash)
 
 /** A chapter row's one key, on the band or in the list: a pinned chapter
  * moves rather than showing twice, so the row itself can travel. */
@@ -1620,6 +1660,24 @@ internal fun chapterRows(
 
 /** Key of the chapter row that owns the reading place. */
 internal fun placeRowKey(continueId: Int?): String? = continueId?.let(::chapterKey)
+
+/** The kinds of row a word-search section lays out, each its own lazy item. */
+internal enum class WordSearchRow { Header, Hit, Expand, Collapse }
+
+/**
+ * A word-search row's lazy key. Positional within the results (section, then
+ * hit) so two hits on one verse can never collide, and prefixed so no result
+ * row can share a key with a chapter row or a label.
+ */
+internal fun wordSearchRowKey(
+    row: WordSearchRow,
+    sectionIndex: Int,
+    surahId: Int,
+    hitIndex: Int = 0,
+): String = when (row) {
+    WordSearchRow.Hit -> "word-hit-$sectionIndex-$surahId-$hitIndex"
+    else -> "word-${row.name.lowercase()}-$sectionIndex-$surahId"
+}
 
 /** The reflow when a chapter is pinned or unpinned: the row glides to its
  * new seat and the list closes or opens around it. */
@@ -2089,13 +2147,7 @@ private fun Modifier.holdToPin(
                         }
                         full = elapsed >= (HoldStartMs + HoldFillMs) * pace
                     }
-                    view.performHapticFeedback(
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                            HapticFeedbackConstants.CONFIRM
-                        } else {
-                            HapticFeedbackConstants.LONG_PRESS
-                        },
-                    )
+                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                     held()
                 }
                 var up: PointerInputChange? = null
@@ -2124,7 +2176,7 @@ private fun Modifier.holdToPin(
                     val opens = up != null &&
                         (!canHold || holdOutcome(up.uptimeMillis - down.uptimeMillis, pace) == HoldOutcome.Tap)
                     if (opens) {
-                        up!!.consume()
+                        up.consume()
                         tap()
                     }
                 }

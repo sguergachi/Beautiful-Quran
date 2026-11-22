@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -27,13 +26,13 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import com.beautifulquran.ui.theme.rememberMirroredSliderState
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,7 +51,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -103,6 +103,7 @@ import com.beautifulquran.ui.theme.paperSelectHaptic
 import com.beautifulquran.ui.theme.paperToggleHaptic
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.shippedCheckParams
+import com.beautifulquran.ui.theme.themePreviewAccents
 import com.beautifulquran.ui.theme.themePreviewColors
 import com.beautifulquran.ui.theme.verticalFadingEdges
 import com.beautifulquran.ui.theme.typeScale
@@ -976,9 +977,8 @@ internal fun BrushTuningSlider(
             modifier = Modifier.width(104.dp),
         )
         Slider(
-            value = value,
+            state = rememberMirroredSliderState(value, range),
             onValueChange = onChange,
-            valueRange = range,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -1242,27 +1242,32 @@ internal fun TextSizeControl(scale: Float, onScale: (Float) -> Unit) {
     }
 }
 
-/** Theme preview: main paper fill in a round rect with a gilded gold rim. */
+/**
+ * Theme preview: a slip of the theme's paper edged with the same gold hairline
+ * as the Customize preview leaf (0.5dp, gold at 0.28) — in the theme's own
+ * gold (`Theme.kt`), so each slip carries the paper and gilt it will draw.
+ */
 @Composable
 internal fun ThemeColorPreview(mode: ThemeMode) {
-    val colors = themePreviewColors(mode)
-    val fill = colors.first()
-    // Paper gilt on light surfaces; warmer gilt on dark (matches Theme.kt accents).
-    val gilt = when (mode) {
-        ThemeMode.DARK, ThemeMode.ROYAL_GREEN -> Color(0xFFD9B44A)
-        ThemeMode.LIGHT -> Color(0xFFC9A227)
-        ThemeMode.SYSTEM -> {
-            val c = colors.first()
-            if (c.red + c.green + c.blue < 1.5f) Color(0xFFD9B44A) else Color(0xFFC9A227)
-        }
+    val fill = themePreviewColors(mode).first()
+    val gold = themePreviewAccents(mode).gold
+    Canvas(Modifier.size(width = 64.dp, height = 22.dp)) {
+        val corner = CornerRadius(6.dp.toPx())
+        drawRoundRect(fill, cornerRadius = corner)
+        val hairline = 0.5.dp.toPx()
+        val inset = hairline / 2f
+        drawRoundRect(
+            color = gold.copy(alpha = ThemeSwatchHairlineAlpha),
+            topLeft = Offset(inset, inset),
+            size = Size(size.width - hairline, size.height - hairline),
+            cornerRadius = CornerRadius(corner.x - inset),
+            style = Stroke(width = hairline),
+        )
     }
-    Box(
-        modifier = Modifier
-            .size(width = 64.dp, height = 22.dp)
-            .border(1.5.dp, gilt, RoundedCornerShape(6.dp))
-            .background(fill, RoundedCornerShape(6.dp)),
-    )
 }
+
+/** The Customize preview leaf's hairline weight (CustomizeScreen `ReadingPreview`). */
+private const val ThemeSwatchHairlineAlpha = 0.28f
 
 internal val ThemeMode.label: String
     get() = themeLabel(this)
