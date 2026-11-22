@@ -666,11 +666,60 @@ def main():
              "left_at_baseline": sum(int(key.split(":")[0]) in selected for key in rows) - len(queue)})
         processed = 0
         pending_jobs = {}
+        next_snapshot = 25
+
+        def write_candidate():
+            """Publish what is banked so far; an interrupted run must still leave an artifact."""
+            accepted = []
+            for key, state in states.items():
+                if state.get("status") != "model_reviewed" or key not in rows:
+                    continue
+                if state.get("origin") == "prior_ai_review":
+                    ledger.require(state["seed_sha256"] == ledger.digest(ledger.encoded(seed_rows[key])),
+                                   "Prior AI decision changed")
+                    accepted.append(state["row"])
+                    continue
+                evidence = json.loads((work / "evidence" / (key.replace(":", "-") + ".json")).read_text())
+                stored_reasoning = state.get("reasoning")  # None for banked reviews (backward compat)
+                # Accept reviews signed under any shipped policy, or whose completed
+                # state file exists on disk (preserves banked work across policy edits).
+                signed = {job_signature(rows[key], manifest["verses"][key], evidence, state["model"], policy,
+                                        stored_reasoning)
+                          for policy in (REVIEW_POLICY, BATCH_POLICY,
+                                         '980228ecaa05e58461bb3194b170267fc9279cfd4e367f7570db4ab2e08ae999',
+                                         '98ee9bd9456b88ddead53b4dce45734db6a04e98d5658a286c42f76e3280c85e',
+                                         'c66cf645f4bb9486832056096c70a8f47e57ef276ea2225d297b144ff4086ce9')}
+                state_file_on_disk = (work / "jobs" / key.replace(":", "-") / (state["input_sha256"] + ".json")).exists()
+                if state["input_sha256"] in signed or state_file_on_disk:
+                    accepted.append(state["row"])
+                else:
+                    state.update(status="held", issues=["Review inputs or policy changed; rerun this chapter"])
+            save(state_file, states)
+            reused = sum(s.get("origin") == "prior_ai_review" for s in states.values() if s.get("status") == "model_reviewed")
+            for row in seeds:
+                ledger.require(all(t["status"] == "model_reviewed" for t in row["tokens"]),
+                               "Seed must retain the AI-review policy")
+                if int(row["verse"].split(":")[0]) in selected or row["verse"] in {r["verse"] for r in accepted}:
+                    continue
+                if ledger.compile_verse(row, manifest["verses"][row["verse"]], ai_reviewed=True):
+                    accepted.append(row)
+                    reused += 1
+            pending = work / "candidate-ledger.jsonl"
+            pending.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in accepted))
+            artifact, coverage = ledger.compile_ledger(pending, manifest, allow_partial=True, ai_reviewed=True)
+            (work / "candidate-alignments.tsv").write_text(artifact)
+            return accepted, coverage, reused, artifact
+
         def checkpoint(key, state):
+            nonlocal next_snapshot
             states[key] = state
             save(state_file, states)
             save(work / "report.json", summarize(rows, states, selected, "pending", queue))
             print(f"{key}: {state['status']}", flush=True)
+            reviewed = sum(s.get("status") == "model_reviewed" for s in states.values())
+            if reviewed >= next_snapshot:
+                next_snapshot = reviewed + 25
+                write_candidate()
             if state.get("provider_unavailable"):
                 cancelled.set()
                 subprocess.run(["pkill", "-TERM", "-P", str(os.getpid())], check=False)
@@ -749,43 +798,8 @@ def main():
             while pending_jobs:
                 collect()
         evidence_pool.shutdown(wait=True, cancel_futures=True)
-        # Only currently bound model-reviewed rows enter the candidate artifact.
-        accepted = []
-        for key, state in states.items():
-            if state.get("status") != "model_reviewed" or key not in rows:
-                continue
-            if state.get("origin") == "prior_ai_review":
-                ledger.require(state["seed_sha256"] == ledger.digest(ledger.encoded(seed_rows[key])), "Prior AI decision changed")
-                accepted.append(state["row"])
-                continue
-            evidence = json.loads((work / "evidence" / (key.replace(":", "-") + ".json")).read_text())
-            stored_reasoning = state.get("reasoning")  # None for banked reviews (backward compat)
-            # Accept reviews signed under any shipped policy, or whose completed
-            # state file is on disk (preserves banked work across policy edits).
-            signed = {job_signature(rows[key], manifest["verses"][key], evidence, state["model"], policy, stored_reasoning)
-                      for policy in (REVIEW_POLICY, BATCH_POLICY,
-                                     '980228ecaa05e58461bb3194b170267fc9279cfd4e367f7570db4ab2e08ae999',
-                                     '98ee9bd9456b88ddead53b4dce45734db6a04e98d5658a286c42f76e3280c85e',
-                                     'c66cf645f4bb9486832056096c70a8f47e57ef276ea2225d297b144ff4086ce9')}
-            state_file_on_disk = (work / "jobs" / key.replace(":", "-") / (state["input_sha256"] + ".json")).exists()
-            if state["input_sha256"] in signed or state_file_on_disk:
-                accepted.append(state["row"])
-            else:
-                state.update(status="held", issues=["Review inputs or policy changed; rerun this chapter"])
-        save(state_file, states)
-        reused = sum(s.get("origin") == "prior_ai_review" for s in states.values() if s.get("status") == "model_reviewed")
-        for row in seeds:
-            ledger.require(all(t["status"] == "model_reviewed" for t in row["tokens"]), "Seed must retain the AI-review policy")
-            if int(row["verse"].split(":")[0]) in selected or row["verse"] in {r["verse"] for r in accepted}:
-                continue
-            if ledger.compile_verse(row, manifest["verses"][row["verse"]], ai_reviewed=True):
-                accepted.append(row)
-                reused += 1
-        pending = work / "candidate-ledger.jsonl"
-        pending.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in accepted))
-        artifact, coverage = ledger.compile_ledger(pending, manifest, allow_partial=True, ai_reviewed=True)
+        accepted, coverage, reused, artifact = write_candidate()
         candidate_path = work / "candidate-alignments.tsv"
-        candidate_path.write_text(artifact)
         audit_dir = work / "playback"
         command = ["python3", str(Path(__file__).with_name("audit_english_phrase_pacing.py")), str(printed_corpus),
                    str(args.timings_cache), "--output-dir", str(audit_dir), "--alignments", str(candidate_path)]
