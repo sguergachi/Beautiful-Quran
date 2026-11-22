@@ -64,6 +64,8 @@ export interface Settings {
    * Off hides them; stored writing is never deleted.
    */
   annotationsEnabled: boolean
+  /** Paper page-turn and cover-open sound effects, on until the reader turns them off. */
+  soundEffectsEnabled: boolean
   themeMode: ThemeMode
   ayahSelectorSide: AyahSelectorSide
   /** Continue Listening — last verse actually recited (not mere open/scroll).
@@ -112,6 +114,7 @@ const DEFAULTS: Settings = {
   showTranslation: false,
   englishLeafText: 'translation',
   annotationsEnabled: true,
+  soundEffectsEnabled: true,
   themeMode: 'system',
   ayahSelectorSide: 'left',
   lastSurah: 0,
@@ -198,6 +201,7 @@ export function normalizeSettings(partial: Partial<Settings> = {}): Settings {
     developerMode,
     englishLeafText: partial.englishLeafText === 'gloss' ? 'gloss' : 'translation',
     annotationsEnabled: Boolean(partial.annotationsEnabled ?? DEFAULTS.annotationsEnabled),
+    soundEffectsEnabled: partial.soundEffectsEnabled !== false,
     // A developer toggle. The web used to default it on and saved that for
     // every reader, so a stored `true` only counts while developer mode is on.
     educationGuidesEnabled:

@@ -18,7 +18,12 @@ import { EntranceCover } from './entrance/EntranceCover'
 import { OrnamentsLab } from './lab/OrnamentsLab'
 import { bookmarkSwipeDestination, closesBook, spreadLayers, useBookSpread } from './paper/bookSpread'
 import { BookSpread } from './paper/BookSpread'
-import { PAGE_TURN_SCHEDULE, playFlip, unlockPageTurnSounds } from './paper/pageTurnSounds'
+import {
+  PAGE_TURN_SCHEDULE,
+  playFlip,
+  setSoundEffectsEnabled,
+  unlockPageTurnSounds,
+} from './paper/pageTurnSounds'
 import { useSheetFocus } from './paper/sheetFocus'
 import { useVerseRoute } from './useVerseRoute'
 import { STACK_SWIPE_AXIS_BIAS, stackDragPosition, stackDragRange, stackSwipeDestination } from './paper/stackSwipe'
@@ -163,6 +168,11 @@ export function App() {
       window.removeEventListener('keydown', unlockPageTurnSounds, true)
     }
   }, [])
+
+  // The Customize switch is live: every paper flip reads this gate at play time.
+  useEffect(() => {
+    setSoundEffectsEnabled(state.settings.soundEffectsEnabled)
+  }, [state.settings.soundEffectsEnabled])
 
   // A phone's sheets are paper: every turn of the stack sounds the
   // three-part flip (Android PageTurnSounds, fed the stack position). The

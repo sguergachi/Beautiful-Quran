@@ -316,6 +316,18 @@ export function CustomizeScreen({
               <p className="settings-caption">A single page gives the text more room on a portrait tablet.</p>
             </section>
           ) : null}
+
+          <section className="settings-section">
+            <h2>Sound</h2>
+            <PaperSwitch
+              id="setting-sound-effects"
+              label="Sound effects"
+              checked={settings.soundEffectsEnabled}
+              checkParams={checkParams}
+              paintToken={checkPaintToken}
+              onChange={(checked) => appStore.updateSettings({ soundEffectsEnabled: checked })}
+            />
+          </section>
       </div>
     </div>
   )
