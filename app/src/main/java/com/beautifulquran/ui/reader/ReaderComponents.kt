@@ -1604,6 +1604,8 @@ private fun HighlightLayeredText(
     style: TextStyle,
     modifier: Modifier = Modifier,
     searchHitWash: RepeatWash? = null,
+    /** In-surah search mark: the whole word held in this ink while it is open. */
+    searchMark: Color? = null,
     recessedForSearch: Boolean = false,
     searchBackgroundAlpha: () -> Float = { 1f },
     paperNode: PaperInkNode = rememberPaperInkNode(),
@@ -1690,6 +1692,9 @@ private fun HighlightLayeredText(
                     alpha = 1f - searchBackgroundAlpha(),
                 )
             }
+        }
+        if (searchMark != null) {
+            InkOverlayText(text = text, style = style, color = searchMark, modifier = Modifier)
         }
         if (searchHitActive) {
             InkOverlayText(
@@ -1788,6 +1793,8 @@ private fun WordUnit(
                 )
             },
             searchHitWash = searchHitWash,
+            // The same gold as the gloss below it, so the match reads in both.
+            searchMark = if (searchHit) LocalQuranAccents.current.gold else null,
             recessedForSearch = recessedForSearch,
             searchBackgroundAlpha = searchBackgroundAlpha,
             paperNode = paperNode,
@@ -2095,6 +2102,9 @@ internal fun buildShapedBlooms(
     recessCover: () -> Float,
     flashWordPositions: Set<Int>,
     searchHitWash: RepeatWash,
+    /** Words the in-surah search marks: held in [searchMarkInk] while it is open. */
+    searchMarks: Set<Int> = emptySet(),
+    searchMarkInk: Color = Color.Unspecified,
     searchFocusPositions: Set<Int>? = null,
     searchBackgroundAlpha: () -> Float = { SearchHitFlash.BACKGROUND_ALPHA },
     /** Let a verse that was showing full ink follow [recessCover] back down
@@ -2183,6 +2193,17 @@ internal fun buildShapedBlooms(
         paperInk = paperInk,
         paperCovers = paperCovers,
     )
+    // In-surah search: each marked word is held whole in gold — the gold the
+    // English gloss and translation take for the same match — so the word
+    // searched for is marked in the Arabic as well. Under the flash, which
+    // still breathes over it when a home hit lands on a marked word.
+    if (searchMarks.isNotEmpty()) {
+        words.forEachIndexed { index, word ->
+            val range = rendered.wordRanges.getOrNull(index)
+            if (word.position !in searchMarks || range == null) return@forEachIndexed
+            blooms += ShapedWordBloom.ColorReveal(range = range, progress = 1f, color = searchMarkInk)
+        }
+    }
     // Home search-hit flash: the complete glyph-shaped orange word breathes
     // through opacity without reshaping or moving the base text.
     if (searchHitWash.alpha.value > 0f) {
@@ -2260,7 +2281,7 @@ private fun ResponsiveEnglishAyah(
     keepUnreadFloor: Boolean,
     markAlpha: () -> Float,
     fontScale: Float,
-    searchQuery: String?,
+    searchMarks: Set<Int>,
     flashWordPositions: Set<Int>,
     searchHitWash: RepeatWash,
     searchFocusPositions: Set<Int>? = null,
@@ -2299,8 +2320,9 @@ private fun ResponsiveEnglishAyah(
             arabicWords = ayah.words.map { it.arabic },
         )
     }
-    val visibleFlashWordPositions = remember(ayah, flashWordPositions) {
-        flashWordPositions.mapNotNullTo(linkedSetOf()) { position ->
+    // A gloss folded into its neighbour's lyric line is shown by that owner.
+    fun visible(positions: Set<Int>): Set<Int> =
+        positions.mapNotNullTo(linkedSetOf()) { position ->
             val requestedIndex = ayah.words.indexOfFirst { it.position == position }
             EnglishTypography.coalescedGlossOwnerIndex(
                 glosses = ayah.words.map { it.translation },
@@ -2308,13 +2330,14 @@ private fun ResponsiveEnglishAyah(
                 requestedIndex = requestedIndex,
             )?.let { ayah.words[it].position }
         }
-    }
+    val visibleFlashWordPositions = remember(ayah, flashWordPositions) { visible(flashWordPositions) }
+    val visibleSearchMarks = remember(ayah, searchMarks) { visible(searchMarks) }
 
     val rendered = remember(
         ayah,
         palette.fullInkColor,
         gold,
-        searchQuery,
+        visibleSearchMarks,
         fontScale,
         lyricGlosses,
         useArabicIndicDigits,
@@ -2333,10 +2356,7 @@ private fun ResponsiveEnglishAyah(
                 val start = length
                 withStyle(
                     SpanStyle(
-                        color = if (
-                            searchQuery != null &&
-                            EnglishTypography.fold(word.translation).contains(searchQuery, ignoreCase = true)
-                        ) {
+                        color = if (word.position in visibleSearchMarks) {
                             gold
                         } else {
                             palette.fullInkColor
@@ -2556,6 +2576,8 @@ private fun ResponsiveHafsAyah(
     /** 0..1 opacity for the trailing ﴿N﴾ mark — fades to full when focused. */
     markAlpha: () -> Float,
     fontSize: TextUnit,
+    /** Words the in-surah search marks, held in gold ([InSurahSearch]). */
+    searchMarks: Set<Int> = emptySet(),
     flashWordPositions: Set<Int> = emptySet(),
     searchHitWash: RepeatWash,
     searchFocusPositions: Set<Int>? = null,
@@ -2662,6 +2684,8 @@ private fun ResponsiveHafsAyah(
                         glintInk = glintInk,
                         markAlpha = markAlpha,
                         recessCover = { recessCover.value },
+                        searchMarks = searchMarks,
+                        searchMarkInk = ayahMarkInk,
                         flashWordPositions = flashWordPositions,
                         searchHitWash = searchHitWash,
                         searchFocusPositions = searchFocusPositions,
@@ -3184,6 +3208,8 @@ fun AyahBlock(
     showTranslation: Boolean,
     verseNumberScript: VerseNumberScript = VerseNumberScript.ARABIC,
     searchQuery: String? = null,
+    /** Word positions the in-surah search marks in this verse ([InSurahSearch]). */
+    searchMarks: Set<Int> = emptySet(),
     /** 1-based word to orange-flash (home search hit); null = no flash. */
     flashWordPosition: Int? = null,
     /** All word positions that flash together for a multi-term result. */
@@ -3254,8 +3280,7 @@ fun AyahBlock(
         flashWordPositions + listOfNotNull(flashWordPosition?.takeIf { it > 0 })
     }
     val searchTargetAyah = flashWordPosition != null
-    fun hits(word: Word) =
-        searchQuery != null && EnglishTypography.fold(word.translation).contains(searchQuery, ignoreCase = true)
+    fun hits(word: Word) = word.position in searchMarks
     // Non-active ayahs recede while another is being recited. Dim is applied
     // at the word level (Upcoming ink / paper cover) in every mode so ayah
     // handoff does not brighten the verse — block alpha stays at 1 except
@@ -3477,7 +3502,7 @@ fun AyahBlock(
                     keepUnreadFloor = hasOwnedInk,
                     markAlpha = { ayahMarkAlpha.value },
                     fontScale = fontScale,
-                    searchQuery = searchQuery,
+                    searchMarks = searchMarks,
                     flashWordPositions = searchTargets,
                     searchHitWash = searchHitWash,
                     searchFocusPositions = searchTargets.takeIf { searchTargetAyah },
@@ -3569,6 +3594,7 @@ fun AyahBlock(
                         keepUnreadFloor = hasOwnedInk,
                         markAlpha = { ayahMarkAlpha.value },
                         fontSize = ArabicWordStyle.fontSize * fontScale * ARABIC_ONLY_HAFS_FONT_MULTIPLIER,
+                        searchMarks = searchMarks,
                         flashWordPositions = searchTargets,
                         searchHitWash = searchHitWash,
                         searchFocusPositions = searchTargets.takeIf { searchTargetAyah },

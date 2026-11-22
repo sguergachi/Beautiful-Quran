@@ -1,6 +1,5 @@
 package com.beautifulquran.ui.reader
 
-import com.beautifulquran.domain.EnglishTypography
 import android.app.Activity
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
@@ -701,18 +700,26 @@ fun ReaderScreen(
         mutableStateOf<Surah?>(null)
     }
 
-    // In-surah English search: matches are ayahs whose translation or any
-    // word gloss contains the query.
+    // In-surah search: matches are ayahs whose translation contains the query,
+    // or whose words it marks (English glosses, or the Arabic for an Arabic
+    // query). The marked words are marked on the page in every view.
     val search = rememberSurahSearchState()
     val activeQuery = search.activeQuery
-    val searchMatches = remember(uiState.content, activeQuery) {
+    val searchMarks = remember(uiState.content, activeQuery) {
+        val content = uiState.content
+        if (activeQuery == null || content == null) {
+            emptyMap()
+        } else {
+            content.ayahs.associate { it.number to InSurahSearch.markedWords(it, activeQuery) }
+        }
+    }
+    val searchMatches = remember(uiState.content, searchMarks) {
         val content = uiState.content
         if (activeQuery == null || content == null) {
             emptyList()
         } else {
             content.ayahs.filter { a ->
-                EnglishTypography.fold(a.translation).contains(activeQuery, ignoreCase = true) ||
-                    a.words.any { EnglishTypography.fold(it.translation).contains(activeQuery, ignoreCase = true) }
+                InSurahSearch.matches(a, activeQuery, searchMarks[a.number].orEmpty())
             }.map { it.number }
         }
     }
@@ -3361,6 +3368,7 @@ fun ReaderScreen(
                                 showTranslation = settings.showTranslation,
                                 verseNumberScript = settings.verseNumberScript,
                                 searchQuery = activeQuery,
+                                searchMarks = searchMarks[ayah.number].orEmpty(),
                                 flashWordPosition = searchFlashWord
                                     ?.takeIf { searchFlashAyah == ayah.number },
                                 flashWordPositions = searchFlashWords
