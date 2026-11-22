@@ -160,6 +160,13 @@ class ChapterReviewTest(unittest.TestCase):
             self.assertNotIn("entry", receipt["sources"]["fetch_quran"])
             self.assertNotIn("morphology", receipt)
 
+    def test_only_a_hold_that_never_reached_a_verdict_is_retried(self):
+        self.assertTrue(runner.retryable_hold({"issues": ["HTTP Error 404: Not Found"]}))
+        self.assertTrue(runner.retryable_hold({"issues": ["Morphology positions differ"]}))
+        self.assertTrue(runner.retryable_hold({"issues": ["anything"], "provider_unavailable": True}))
+        self.assertFalse(runner.retryable_hold({"issues": ["Token 75, “which,” is anchored at slot 32"]}))
+        self.assertFalse(runner.retryable_hold({"issues": []}))
+
     def test_evidence_is_fetched_once_per_pending_verse_and_never_for_banked_work(self):
         states = {"1:1": {"origin": "prior_ai_review", "status": "model_reviewed"},
                   "1:2": {"status": "model_reviewed"},

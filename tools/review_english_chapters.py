@@ -217,6 +217,19 @@ def stored_evidence(work, row):
     return receipt if bound else None
 
 
+TECHNICAL_HOLD = re.compile(r"^(HTTP Error|quran\.ai|Wrong|Unexpected|Missing|Invalid|Cached|Morphology|Fetched)")
+
+
+def retryable_hold(state):
+    """A hold that never reached a verdict: a failed fetch or a rejected evidence package.
+
+    A critique's refusal is a decision, not a fault. Re-running it is another roll of
+    the same dice, so it stays held until someone chooses to re-open it.
+    """
+    issues = state.get("issues") or [""]
+    return bool(state.get("retryable") or state.get("provider_unavailable") or TECHNICAL_HOLD.match(issues[0]))
+
+
 def evidence_plan(queue, states, limit=None):
     """Verses that still need a canonical fetch: not seeds, not reviewed, within the run's budget."""
     pending = [key for key in queue if states.get(key, {}).get("origin") != "prior_ai_review"
@@ -555,7 +568,8 @@ def main():
     parser.add_argument("--seed-ledger", type=Path, default=ledger.REPO / "data/english_ai_alignment_ledger.jsonl",
                         help="Retain previously AI-reviewed verses, bound and playback-tested again")
     parser.add_argument("--refresh-reviewed", action="store_true", help="Re-annotate selected prior AI verses instead of reusing them")
-    parser.add_argument("--retry-held", action="store_true")
+    parser.add_argument("--retry-held", action="store_true",
+                        help="Retry holds that never reached a verdict (fetch or evidence failure); verdict holds stay")
     parser.add_argument("--max-verses", type=int, default=25,
                         help="New/retried verse budget (default 25); cached reviews do not consume it")
     parser.add_argument("--reasoning", default="high",
@@ -700,6 +714,10 @@ def main():
                         # Already reviewed (possibly by a different model); preserve it.
                         checkpoint(key, states[key])
                         continue
+                    if states.get(key, {}).get("status") == "held" and args.retry_held \
+                            and not retryable_hold(states[key]):
+                        checkpoint(key, states[key])
+                        continue
                     try:
                         usage_wait.wait()
                         evidence = evidence_for(key).result()
@@ -714,7 +732,7 @@ def main():
                 directory = batch_directory(work, items, args.model)
                 state_path = state_path_of(items, signature, directory, args.model, args.reasoning)
                 if any(states.get(item["row"]["verse"], {}).get("provider_unavailable")
-                       or (args.retry_held and states.get(item["row"]["verse"], {}).get("status") == "held")
+                       or (args.retry_held and retryable_hold(states.get(item["row"]["verse"], {})))
                        for item in items) and state_path.exists():
                     import time
                     suffix = f".held-{time.time_ns()}"
