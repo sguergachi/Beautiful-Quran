@@ -253,7 +253,13 @@ fun BookmarksScreen(
                                     uiState.annotations["${bookmark.surah.id}:${bookmark.ayahNumber}"],
                                 )
                             },
-                            onAnnotationChange = { annotationDraft = it },
+                            // Guarded like the commit: a note losing focus after
+                            // another opened hands over its stale final text.
+                            onAnnotationChange = {
+                                if (editingSurah == key.surahId && editingAyah == key.ayahNumber) {
+                                    annotationDraft = it
+                                }
+                            },
                             onAnnotationEditDone = {
                                 if (editingSurah == key.surahId && editingAyah == key.ayahNumber) {
                                     commitAnnotation()

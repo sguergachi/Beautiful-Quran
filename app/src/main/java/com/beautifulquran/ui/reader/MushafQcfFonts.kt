@@ -40,8 +40,12 @@ internal object MushafQcfFonts {
     ) {
         override fun removeEldestEntry(
             eldest: MutableMap.MutableEntry<Int, MushafQcfFace>,
-        ): Boolean =
-            size > MAX_RESIDENT
+        ): Boolean {
+            if (size <= MAX_RESIDENT) return false
+            // Its laid-out cells hold the same native font; let them go with it.
+            MushafWordLayouts.forget(eldest.value.family)
+            return true
+        }
     }
 
     @Synchronized

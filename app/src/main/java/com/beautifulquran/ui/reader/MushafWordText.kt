@@ -69,6 +69,17 @@ internal object MushafWordLayouts {
     @Synchronized
     private fun cached(key: Key): TextLayoutResult? = entries[key]
 
+    /**
+     * Drops every cell set in [family]. [MushafQcfFonts] calls it when a page
+     * face leaves its resident window: the cells' styles and paragraphs hold
+     * that face's native font, and a rebuilt face is a new family that would
+     * never hit them again, so keeping them only pinned the font past the window.
+     */
+    @Synchronized
+    fun forget(family: FontFamily) {
+        entries.keys.removeAll { it.style.fontFamily == family }
+    }
+
     @Synchronized
     private fun store(key: Key, result: TextLayoutResult): TextLayoutResult =
         entries.getOrPut(key) { result }

@@ -713,7 +713,7 @@ fun ReaderScreen(
             content.ayahs.associate { it.number to InSurahSearch.markedWords(it, activeQuery) }
         }
     }
-    val searchMatches = remember(uiState.content, searchMarks) {
+    val searchMatches = remember(uiState.content, activeQuery, searchMarks) {
         val content = uiState.content
         if (activeQuery == null || content == null) {
             emptyList()
@@ -1839,7 +1839,7 @@ fun ReaderScreen(
                                 Box(contentAlignment = Alignment.CenterStart) {
                                     if (search.queryField.text.isEmpty()) {
                                         Text(
-                                            text = "Find an English word…",
+                                            text = "Find a word…",
                                             style = MaterialTheme.typography.bodyLarge,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 .copy(alpha = 0.5f),
@@ -3539,11 +3539,15 @@ fun ReaderScreen(
                                     bookmarked &&
                                     settings.annotationsEnabled &&
                                     editingAnnotationAyah == ayah.number,
-                                onAnnotationChange = { editingAnnotationText = it },
-                                // Guarded by identity: switching verses makes the
-                                // old field lose focus *after* the new one opened,
-                                // and that stale callback must not close the new
-                                // editor or write the new draft to the old verse.
+                                // Both guarded by identity: switching verses makes
+                                // the old field lose focus *after* the new one
+                                // opened, and its stale callbacks — the final-text
+                                // handover, then the commit — must not write the
+                                // old note into the new draft or close the new
+                                // editor.
+                                onAnnotationChange = {
+                                    if (editingAnnotationAyah == ayah.number) editingAnnotationText = it
+                                },
                                 onAnnotationEditDone = {
                                     if (editingAnnotationAyah == ayah.number) commitOpenAnnotation()
                                 },

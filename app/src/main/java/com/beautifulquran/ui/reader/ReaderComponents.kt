@@ -1604,8 +1604,6 @@ private fun HighlightLayeredText(
     style: TextStyle,
     modifier: Modifier = Modifier,
     searchHitWash: RepeatWash? = null,
-    /** In-surah search mark: the whole word held in this ink while it is open. */
-    searchMark: Color? = null,
     recessedForSearch: Boolean = false,
     searchBackgroundAlpha: () -> Float = { 1f },
     paperNode: PaperInkNode = rememberPaperInkNode(),
@@ -1692,9 +1690,6 @@ private fun HighlightLayeredText(
                     alpha = 1f - searchBackgroundAlpha(),
                 )
             }
-        }
-        if (searchMark != null) {
-            InkOverlayText(text = text, style = style, color = searchMark, modifier = Modifier)
         }
         if (searchHitActive) {
             InkOverlayText(
@@ -1785,7 +1780,9 @@ private fun WordUnit(
             text = word.arabic,
             motion = motion,
             rtl = true,
-            color = MaterialTheme.colorScheme.onBackground,
+            // A word the in-surah search marks is inked in the gloss's gold, so
+            // the match reads in both, and the karaoke layers play over it.
+            color = if (searchHit) LocalQuranAccents.current.gold else MaterialTheme.colorScheme.onBackground,
             style = LocalScrollArabicType.current.let { face ->
                 ArabicWordStyle.copy(
                     fontFamily = face.fontFamily,
@@ -1793,8 +1790,6 @@ private fun WordUnit(
                 )
             },
             searchHitWash = searchHitWash,
-            // The same gold as the gloss below it, so the match reads in both.
-            searchMark = if (searchHit) LocalQuranAccents.current.gold else null,
             recessedForSearch = recessedForSearch,
             searchBackgroundAlpha = searchBackgroundAlpha,
             paperNode = paperNode,
@@ -2102,9 +2097,6 @@ internal fun buildShapedBlooms(
     recessCover: () -> Float,
     flashWordPositions: Set<Int>,
     searchHitWash: RepeatWash,
-    /** Words the in-surah search marks: held in [searchMarkInk] while it is open. */
-    searchMarks: Set<Int> = emptySet(),
-    searchMarkInk: Color = Color.Unspecified,
     searchFocusPositions: Set<Int>? = null,
     searchBackgroundAlpha: () -> Float = { SearchHitFlash.BACKGROUND_ALPHA },
     /** Let a verse that was showing full ink follow [recessCover] back down
@@ -2193,17 +2185,6 @@ internal fun buildShapedBlooms(
         paperInk = paperInk,
         paperCovers = paperCovers,
     )
-    // In-surah search: each marked word is held whole in gold — the gold the
-    // English gloss and translation take for the same match — so the word
-    // searched for is marked in the Arabic as well. Under the flash, which
-    // still breathes over it when a home hit lands on a marked word.
-    if (searchMarks.isNotEmpty()) {
-        words.forEachIndexed { index, word ->
-            val range = rendered.wordRanges.getOrNull(index)
-            if (word.position !in searchMarks || range == null) return@forEachIndexed
-            blooms += ShapedWordBloom.ColorReveal(range = range, progress = 1f, color = searchMarkInk)
-        }
-    }
     // Home search-hit flash: the complete glyph-shaped orange word breathes
     // through opacity without reshaping or moving the base text.
     if (searchHitWash.alpha.value > 0f) {
@@ -2576,7 +2557,7 @@ private fun ResponsiveHafsAyah(
     /** 0..1 opacity for the trailing ﴿N﴾ mark — fades to full when focused. */
     markAlpha: () -> Float,
     fontSize: TextUnit,
-    /** Words the in-surah search marks, held in gold ([InSurahSearch]). */
+    /** Words the in-surah search marks: gold full ink ([InSurahSearch]). */
     searchMarks: Set<Int> = emptySet(),
     flashWordPositions: Set<Int> = emptySet(),
     searchHitWash: RepeatWash,
@@ -2619,11 +2600,14 @@ private fun ResponsiveHafsAyah(
 
     // Full-ink spans only — never bake upcoming/active into the annotated
     // string. Dim, bloom, and orange are draw-phase overlays, so word and
-    // ayah boundaries do not reshape or flash the run.
+    // ayah boundaries do not reshape or flash the run. A word the in-surah
+    // search marks takes gold as its full ink, as the English line does, so
+    // the karaoke wash and the covers still play over it unchanged.
     val rendered = remember(
         ayah,
         palette.fullInkColor,
         ayahMarkInk,
+        searchMarks,
         fontSize,
         useArabicIndicDigits,
         translationFontFamily,
@@ -2636,7 +2620,8 @@ private fun ResponsiveHafsAyah(
                 // One contiguous colour span per word keeps Uthmanic Hafs
                 // joining/ligatures intact. Per-glyph spans split shaping runs
                 // and caused a visible font flip (#133).
-                withStyle(SpanStyle(color = palette.fullInkColor)) {
+                val ink = if (word.position in searchMarks) ayahMarkInk else palette.fullInkColor
+                withStyle(SpanStyle(color = ink)) {
                     append(word.arabic)
                 }
                 ranges += start until length
@@ -2684,8 +2669,6 @@ private fun ResponsiveHafsAyah(
                         glintInk = glintInk,
                         markAlpha = markAlpha,
                         recessCover = { recessCover.value },
-                        searchMarks = searchMarks,
-                        searchMarkInk = ayahMarkInk,
                         flashWordPositions = flashWordPositions,
                         searchHitWash = searchHitWash,
                         searchFocusPositions = searchFocusPositions,
