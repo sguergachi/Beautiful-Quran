@@ -703,22 +703,44 @@ private fun mushafLineJoins(
 }
 
 /**
- * The narrowest [line] can be set at [fontPx]: its letters narrowed to
- * [MUSHAF_MIN_LINE_SCALE] and every join at its fit floor — the width below
- * which [mushafInkLineFit] gives up and the line runs past its measure. Null
- * until the page face has loaded, when there are no joins to measure.
+ * How wide [line] comes to, px at [fontPx], set exactly as a full line of
+ * the book is: its white levelled to [MUSHAF_MAX_WHITE_LEVEL_EM] and its
+ * letters widened to [MUSHAF_MAX_LINE_SCALE] — where [mushafInkLineFit]
+ * leaves the reflowed rows of an ordinary leaf. Given that width as its
+ * measure, the line is set in the same hand and the same word spacing as
+ * every other page.
+ *
+ * The two opening leaves set their lines to it, so their medallion is drawn
+ * by the words themselves rather than by widths the words are forced into: an
+ * earlier measure, the print's own extent from the page face's advances,
+ * came in under the fit's floor for the joins, and the fit narrowed the
+ * letters to ~0.9 — the opening leaves read a size smaller than the book.
+ * A line the fit does not justify (one word, or joins that do not line up
+ * with its cells) is measured the way it is set instead. Null until the page
+ * face has loaded.
  */
-internal fun mushafLineMinWidthPx(
+internal fun mushafLineSetWidthPx(
     line: MushafLine,
     typeface: android.graphics.Typeface?,
     fontPx: Float,
 ): Float? {
     if (typeface == null || fontPx <= 0f) return null
     val texts = mushafLineTexts(line)
-    val ink = mushafLineCells(texts.map { it.text }, typeface, fontPx, condense = 1f)
-        .sumOf { it.inkWidth.toDouble() }.toFloat()
-    val tight = mushafLineJoins(texts, typeface).sumOf { it.fitFloorEm.toDouble() }.toFloat() * fontPx
-    return ink * MUSHAF_MIN_LINE_SCALE + tight
+    val cells = mushafLineCells(texts.map { it.text }, typeface, fontPx, condense = 1f)
+    if (cells.isEmpty()) return null
+    val joins = mushafLineJoins(texts, typeface)
+    if (!mushafLineJustifies(line.tokens.size) || joins.isEmpty() || joins.size != cells.size - 1) {
+        // Set as [lineGeometry] sets such a line: the face's own advances,
+        // a word gap between cells, unnarrowed.
+        return cells.sumOf { it.advance.toDouble() }.toFloat() +
+            MUSHAF_WORD_GAP_EM * fontPx * (cells.size - 1)
+    }
+    val ink = cells.sumOf { it.inkWidth.toDouble() }.toFloat() / fontPx
+    var opened = 0f
+    for (join in joins) {
+        opened += maxOf(join.whiteAt(MUSHAF_MAX_WHITE_LEVEL_EM) - join.paper, join.floorEm)
+    }
+    return (ink + opened) * MUSHAF_MAX_LINE_SCALE * fontPx
 }
 
 /** Rasterizes a leaf's ink joins before that leaf reaches composition. */

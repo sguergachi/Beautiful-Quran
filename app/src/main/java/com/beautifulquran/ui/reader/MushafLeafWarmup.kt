@@ -65,7 +65,9 @@ internal object MushafLeafWarmup {
         val face = MushafQcfFonts.face(context, page.page) ?: return
         warmMushafInkProfiles(page, face.typeface)
         val setting = setting ?: return
-        // The opening leaves are set in a circle, each row to its own chord.
+        // The opening leaves size each row from its own set width in
+        // MushafPageSheet (mushafLineSetWidthPx), a measure this does not
+        // predict.
         if (mushafIsOpeningLeaf(page.page)) return
         val display = mushafDisplayPage(page, face.typeface)
         val fontPx = mushafLeafFontPx(page, setting.fitWidthPx, setting.unitPx)
