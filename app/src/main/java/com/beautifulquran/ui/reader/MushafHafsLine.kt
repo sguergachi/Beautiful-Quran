@@ -349,20 +349,40 @@ private fun MushafQcfPageLine(
         val ti = cellToken.getOrElse(best) { -1 }
         return line.tokens.getOrNull(ti)
     }
+    val tappable = modifier
+        .fillMaxWidth()
+        .pointerInput(line, cells, onWordClick, onWordLongClick, onAyahClick) {
+            detectTapGestures(
+                onTap = { pos ->
+                    val token = tokenAt(pos.x)
+                    if (token != null) onWordClick(token) else onAyahClick(line.tokens.first())
+                },
+                onLongPress = { pos ->
+                    tokenAt(pos.x)?.let(onWordLongClick)
+                },
+            )
+        }
+    // A line with no ink to animate is one node: see [mushafStaticQcfLine].
+    // A cell big enough to be drawn as a path keeps the word nodes, since it
+    // has to be drawn live over the leaf's picture (see mushafCellDrawnAsPath).
+    val inkAtRest by remember(line, packs) { derivedStateOf { mushafLineInkAtRest(line, packs) } }
+    val oneNode = (!liveInk || inkAtRest) && cells.size == texts.size && cells.none(::mushafCellDrawnAsPath)
+    if (oneNode) {
+        val onPlaced = remember(placedOrigins) { { origins: FloatArray -> placedOrigins[0] = origins } }
+        Spacer(
+            tappable.mushafStaticQcfLine(
+                texts = texts,
+                wordStyle = wordStyle,
+                markStyle = markStyle,
+                geometry = geometry,
+                emPx = emPx,
+                onPlaced = onPlaced,
+            ),
+        )
+        return
+    }
     Layout(
-        modifier = modifier
-            .fillMaxWidth()
-            .pointerInput(line, cells, onWordClick, onWordLongClick, onAyahClick) {
-                detectTapGestures(
-                    onTap = { pos ->
-                        val token = tokenAt(pos.x)
-                        if (token != null) onWordClick(token) else onAyahClick(line.tokens.first())
-                    },
-                    onLongPress = { pos ->
-                        tokenAt(pos.x)?.let(onWordLongClick)
-                    },
-                )
-            },
+        modifier = tappable,
         content = {
             var cell = 0
             line.tokens.forEach { token ->
@@ -424,6 +444,25 @@ private fun MushafQcfPageLine(
             }
         }
     }
+}
+
+/**
+ * Whether every verse on [line] is inked exactly as a leaf without live ink
+ * inks it: no wash running, no recess, and its circled mark at full strength.
+ * That is every verse of a leaf at rest with no voice on it, and every verse
+ * the voice has finished with once its mark has come up. [MushafQcfWord] draws
+ * nothing then but the word, so the line can be drawn by one node, and goes
+ * back to its word nodes the frame a verse on it takes ink again.
+ */
+internal fun mushafLineInkAtRest(
+    line: MushafLine,
+    packs: Map<Pair<Int, Int>, AyahInkPack>,
+): Boolean = line.tokens.all { token ->
+    val pack = packs[token.surahId to token.ayah]
+    pack == null || (
+        pack.motions.isEmpty() && !pack.wholeAyahRecess &&
+            (!token.endsAyah || pack.markAlpha.value >= 1f)
+        )
 }
 
 internal fun mushafAyahMarkInkAlpha(liveInk: Boolean, markAlpha: Float?): Float =

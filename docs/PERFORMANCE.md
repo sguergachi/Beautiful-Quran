@@ -656,6 +656,17 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   layouts (`MushafWordLayouts`) — under the keys the composition uses, from
   the setting the last composed leaf published (`MushafLeafSetting`). A miss
   only means the composition measures as it always did.
+- A line with no ink to animate is one node (`mushafStaticQcfLine`), not a
+  node per word and mark. A word only needs a node of its own for the
+  layers live ink puts on it; a static leaf has none, and neither has a line
+  whose verses are at rest (`mushafLineInkAtRest`: no wash, no recess, its
+  mark at full strength — every line of a resting leaf with no voice on
+  it). The one node lays its cells out through the same cache, places them
+  at the same rounded origins and draws them in the same order, so its pixels
+  are the word nodes' (identical on pages 1–6 at two sizes; sabotaging it
+  shows at once). A line goes back to its word nodes the frame a verse on it
+  takes ink, and only that line; a cell drawn as a path keeps the word nodes
+  so it can be drawn live over the picture.
 - "Resting" is its own state (`restPage`), two still frames after the scroll
   ends. `settledPage` moves on the frame a finger lifts, between the drag's
   scroll and the fling's, while the leaf has half the screen to go: every leaf
@@ -731,6 +742,19 @@ render thread 17 over, 95th percentile 5.9 ms — of those, one per run is the
 landing leaf going live at rest (50–65 ms of glyph uploads, nothing moving)
 and one per run a first-draw shader compile. At reading pace the turn frames
 stay as before (UI max 4.6 ms; render thread 4 of ~1,240 over, max 11.4 ms).
+
+2026-11-23, one node per still line, same emulator and method, three runs
+each. Quick flips: UI thread 2 of 926 frames over 8.3 ms (95th/99th
+percentile 3.3/7.4 ms) → 0 of 1,309 (1.9/5.3 ms, max 8.2). Reading pace:
+UI thread 7 over in 963 frames (max 10.3 ms) → 2 in 1,819 (max 9.9). Only
+static leaves on one node had made it worse (10 in 1,693, max 12.0): a
+landing leaf rebuilding every word node raised the landing frame's
+composition from 2 to 5 ms, so resting lines keep the one node too.
+Recitation start (Al-Baqarah, 12 s from Play), when a leaf's lines go back
+to word nodes as its verses dim, against live leaves kept on word nodes: UI
+frames over 8.3 ms 4–5 → 3–5 per run (one noisy run of the before: 59),
+worst frame 34 → 26 ms. Render-thread frames are unchanged, and heavy during
+recitation either way on this emulator.
 
 ### 6. R8 release builds are what ships
 
@@ -933,12 +957,14 @@ Until a physical trace shows a stall, leave the wash and startup order alone.
   parent.
 - Neighbour leaf composition (turns fixed 2026-11-22: leaves joining the
   window mid-turn stay blank until rest, see 5b). Bringing a leaf into the
-  pager's window still composes ~150 word nodes in one frame (16–44 ms of composition on the
+  pager's window composed ~150 word nodes in one frame (16–44 ms of composition on the
   emulator, on top of first-visit measure). Splitting it with pausable
   composition needs a pager prefetch hook that `HorizontalPager` does not
-  expose. Drawing a line's static words from one node would cut the node
-  count. However, it would rebuild every word node when ink packs arrive at
-  playback start, which is an animated moment.
+  expose. Lines without moving ink are one node now (see 5b), which cut it;
+  the line's cells are still one cached `TextLayoutResult` each, and drawing
+  their glyphs straight from a `Paint` would save the warm-up's paragraph
+  layouts (~17 ms a leaf, off the UI thread) but would have to be proved
+  pixel-identical first.
 - The surah band's ground is two `generatedFieldWeave` layers, the second a
   mirror of the first. A new chapter opening tessellates both
   (`AAHairlineOp`, 1–7 ms each, ~19 ms of an 80 ms dial-landing frame).
