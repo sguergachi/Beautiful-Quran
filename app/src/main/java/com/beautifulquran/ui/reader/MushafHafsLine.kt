@@ -650,7 +650,9 @@ private fun mushafLineJoins(
  * earlier measure, the print's own extent from the page face's advances,
  * came in under the fit's floor for the joins, and the fit narrowed the
  * letters to ~0.9 — the opening leaves read a size smaller than the book.
- * Null until the page face has loaded, when there are no joins to measure.
+ * A line the fit does not justify (one word, or joins that do not line up
+ * with its cells) is measured the way it is set instead. Null until the page
+ * face has loaded.
  */
 internal fun mushafLineSetWidthPx(
     line: MushafLine,
@@ -660,8 +662,14 @@ internal fun mushafLineSetWidthPx(
     if (typeface == null || fontPx <= 0f) return null
     val texts = mushafLineTexts(line)
     val cells = mushafLineCells(texts.map { it.text }, typeface, fontPx, condense = 1f)
+    if (cells.isEmpty()) return null
     val joins = mushafLineJoins(texts, typeface)
-    if (cells.isEmpty() || joins.size != cells.size - 1) return null
+    if (!mushafLineJustifies(line.tokens.size) || joins.isEmpty() || joins.size != cells.size - 1) {
+        // Set as [lineGeometry] sets such a line: the face's own advances,
+        // a word gap between cells, unnarrowed.
+        return cells.sumOf { it.advance.toDouble() }.toFloat() +
+            MUSHAF_WORD_GAP_EM * fontPx * (cells.size - 1)
+    }
     val ink = cells.sumOf { it.inkWidth.toDouble() }.toFloat() / fontPx
     var opened = 0f
     for (join in joins) {
