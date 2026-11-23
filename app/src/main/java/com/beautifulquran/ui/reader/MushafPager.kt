@@ -1783,8 +1783,8 @@ private fun MushafPageSheet(
                         .padding(horizontal = MushafEdgeGutter),
                     // Ordinary leaves start at the head, even when the last
                     // lines of a chapter leave the foot empty. The two framed
-                    // opening pages are a medallion: the block sits in the
-                    // middle of the well, the way the print centres them.
+                    // opening pages are a medallion: the circle sits in the
+                    // middle of the well, the way the print centres it.
                     verticalArrangement = if (mushafIsOpeningLeaf(page.page)) {
                         Arrangement.Center
                     } else {
@@ -1857,6 +1857,12 @@ private fun MushafPageSheet(
                                 pageFont = pageFont,
                             )
                         }
+                    }
+                    // The circle is what the eye centres, not the band above
+                    // it: the same paper again below, so the column's centring
+                    // lands on the medallion's middle row.
+                    if (medallionRowWidths != null) {
+                        Spacer(Modifier.height(furnitureSlot * displayPage.surahStarts.size))
                     }
                 }
             }
