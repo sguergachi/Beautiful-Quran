@@ -398,6 +398,19 @@
   min-height: 132px;
 }
 
+.component-kit-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.component-kit-version-label {
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-rung-muted);
+}
+
 /* ── Customize preview (Android ReadingPreview) ──────────────────────── */
 
 /* A faded leaf: reading paper, 3px corners, a 0.5px gold hairline at 28%,

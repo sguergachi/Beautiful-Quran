@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { appStore } from '../../store/appStore'
 import type { BrushCircleStyle } from '../../data/settings'
 import {
@@ -97,8 +97,9 @@ async function readClipboard(): Promise<string> {
 
 /**
  * Settings → Developer → Component kit: one of the app's own marks per page,
- * its preview held above its dials. Edits are session-only and every real
- * control on the Settings and Customize sheets follows them.
+ * its preview held above its dials. The stage shows the current default (what
+ * Reset restores) beside the version being customized. Edits are session-only
+ * and every real control on the Settings and Customize sheets follows them.
  */
 export function ComponentKitScreen({ lab, onBack }: { lab: InkLabState; onBack: () => void }) {
   const [index, setIndex] = useState(0)
@@ -153,8 +154,19 @@ export function ComponentKitScreen({ lab, onBack }: { lab: InkLabState; onBack: 
   )
 }
 
+/** One labelled copy of the mark on the stage (default or customized). */
+function KitVersion({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="component-kit-version">
+      <p className="component-kit-version-label">{label}</p>
+      {children}
+    </div>
+  )
+}
+
 function CheckLab({ lab, onNote }: { lab: InkLabState; onNote: (note: string) => void }) {
   const [checked, setChecked] = useState(true)
+  const [defaultChecked, setDefaultChecked] = useState(true)
   const [pasteText, setPasteText] = useState('')
   const pasteRef = useRef<HTMLTextAreaElement>(null)
   const { checkParams, setCheckParams, bumpCheckPaint, bumpCheckSliders } = lab
@@ -199,18 +211,33 @@ function CheckLab({ lab, onNote }: { lab: InkLabState; onNote: (note: string) =>
 
   return (
     <>
-      <div className="component-kit-stage">
-        <PaperSwitch
-          id="kit-check-preview"
-          label="Preview"
-          checked={checked}
-          checkParams={checkParams}
-          paintToken={lab.checkPaintToken}
-          onChange={(next) => {
-            setChecked(next)
-            bumpCheckPaint()
-          }}
-        />
+      <div className="component-kit-stage component-kit-compare">
+        <KitVersion label="Current default">
+          <PaperSwitch
+            id="kit-check-default"
+            label="Preview"
+            checked={defaultChecked}
+            checkParams={SHIPPED_CHECK_PARAMS}
+            paintToken={lab.checkPaintToken}
+            onChange={(next) => {
+              setDefaultChecked(next)
+              bumpCheckPaint()
+            }}
+          />
+        </KitVersion>
+        <KitVersion label="Customized">
+          <PaperSwitch
+            id="kit-check-preview"
+            label="Preview"
+            checked={checked}
+            checkParams={checkParams}
+            paintToken={lab.checkPaintToken}
+            onChange={(next) => {
+              setChecked(next)
+              bumpCheckPaint()
+            }}
+          />
+        </KitVersion>
       </div>
       <div className="settings-dev-block">
         <p className="settings-body-label">Stroke</p>
@@ -293,6 +320,7 @@ function CheckLab({ lab, onNote }: { lab: InkLabState; onNote: (note: string) =>
 
 function BrushLab({ lab, onNote }: { lab: InkLabState; onNote: (note: string) => void }) {
   const [choice, setChoice] = useState('scroll')
+  const [defaultChoice, setDefaultChoice] = useState('scroll')
   const [pasteText, setPasteText] = useState('')
   const pasteRef = useRef<HTMLTextAreaElement>(null)
   const { brushParams, setBrushParams, bumpPaint, bumpSliders, brushStyle } = lab
@@ -348,19 +376,35 @@ function BrushLab({ lab, onNote }: { lab: InkLabState; onNote: (note: string) =>
 
   return (
     <>
-      <div className="component-kit-stage">
-        <PaperSegmented
-          aria-label="Brush circle preview"
-          value={choice}
-          brushParams={brushParams}
-          paintToken={lab.paintToken}
-          options={[
-            { value: 'scroll', label: 'Scroll' },
-            { value: 'mushaf', label: 'Mushaf' },
-            { value: 'both', label: 'Both' },
-          ]}
-          onChange={setChoice}
-        />
+      <div className="component-kit-stage component-kit-compare">
+        <KitVersion label="Current default">
+          <PaperSegmented
+            aria-label="Brush circle default preview"
+            value={defaultChoice}
+            brushParams={brushCircleParams(brushStyle)}
+            paintToken={lab.paintToken}
+            options={[
+              { value: 'scroll', label: 'Scroll' },
+              { value: 'mushaf', label: 'Mushaf' },
+              { value: 'both', label: 'Both' },
+            ]}
+            onChange={setDefaultChoice}
+          />
+        </KitVersion>
+        <KitVersion label="Customized">
+          <PaperSegmented
+            aria-label="Brush circle preview"
+            value={choice}
+            brushParams={brushParams}
+            paintToken={lab.paintToken}
+            options={[
+              { value: 'scroll', label: 'Scroll' },
+              { value: 'mushaf', label: 'Mushaf' },
+              { value: 'both', label: 'Both' },
+            ]}
+            onChange={setChoice}
+          />
+        </KitVersion>
       </div>
       <div className="settings-dev-block">
         <p className="settings-body-label">Preset</p>
