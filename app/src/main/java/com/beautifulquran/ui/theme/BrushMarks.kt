@@ -91,7 +91,7 @@ fun View.paperToggleHaptic(turningOn: Boolean) {
 const val SHIPPED_BRUSH_REVISION = 9
 
 /** Bump when [BrushCheckParams] defaults change so the lab reseeds. */
-const val SHIPPED_CHECK_REVISION = 2
+const val SHIPPED_CHECK_REVISION = 3
 
 /** Dimensionless (dp-valued) knobs for one ink-brush circle style. */
 data class BrushCircleParams(
@@ -124,21 +124,21 @@ data class BrushCircleParams(
 
 /** Lab-tunable ink check. Keep in lockstep with web brushCheck.ts. */
 data class BrushCheckParams(
-    val p0x: Float = 0.1f,
+    val p0x: Float = 0.14f,
     val p0y: Float = 0.49f,
     val p1x: Float = 0.39f,
-    val p1y: Float = 0.8f,
+    val p1y: Float = 0.77f,
     val p2x: Float = 0.73f,
-    val p2y: Float = 0.11f,
-    val sizeDp: Float = 24f,
-    val peakHalfDp: Float = 1.68f,
-    val nibBias: Float = 0.56f,
-    val attack: Float = 0.184f,
+    val p2y: Float = 0.12f,
+    val sizeDp: Float = 24.7f,
+    val peakHalfDp: Float = 1.81f,
+    val nibBias: Float = 0.63f,
+    val attack: Float = 0.087f,
     val releaseStart: Float = 0.74f,
-    val bodyAmp: Float = 0.1f,
-    val bodyFreq: Float = 2.2f,
-    val paintMs: Int = 833,
-    val alpha: Float = 0.75f,
+    val bodyAmp: Float = 0f,
+    val bodyFreq: Float = 0.5f,
+    val paintMs: Int = 301,
+    val alpha: Float = 0.86f,
 )
 
 fun shippedCheckParams() = BrushCheckParams()

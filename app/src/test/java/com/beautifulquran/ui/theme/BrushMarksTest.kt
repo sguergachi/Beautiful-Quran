@@ -75,28 +75,28 @@ class BrushMarksTest {
     @Test
     fun `shipped check knobs match the web baseline bit for bit`() {
         val p = shippedCheckParams()
-        assertEquals(0.1f, p.p0x, 0f)
+        assertEquals(0.14f, p.p0x, 0f)
         assertEquals(0.49f, p.p0y, 0f)
         assertEquals(0.39f, p.p1x, 0f)
-        assertEquals(0.8f, p.p1y, 0f)
+        assertEquals(0.77f, p.p1y, 0f)
         assertEquals(0.73f, p.p2x, 0f)
-        assertEquals(0.11f, p.p2y, 0f)
-        assertEquals(24f, p.sizeDp, 0f)
-        assertEquals(1.68f, p.peakHalfDp, 0f)
-        assertEquals(0.56f, p.nibBias, 0f)
-        assertEquals(0.184f, p.attack, 0f)
+        assertEquals(0.12f, p.p2y, 0f)
+        assertEquals(24.7f, p.sizeDp, 0f)
+        assertEquals(1.81f, p.peakHalfDp, 0f)
+        assertEquals(0.63f, p.nibBias, 0f)
+        assertEquals(0.087f, p.attack, 0f)
         assertEquals(0.74f, p.releaseStart, 0f)
-        assertEquals(0.1f, p.bodyAmp, 0f)
-        assertEquals(2.2f, p.bodyFreq, 0f)
-        assertEquals(833, p.paintMs)
-        assertEquals(0.75f, p.alpha, 0f)
+        assertEquals(0f, p.bodyAmp, 0f)
+        assertEquals(0.5f, p.bodyFreq, 0f)
+        assertEquals(301, p.paintMs)
+        assertEquals(0.86f, p.alpha, 0f)
     }
 
     /** The lab reseeds off these; web pins the same numbers. */
     @Test
     fun `shipped revisions match the web`() {
         assertEquals(9, SHIPPED_BRUSH_REVISION)
-        assertEquals(2, SHIPPED_CHECK_REVISION)
+        assertEquals(3, SHIPPED_CHECK_REVISION)
     }
 
     // ---- style catalogue ----------------------------------------------------------
