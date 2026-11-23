@@ -78,11 +78,7 @@ import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.mushafFontPreloadPages
 import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.MushafType
-import com.beautifulquran.domain.mushafDisplayGridSlots
 import com.beautifulquran.domain.mushafIsOpeningLeaf
-import com.beautifulquran.domain.mushafMedallionChords
-import com.beautifulquran.domain.mushafMedallionPitchPx
-import com.beautifulquran.domain.MUSHAF_MEDALLION_DIAMETER_EM
 import com.beautifulquran.domain.mushafLineMayStandShort
 import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.EnglishVerseAlignments
@@ -1781,38 +1777,16 @@ private fun MushafPageSheet(
             ),
     ) {
             val density = LocalDensity.current
-            // The only inset left inside the text block: enough for a circled
-            // ayah mark's overhang at the line end, and nothing more. It is an
-            // inset of the *measure* — taking it off the height as well made
-            // the leading a fortieth shorter than MUSHAF_LINE_INK_EM claims and
-            // charged the type for the difference. The height gives up nothing
-            // but rounding slack, so fifteen slots still land inside the well.
-            val edgeGutterPx = with(density) { MushafEdgeGutter.toPx() }
-            val fitSlackPx = with(density) { MushafFitSlack.toPx() }
-            val fitInsetPx = edgeGutterPx + fitSlackPx
-            val availableH = (constraints.maxHeight.toFloat() - fitSlackPx)
-                .coerceAtLeast(1f)
-            val availableW = (constraints.maxWidth.toFloat() - fitInsetPx * 2)
-                .coerceAtLeast(1f)
-            // Every chapter opening costs the grid a line for its title band,
-            // and another for the basmalah under it where the chapter takes one.
-            val fitSlotCount = mushafLeafFitSlotCount(page)
-            val displaySlotCount = (displayPage.lines.size + displayPage.surahStarts.size +
-                displayPage.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) })
-                .coerceAtLeast(1)
-            // One size for the whole book: the measure, not this page's own
-            // longest line. Fitting each leaf to itself made the hand grow and
-            // shrink as the pages turned.
-            val unitPx = with(density) { unit.toPx() }
-            val fontPx = remember(unitPx, availableW, fitSlotCount) {
-                mushafLeafFontPx(page, availableW, unitPx)
-            }
+            val frame = MushafLeafFrame(
+                widthPx = constraints.maxWidth.toFloat(),
+                heightPx = constraints.maxHeight.toFloat(),
+                edgeGutterPx = with(density) { MushafEdgeGutter.toPx() },
+                fitSlackPx = with(density) { MushafFitSlack.toPx() },
+                unitPx = with(density) { unit.toPx() },
+            )
+            val fontPx = remember(frame, page) { frame.fontPx(page) }
             val fontSp = with(density) { fontPx.toSp() }
-            // Every line on the leaf is set to this one measure — the leaf
-            // inside its gutters. Computed once here rather than by a
-            // BoxWithConstraints per line (see [MushafHafsLine]).
-            val lineMeasurePx = (constraints.maxWidth.toFloat() - edgeGutterPx * 2)
-                .coerceAtLeast(1f)
+            val lineMeasurePx = frame.lineMeasurePx
             // Handed to the leaves still to come, which are set from it in the
             // background before they are composed (see [MushafLeafWarmup]).
             val wordInk = rememberWordInkPalette().fullInkColor
@@ -1820,59 +1794,20 @@ private fun MushafPageSheet(
             val resolver = LocalFontFamilyResolver.current
             val locales = LocalLocaleList.current
             if (pageFont != null && !mushafIsOpeningLeaf(page.page)) {
-                val setting = remember(availableW, unitPx, lineMeasurePx, density, resolver, locales, wordInk, markInk) {
-                    MushafLeafSetting(availableW, unitPx, lineMeasurePx, density, resolver, locales, wordInk, markInk)
+                val setting = remember(frame, density, resolver, locales, wordInk, markInk) {
+                    MushafLeafSetting(frame, density, resolver, locales, wordInk, markInk)
                 }
                 SideEffect { MushafLeafWarmup.setting = setting }
             }
-            // One slot is one unit of the leaf's grid, whatever the page holds.
-            val lineSlot = with(density) {
-                (availableH / mushafDisplayGridSlots(displaySlotCount)).toDp()
+            val lineSlot = with(density) { frame.lineSlotPx(displayPage).toDp() }
+            val medallion = remember(displayPage, pageTypeface, fontPx, frame) {
+                mushafMedallion(displayPage, pageTypeface, fontPx, frame)
             }
-            // The two opening leaves are the print's medallion: seven rows in a
-            // circle — al-Fātiḥah's seven lines, al-Baqarah's basmalah and six
-            // — under a title band. Each line is as wide as it comes to set in
-            // the book's own hand and word spacing (mushafLineSetWidthPx), so
-            // the print's short and long lines draw the circle, and every row,
-            // the band's included, stands on one pitch: the circle's diameter
-            // over its rows (mushafMedallionPitchPx), one circle for the
-            // facing pair. All of it follows the type size, so the shape is
-            // the same on every screen.
-            val medallion = mushafIsOpeningLeaf(page.page)
-            val medallionBasmalahRows = if (medallion) {
-                displayPage.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) }
-            } else {
-                0
-            }
-            val medallionRowWidths = remember(medallion, displayPage, pageTypeface, fontPx, lineMeasurePx) {
-                if (!medallion) return@remember null
-                val rows = displayPage.lines.size + medallionBasmalahRows
-                val chords = mushafMedallionChords(rows)
-                FloatArray(displayPage.lines.size) { i ->
-                    val natural = mushafLineSetWidthPx(displayPage.lines[i], pageTypeface, fontPx)
-                    // The Hafs stand-in, before the page face lands, has no
-                    // print widths: it takes the circle's chords at the
-                    // print's proportion of the measure.
-                    (natural ?: MUSHAF_MEDALLION_DIAMETER_EM * fontPx * chords[i + medallionBasmalahRows])
-                        .coerceAtMost(lineMeasurePx)
-                }
-            }
-            val textSlot = if (medallionRowWidths != null && medallionRowWidths.isNotEmpty()) {
-                with(density) {
-                    mushafMedallionPitchPx(
-                        fontPx = fontPx,
-                        widestRowPx = medallionRowWidths.max(),
-                        rows = medallionRowWidths.size + medallionBasmalahRows,
-                        wellHeightPx = availableH,
-                        slotsOutside = displayPage.surahStarts.size,
-                    ).toDp()
-                }
-            } else {
-                lineSlot
-            }
+            val medallionRowWidths = medallion?.rowWidthsPx
+            val textSlot = medallion?.let { with(density) { it.pitchPx.toDp() } } ?: lineSlot
             // The band and basmalah stand on the same pitch as the medallion's
             // rows; everywhere else, on the book's leading.
-            val furnitureSlot = if (medallionRowWidths != null) textSlot else lineSlot
+            val furnitureSlot = textSlot
             CompositionLocalProvider(
                 LocalLayoutDirection provides LayoutDirection.Rtl,
                 LocalLeafOverlay provides leafOverlay,

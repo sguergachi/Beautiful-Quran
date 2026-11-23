@@ -8,18 +8,13 @@ import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
-import com.beautifulquran.domain.MushafGrid
 import com.beautifulquran.domain.MushafPage
-import com.beautifulquran.domain.mushafDisplayFontPx
-import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafIsOpeningLeaf
 import com.beautifulquran.domain.mushafLineJustifies
 import com.beautifulquran.domain.mushafLineMayStandShort
-import com.beautifulquran.domain.mushafUniformFontPx
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.domain.reflowMushafPage
-import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
@@ -29,11 +24,7 @@ import kotlinx.coroutines.ensureActive
  * set from it before they are composed.
  */
 internal class MushafLeafSetting(
-    /** The measure the type size is fitted to: the leaf inside its fit inset. */
-    val fitWidthPx: Float,
-    val unitPx: Float,
-    /** The measure every ordinary line is set to. */
-    val lineMeasurePx: Float,
+    val frame: MushafLeafFrame,
     val density: Density,
     val resolver: FontFamily.Resolver,
     val locales: LocaleList,
@@ -75,7 +66,7 @@ internal object MushafLeafWarmup {
             return
         }
         val display = mushafDisplayPage(page, face.typeface)
-        val fontPx = mushafLeafFontPx(page, setting.fitWidthPx, setting.unitPx)
+        val fontPx = setting.frame.fontPx(page)
         val fontSp = with(setting.density) { fontPx.toSp() }
         val linePx = with(setting.density) { fontSp.toPx() }
         display.lines.forEach { line ->
@@ -87,7 +78,7 @@ internal object MushafLeafWarmup {
                 line = line,
                 pageTypeface = face.typeface,
                 linePx = linePx,
-                measureWidthPx = setting.lineMeasurePx,
+                measureWidthPx = setting.frame.lineMeasurePx,
                 justify = mushafLineJustifies(line.tokens.size),
                 allowShort = mushafLineMayStandShort(page.page, last, last?.surahId?.let(surahAyahCount)),
             )
@@ -148,32 +139,6 @@ private val displayPages = object : LinkedHashMap<DisplayPageKey, DisplayPage>(3
     override fun removeEldestEntry(eldest: MutableMap.MutableEntry<DisplayPageKey, DisplayPage>) =
         size > 32
 }
-
-/**
- * The fit's slot count: the page's lines, plus a title band for every chapter
- * opening on it and a basmalah row under each that takes one.
- */
-internal fun mushafLeafFitSlotCount(page: MushafPage): Int =
-    (page.lines.size + page.surahStarts.size +
-        page.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) })
-        .coerceAtLeast(1)
-
-/**
- * The one type size a leaf is set at (see [MushafPageSheet]). The well is the
- * grid's fifteen units, whatever the page holds: a leaf carrying a chapter's
- * opening asks for more slots than that and packs them into the same paper.
- * Both arguments used to be scaled by the slot count, which cancelled and left
- * the guard unable to bite — a chapter opening kept type cut for a full slot
- * while its slot had shrunk to about 0.88 of one.
- */
-internal fun mushafLeafFontPx(page: MushafPage, fitWidthPx: Float, unitPx: Float): Float =
-    mushafDisplayFontPx(
-        mushafUniformFontPx(
-            measureWidthPx = fitWidthPx,
-            wellHeightPx = unitPx * MushafGrid.TEXT_LINES,
-            slots = mushafGridSlots(mushafLeafFitSlotCount(page)),
-        ),
-    )
 
 /** How many leaves past a turn's target are set ahead of it. */
 internal const val MushafWarmReach = 3
