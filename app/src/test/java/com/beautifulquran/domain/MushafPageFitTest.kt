@@ -79,16 +79,17 @@ class MushafPageFitTest {
     }
 
     @Test
-    fun `an opening medallion is as tall as its widest row and keeps one pitch`() {
-        // Seven rows whose widest (the middle one, chord 1) is 770 px: a
-        // 770 px circle, 110 px a row, whatever the well's height.
-        assertEquals(110f, mushafMedallionPitchPx(770f, rows = 7, wellHeightPx = 1900f, slotsOutside = 1), 0.01f)
-        assertEquals(110f, mushafMedallionPitchPx(770f, rows = 7, wellHeightPx = 1200f, slotsOutside = 1), 0.01f)
-        // The pitch follows the type: half the size, half the pitch.
-        assertEquals(55f, mushafMedallionPitchPx(385f, rows = 7, wellHeightPx = 1900f, slotsOutside = 1), 0.01f)
+    fun `both opening medallions stand on one pitch that follows the type`() {
+        // 15.5 em over seven rows, whatever each leaf's own widest row.
+        assertEquals(15.5f * 60f / 7f, mushafMedallionPitchPx(60f, 845f, rows = 7, wellHeightPx = 1900f, slotsOutside = 1), 0.01f)
+        assertEquals(15.5f * 60f / 7f, mushafMedallionPitchPx(60f, 911f, rows = 7, wellHeightPx = 1900f, slotsOutside = 1), 0.01f)
+        // Half the type, half the pitch.
+        assertEquals(15.5f * 30f / 7f, mushafMedallionPitchPx(30f, 450f, rows = 7, wellHeightPx = 1900f, slotsOutside = 1), 0.01f)
+        // A row wider than the circle widens it rather than breaking out.
+        assertEquals(1050f / 7f, mushafMedallionPitchPx(60f, 1050f, rows = 7, wellHeightPx = 1900f, slotsOutside = 1), 0.01f)
         // Never taller than the well, band included.
-        assertEquals(80f, mushafMedallionPitchPx(770f, rows = 7, wellHeightPx = 640f, slotsOutside = 1), 0.01f)
-        assertEquals(0f, mushafMedallionPitchPx(770f, rows = 0, wellHeightPx = 640f, slotsOutside = 1), 0f)
+        assertEquals(80f, mushafMedallionPitchPx(60f, 900f, rows = 7, wellHeightPx = 640f, slotsOutside = 1), 0.01f)
+        assertEquals(0f, mushafMedallionPitchPx(60f, 900f, rows = 0, wellHeightPx = 640f, slotsOutside = 1), 0f)
     }
 
     @Test

@@ -462,12 +462,13 @@ a glitch rather than as the shape of a book.)
 
 Pages 1–2 (al-Fātiḥah and the opening of al-Baqarah) sit in the middle of
 the well as the print's medallion: seven rows in a circle (al-Fātiḥah's seven
-lines; al-Baqarah's basmalah and six) under the title band. Each line keeps
-the width the print set it at — the page faces' own advances — so its words
-keep the print's spacing and the circle is the print's, not one the lines are
-stretched to. Every row, the band's included, stands on one pitch, the
-circle's diameter over its rows, which falls within a few pixels of the
-book's own leading. All of it follows the one type size, so the shape is the
+lines; al-Baqarah's basmalah and six) under the title band. Each line is set
+exactly as a full line of the book is — the same letter width and word
+spacing — and stands as wide as that makes it, so the print's short and long
+lines draw the circle rather than being stretched or squeezed into one. Every row, the band's included, stands on one pitch, the
+circle's diameter over its rows — one 15.5 em circle for the facing pair, so
+both pages share it; it is airier than a full page's leading, as the print's
+opening pages are. All of it follows the one type size, so the shape is the
 same on every screen. A full Madinah page fills the well, and any other short
 leaf still hangs from the head. A swipe turns the whole leaf (running head, text, folio) the way
 iBooks turns a page. Transport is a quiet line of ink on the paper *under* the

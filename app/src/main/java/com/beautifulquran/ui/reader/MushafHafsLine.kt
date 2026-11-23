@@ -638,31 +638,36 @@ private fun mushafLineJoins(
 }
 
 /**
- * How wide [line] stands in the print, px at [fontPx]: from its first stroke
- * to its last with every cell at the face's own advance. The QCF page faces
- * carry the print's setting in those advances — an ordinary line comes to
- * the same ~15.6 em measure on every page — so on the two opening leaves,
- * whose lines the print sets short to draw its medallion, this is the shape
- * the print gave them. Null until the page face has loaded.
+ * How wide [line] comes to, px at [fontPx], set exactly as a full line of
+ * the book is: its white levelled to [MUSHAF_MAX_WHITE_LEVEL_EM] and its
+ * letters widened to [MUSHAF_MAX_LINE_SCALE] — where [mushafInkLineFit]
+ * leaves the reflowed rows of an ordinary leaf. Given that width as its
+ * measure, the line is set in the same hand and the same word spacing as
+ * every other page.
+ *
+ * The two opening leaves set their lines to it, so their medallion is drawn
+ * by the words themselves rather than by widths the words are forced into: an
+ * earlier measure, the print's own extent from the page face's advances,
+ * came in under the fit's floor for the joins, and the fit narrowed the
+ * letters to ~0.9 — the opening leaves read a size smaller than the book.
+ * Null until the page face has loaded, when there are no joins to measure.
  */
-internal fun mushafLineNaturalInkPx(
+internal fun mushafLineSetWidthPx(
     line: MushafLine,
     typeface: android.graphics.Typeface?,
     fontPx: Float,
 ): Float? {
     if (typeface == null || fontPx <= 0f) return null
-    val cells = mushafLineCells(mushafLineTexts(line).map { it.text }, typeface, fontPx, condense = 1f)
-    var x = 0f
-    var left = Float.MAX_VALUE
-    var right = -Float.MAX_VALUE
-    cells.forEach { cell ->
-        if (cell.inkWidth > 0f) {
-            left = minOf(left, x + cell.inkLeft)
-            right = maxOf(right, x + cell.inkRight)
-        }
-        x += cell.advance
+    val texts = mushafLineTexts(line)
+    val cells = mushafLineCells(texts.map { it.text }, typeface, fontPx, condense = 1f)
+    val joins = mushafLineJoins(texts, typeface)
+    if (cells.isEmpty() || joins.size != cells.size - 1) return null
+    val ink = cells.sumOf { it.inkWidth.toDouble() }.toFloat() / fontPx
+    var opened = 0f
+    for (join in joins) {
+        opened += maxOf(join.whiteAt(MUSHAF_MAX_WHITE_LEVEL_EM) - join.paper, join.floorEm)
     }
-    return if (right > left) right - left else null
+    return (ink + opened) * MUSHAF_MAX_LINE_SCALE * fontPx
 }
 
 /** Rasterizes a leaf's ink joins before that leaf reaches composition. */

@@ -81,6 +81,7 @@ import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafIsOpeningLeaf
 import com.beautifulquran.domain.mushafMedallionChords
 import com.beautifulquran.domain.mushafMedallionPitchPx
+import com.beautifulquran.domain.MUSHAF_MEDALLION_DIAMETER_EM
 import com.beautifulquran.domain.mushafLineMayStandShort
 import com.beautifulquran.domain.mushafUniformFontPx
 import com.beautifulquran.domain.qcfTrailingMark
@@ -1731,12 +1732,13 @@ private fun MushafPageSheet(
             }
             // The two opening leaves are the print's medallion: seven rows in a
             // circle — al-Fātiḥah's seven lines, al-Baqarah's basmalah and six
-            // — under a title band. Each line keeps the width the print set it
-            // at (mushafLineNaturalInkPx), so its words keep the print's
-            // spacing, and every row, the band's included, stands on one
-            // pitch: the circle's diameter over its rows
-            // (mushafMedallionPitchPx). All of it follows the type size, so
-            // the shape is the same on every screen.
+            // — under a title band. Each line is as wide as it comes to set in
+            // the book's own hand and word spacing (mushafLineSetWidthPx), so
+            // the print's short and long lines draw the circle, and every row,
+            // the band's included, stands on one pitch: the circle's diameter
+            // over its rows (mushafMedallionPitchPx), one circle for the
+            // facing pair. All of it follows the type size, so the shape is
+            // the same on every screen.
             val medallion = mushafIsOpeningLeaf(page.page)
             val medallionBasmalahRows = if (medallion) {
                 displayPage.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) }
@@ -1748,17 +1750,18 @@ private fun MushafPageSheet(
                 val rows = displayPage.lines.size + medallionBasmalahRows
                 val chords = mushafMedallionChords(rows)
                 FloatArray(displayPage.lines.size) { i ->
-                    val natural = mushafLineNaturalInkPx(displayPage.lines[i], pageTypeface, fontPx)
+                    val natural = mushafLineSetWidthPx(displayPage.lines[i], pageTypeface, fontPx)
                     // The Hafs stand-in, before the page face lands, has no
                     // print widths: it takes the circle's chords at the
                     // print's proportion of the measure.
-                    (natural ?: lineMeasurePx * MushafMedallionMeasure * chords[i + medallionBasmalahRows])
+                    (natural ?: MUSHAF_MEDALLION_DIAMETER_EM * fontPx * chords[i + medallionBasmalahRows])
                         .coerceAtMost(lineMeasurePx)
                 }
             }
             val textSlot = if (medallionRowWidths != null && medallionRowWidths.isNotEmpty()) {
                 with(density) {
                     mushafMedallionPitchPx(
+                        fontPx = fontPx,
                         widestRowPx = medallionRowWidths.max(),
                         rows = medallionRowWidths.size + medallionBasmalahRows,
                         wellHeightPx = availableH,
@@ -2163,9 +2166,3 @@ private fun TurningFrameRate(
     )
 }
 
-/**
- * The opening medallion's widest row as a share of the measure, as the print
- * sets it (al-Fātiḥah's and al-Baqarah's widest lines come to ~12 em of an
- * ordinary line's ~15.6). Only the Hafs stand-in uses it.
- */
-private const val MushafMedallionMeasure = 0.77f

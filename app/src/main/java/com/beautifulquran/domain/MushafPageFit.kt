@@ -112,30 +112,39 @@ fun mushafMedallionChords(rows: Int): FloatArray {
 }
 
 /**
+ * The opening medallions' diameter, em: the widest row either opening leaf
+ * sets in the book's hand (`mushafLineSetWidthPx`) — al-Baqarah 2:2–3's line,
+ * 15.45 em. Both leaves share it, so the facing pair stand on one pitch;
+ * sized each by its own widest row, al-Fātiḥah's rows sat 8% closer than
+ * al-Baqarah's.
+ */
+const val MUSHAF_MEDALLION_DIAMETER_EM = 15.5f
+
+/**
  * The pitch of an opening medallion's rows, px: the circle's diameter shared
  * between its [rows], every one of them — the opening leaves' title band too
  * ([slotsOutside]) — on this one pitch.
  *
- * The diameter is the widest row's width over the widest chord, so the block
- * stands as tall as it is wide whatever the screen: the rows keep the widths
- * the print gave them ([mushafLineNaturalInkPx]) and only follow the type
- * size, and the pitch follows them. It used to be the measure over the row
- * count — the circle the rows were stretched to, not the one they draw — and
- * the band and basmalah above stayed on the book's own leading, so the crown
- * was crowded and the rows below it spread apart, by a different amount on
- * every screen. Never taller than the well can hold.
+ * The diameter is [MUSHAF_MEDALLION_DIAMETER_EM] of the type size, or the
+ * widest row's own circle if one ever runs wider, so the block stands as tall
+ * as it is wide on every screen. It used to be the measure over the row count
+ * — the circle the rows were stretched to — while the band and basmalah above
+ * stayed on the book's leading, so the crown was crowded and the rows below
+ * spread apart, by a different amount on every screen. Never taller than the
+ * well can hold.
  */
 fun mushafMedallionPitchPx(
+    fontPx: Float,
     widestRowPx: Float,
     rows: Int,
     wellHeightPx: Float,
     slotsOutside: Int,
 ): Float {
-    if (rows <= 0 || widestRowPx <= 0f) return 0f
+    if (rows <= 0 || fontPx <= 0f) return 0f
     val widestChord = mushafMedallionChords(rows).max()
-    val pitch = widestRowPx / widestChord / rows
+    val diameter = maxOf(MUSHAF_MEDALLION_DIAMETER_EM * fontPx, widestRowPx / widestChord)
     val room = wellHeightPx / (rows + slotsOutside).coerceAtLeast(1)
-    return minOf(pitch, room)
+    return minOf(diameter / rows, room)
 }
 
 /**
