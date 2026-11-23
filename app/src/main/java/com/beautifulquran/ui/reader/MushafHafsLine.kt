@@ -638,22 +638,31 @@ private fun mushafLineJoins(
 }
 
 /**
- * The narrowest [line] can be set at [fontPx]: its letters narrowed to
- * [MUSHAF_MIN_LINE_SCALE] and every join at its fit floor — the width below
- * which [mushafInkLineFit] gives up and the line runs past its measure. Null
- * until the page face has loaded, when there are no joins to measure.
+ * How wide [line] stands in the print, px at [fontPx]: from its first stroke
+ * to its last with every cell at the face's own advance. The QCF page faces
+ * carry the print's setting in those advances — an ordinary line comes to
+ * the same ~15.6 em measure on every page — so on the two opening leaves,
+ * whose lines the print sets short to draw its medallion, this is the shape
+ * the print gave them. Null until the page face has loaded.
  */
-internal fun mushafLineMinWidthPx(
+internal fun mushafLineNaturalInkPx(
     line: MushafLine,
     typeface: android.graphics.Typeface?,
     fontPx: Float,
 ): Float? {
     if (typeface == null || fontPx <= 0f) return null
-    val texts = mushafLineTexts(line)
-    val ink = mushafLineCells(texts.map { it.text }, typeface, fontPx, condense = 1f)
-        .sumOf { it.inkWidth.toDouble() }.toFloat()
-    val tight = mushafLineJoins(texts, typeface).sumOf { it.fitFloorEm.toDouble() }.toFloat() * fontPx
-    return ink * MUSHAF_MIN_LINE_SCALE + tight
+    val cells = mushafLineCells(mushafLineTexts(line).map { it.text }, typeface, fontPx, condense = 1f)
+    var x = 0f
+    var left = Float.MAX_VALUE
+    var right = -Float.MAX_VALUE
+    cells.forEach { cell ->
+        if (cell.inkWidth > 0f) {
+            left = minOf(left, x + cell.inkLeft)
+            right = maxOf(right, x + cell.inkRight)
+        }
+        x += cell.advance
+    }
+    return if (right > left) right - left else null
 }
 
 /** Rasterizes a leaf's ink joins before that leaf reaches composition. */

@@ -79,6 +79,19 @@ class MushafPageFitTest {
     }
 
     @Test
+    fun `an opening medallion is as tall as its widest row and keeps one pitch`() {
+        // Seven rows whose widest (the middle one, chord 1) is 770 px: a
+        // 770 px circle, 110 px a row, whatever the well's height.
+        assertEquals(110f, mushafMedallionPitchPx(770f, rows = 7, wellHeightPx = 1900f, slotsOutside = 1), 0.01f)
+        assertEquals(110f, mushafMedallionPitchPx(770f, rows = 7, wellHeightPx = 1200f, slotsOutside = 1), 0.01f)
+        // The pitch follows the type: half the size, half the pitch.
+        assertEquals(55f, mushafMedallionPitchPx(385f, rows = 7, wellHeightPx = 1900f, slotsOutside = 1), 0.01f)
+        // Never taller than the well, band included.
+        assertEquals(80f, mushafMedallionPitchPx(770f, rows = 7, wellHeightPx = 640f, slotsOutside = 1), 0.01f)
+        assertEquals(0f, mushafMedallionPitchPx(770f, rows = 0, wellHeightPx = 640f, slotsOutside = 1), 0f)
+    }
+
+    @Test
     fun `leading comes from the type, not the leftover height`() {
         // A width-bound page: the well is far taller than fifteen lines of
         // this size need, so the pitch stays the printed one and the spare

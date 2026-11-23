@@ -80,6 +80,7 @@ import com.beautifulquran.domain.mushafDisplayGridSlots
 import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafIsOpeningLeaf
 import com.beautifulquran.domain.mushafMedallionChords
+import com.beautifulquran.domain.mushafMedallionPitchPx
 import com.beautifulquran.domain.mushafLineMayStandShort
 import com.beautifulquran.domain.mushafUniformFontPx
 import com.beautifulquran.domain.qcfTrailingMark
@@ -1728,40 +1729,48 @@ private fun MushafPageSheet(
             val lineSlot = with(density) {
                 (availableH / mushafDisplayGridSlots(displaySlotCount)).toDp()
             }
-            // The two opening leaves are set in a circle (see
-            // mushafMedallionChords): each row drawn to its chord, and the rows
-            // spaced so the block is as tall as it is wide — a medallion, not
-            // a short page on the book's leading. Never shorter than that
-            // leading, and never taller than the well can hold.
+            // The two opening leaves are the print's medallion: seven rows in a
+            // circle — al-Fātiḥah's seven lines, al-Baqarah's basmalah and six
+            // — under a title band. Each line keeps the width the print set it
+            // at (mushafLineNaturalInkPx), so its words keep the print's
+            // spacing, and every row, the band's included, stands on one
+            // pitch: the circle's diameter over its rows
+            // (mushafMedallionPitchPx). All of it follows the type size, so
+            // the shape is the same on every screen.
             val medallion = mushafIsOpeningLeaf(page.page)
-            val medallionChords = remember(medallion, displayPage.lines.size) {
-                if (medallion) mushafMedallionChords(displayPage.lines.size) else null
+            val medallionBasmalahRows = if (medallion) {
+                displayPage.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) }
+            } else {
+                0
             }
-            // A chord is as narrow as half the measure at the crown and foot,
-            // and a row that cannot be narrowed into its chord ran past the
-            // circle's edge. The medallion is set down as one, by what its
-            // tightest row needs, so every row still meets its chord.
-            val medallionScale = remember(medallionChords, displayPage, pageTypeface, fontPx, lineMeasurePx) {
-                if (medallionChords == null) return@remember 1f
-                displayPage.lines.withIndex().minOfOrNull { (i, line) ->
-                    val chord = medallionChords.getOrNull(i) ?: return@minOfOrNull 1f
-                    val need = mushafLineMinWidthPx(line, pageTypeface, fontPx) ?: return@minOfOrNull 1f
-                    if (need <= 0f) 1f else (chord * lineMeasurePx / need).coerceAtMost(1f)
-                }?.coerceAtLeast(0.5f) ?: 1f
+            val medallionRowWidths = remember(medallion, displayPage, pageTypeface, fontPx, lineMeasurePx) {
+                if (!medallion) return@remember null
+                val rows = displayPage.lines.size + medallionBasmalahRows
+                val chords = mushafMedallionChords(rows)
+                FloatArray(displayPage.lines.size) { i ->
+                    val natural = mushafLineNaturalInkPx(displayPage.lines[i], pageTypeface, fontPx)
+                    // The Hafs stand-in, before the page face lands, has no
+                    // print widths: it takes the circle's chords at the
+                    // print's proportion of the measure.
+                    (natural ?: lineMeasurePx * MushafMedallionMeasure * chords[i + medallionBasmalahRows])
+                        .coerceAtMost(lineMeasurePx)
+                }
             }
-            val textSlot = if (medallionChords != null && medallionChords.isNotEmpty()) {
-                val rows = medallionChords.size
-                val furniture = displaySlotCount - rows
-                val slotPx = availableH / mushafDisplayGridSlots(displaySlotCount)
-                val roomPx = availableH - furniture * slotPx
+            val textSlot = if (medallionRowWidths != null && medallionRowWidths.isNotEmpty()) {
                 with(density) {
-                    (lineMeasurePx / rows).coerceAtMost(roomPx / rows)
-                        .coerceAtLeast(slotPx)
-                        .toDp()
+                    mushafMedallionPitchPx(
+                        widestRowPx = medallionRowWidths.max(),
+                        rows = medallionRowWidths.size + medallionBasmalahRows,
+                        wellHeightPx = availableH,
+                        slotsOutside = displayPage.surahStarts.size,
+                    ).toDp()
                 }
             } else {
                 lineSlot
             }
+            // The band and basmalah stand on the same pitch as the medallion's
+            // rows; everywhere else, on the book's leading.
+            val furnitureSlot = if (medallionRowWidths != null) textSlot else lineSlot
             CompositionLocalProvider(
                 LocalLayoutDirection provides LayoutDirection.Rtl,
             ) {
@@ -1785,25 +1794,25 @@ private fun MushafPageSheet(
                             Box(
                                 Modifier
                                     .fillMaxWidth()
-                                    .height(lineSlot),
+                                    .height(furnitureSlot),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 MushafSurahTitleBand(
                                     surah = surahsById[start.surahId],
                                     fontSize = fontSp * MushafPanelType,
-                                    bandHeight = lineSlot * MushafPanelBand,
+                                    bandHeight = furnitureSlot * MushafPanelBand,
                                 )
                             }
                             if (surahOpensWithBasmalahPreface(start.surahId)) {
                                 Box(
                                     Modifier
                                         .fillMaxWidth()
-                                        .height(lineSlot),
+                                        .height(furnitureSlot),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     MushafBasmalahLine(
                                         fontSize = fontSp,
-                                        slotHeight = lineSlot,
+                                        slotHeight = furnitureSlot,
                                         active = pageOwnsVoice &&
                                             start.surahId == content.surah.id &&
                                             playback.value.basmalahActive,
@@ -1813,8 +1822,8 @@ private fun MushafPageSheet(
                                 }
                             }
                         }
-                        val chord = medallionChords?.getOrNull(index)
-                        val rowMeasurePx = if (chord != null) lineMeasurePx * chord else lineMeasurePx
+                        val medallionRowPx = medallionRowWidths?.getOrNull(index)
+                        val rowMeasurePx = medallionRowPx ?: lineMeasurePx
                         Box(
                             Modifier
                                 .fillMaxWidth()
@@ -1822,7 +1831,7 @@ private fun MushafPageSheet(
                             contentAlignment = Alignment.Center,
                         ) {
                             MushafHafsLine(
-                                modifier = if (chord != null) {
+                                modifier = if (medallionRowPx != null) {
                                     Modifier.width(with(density) { rowMeasurePx.toDp() })
                                 } else {
                                     Modifier
@@ -1830,7 +1839,7 @@ private fun MushafPageSheet(
                                 line = line,
                                 page = page.page,
                                 packs = packsState,
-                                fontSize = if (chord != null) fontSp * medallionScale else fontSp,
+                                fontSize = fontSp,
                                 measureWidthPx = rowMeasurePx,
                                 pageTypeface = pageTypeface,
                                 liveInk = liveInk,
@@ -2153,3 +2162,10 @@ private fun TurningFrameRate(
         },
     )
 }
+
+/**
+ * The opening medallion's widest row as a share of the measure, as the print
+ * sets it (al-Fātiḥah's and al-Baqarah's widest lines come to ~12 em of an
+ * ordinary line's ~15.6). Only the Hafs stand-in uses it.
+ */
+private const val MushafMedallionMeasure = 0.77f

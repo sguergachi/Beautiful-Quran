@@ -100,6 +100,8 @@ fun mushafIsOpeningLeaf(page: Int): Boolean = page in 1..2
  * with its corners knocked off.
  *
  * The rows tile the circle's height, so row k's chord is taken at its centre.
+ * Al-Baqarah's basmalah is the crown row of its circle; the title bands
+ * stand above both.
  */
 fun mushafMedallionChords(rows: Int): FloatArray {
     if (rows <= 0) return FloatArray(0)
@@ -107,6 +109,33 @@ fun mushafMedallionChords(rows: Int): FloatArray {
         val y = (k + 0.5f) / rows * 2f - 1f
         kotlin.math.sqrt((1f - y * y).coerceAtLeast(0f))
     }
+}
+
+/**
+ * The pitch of an opening medallion's rows, px: the circle's diameter shared
+ * between its [rows], every one of them — the opening leaves' title band too
+ * ([slotsOutside]) — on this one pitch.
+ *
+ * The diameter is the widest row's width over the widest chord, so the block
+ * stands as tall as it is wide whatever the screen: the rows keep the widths
+ * the print gave them ([mushafLineNaturalInkPx]) and only follow the type
+ * size, and the pitch follows them. It used to be the measure over the row
+ * count — the circle the rows were stretched to, not the one they draw — and
+ * the band and basmalah above stayed on the book's own leading, so the crown
+ * was crowded and the rows below it spread apart, by a different amount on
+ * every screen. Never taller than the well can hold.
+ */
+fun mushafMedallionPitchPx(
+    widestRowPx: Float,
+    rows: Int,
+    wellHeightPx: Float,
+    slotsOutside: Int,
+): Float {
+    if (rows <= 0 || widestRowPx <= 0f) return 0f
+    val widestChord = mushafMedallionChords(rows).max()
+    val pitch = widestRowPx / widestChord / rows
+    val room = wellHeightPx / (rows + slotsOutside).coerceAtLeast(1)
+    return minOf(pitch, room)
 }
 
 /**
