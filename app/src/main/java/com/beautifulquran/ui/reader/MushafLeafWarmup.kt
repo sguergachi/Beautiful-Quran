@@ -63,12 +63,17 @@ internal object MushafLeafWarmup {
         surahAyahCount: (Int) -> Int?,
     ) {
         val face = MushafQcfFonts.face(context, page.page) ?: return
-        warmMushafInkProfiles(page, face.typeface)
-        val setting = setting ?: return
+        val setting = setting
         // The opening leaves size each row from its own set width in
         // MushafPageSheet (mushafLineSetWidthPx), a measure this does not
-        // predict.
-        if (mushafIsOpeningLeaf(page.page)) return
+        // predict. Without a setting, or on those leaves, only the words' ink
+        // profiles are warmed; otherwise the line geometry below measures
+        // them itself, and a separate pass over them first was the same
+        // raster work done twice.
+        if (setting == null || mushafIsOpeningLeaf(page.page)) {
+            warmMushafInkProfiles(page, face.typeface)
+            return
+        }
         val display = mushafDisplayPage(page, face.typeface)
         val fontPx = mushafLeafFontPx(page, setting.fitWidthPx, setting.unitPx)
         val fontSp = with(setting.density) { fontPx.toSp() }
