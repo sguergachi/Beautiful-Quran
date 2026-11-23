@@ -626,7 +626,11 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   different strokes. Those (`drawnLiveOverPicture`: the band, the basmalah,
   any word whose ink reaches 232 px, `mushafCellDrawnAsPath`) are left out of
   the picture and drawn over it from layers of their own; none of them uses the
-  glyph atlas. Each picture holds a leaf-sized bitmap (~11 MB) for as long as
+  glyph atlas. `MushafPictureFidelityTest` (baselineprofile module, against the
+  benchmark build, whose `MushafPictureProbe` makes the resting leaf draw its
+  picture) screenshots pages 2 and 3 live and pictured, sRGB and P3, and fails
+  past 3/255; it caught the band and basmalah at 119/255 when they were drawn
+  into the picture. Each picture holds a leaf-sized bitmap (~11 MB) for as long as
   its leaf stays composed. Forcing `Offscreen`
   compositing on the leaf is still wrong: its layers are re-rendered inside
   the turn, a whole page's uploads in one 90 ms frame.

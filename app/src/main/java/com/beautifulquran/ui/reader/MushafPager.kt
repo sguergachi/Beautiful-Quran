@@ -710,6 +710,7 @@ internal fun MushafPager(
     // scope, so a turn starting or settling recomposes the pager call alone
     // and not the whole of this function.
     val turnSnapshots = rememberMushafTurnSnapshots()
+    MushafPictureProbe.Watch()
     // The leaves publish their setting for the warm-up; it goes with the
     // reader, so a rotation or a density change never warms by a stale one.
     DisposableEffect(Unit) { onDispose { MushafLeafWarmup.setting = null } }
@@ -955,7 +956,7 @@ internal fun MushafPager(
                     .graphicsLayer { }
                     .mushafTurnSnapshot(
                         snapshots = turnSnapshots,
-                        pictured = !english && !liveInk,
+                        pictured = !english && (!liveInk || MushafPictureProbe.forcesPicture),
                         still = { leafStill.value },
                         overlay = leafOverlay,
                         bleed = LeafFootBleed,
