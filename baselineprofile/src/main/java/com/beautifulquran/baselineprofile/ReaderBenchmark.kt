@@ -56,6 +56,7 @@ class ReaderBenchmark {
             device.chooseReaderSettings("Mushaf")
             device.openChapter("Al-Fatihah")
             device.waitForMushafReader()
+            device.waitForMushafLeafAtRest(device.mushafPageNumber())
         },
     ) {
         repeat(4) {
@@ -63,6 +64,7 @@ class ReaderBenchmark {
             device.turnMushafTowardLaterPages()
             val to = device.waitUntilMushafPageChanges(from)
             check(to == from + 1) { "Expected the next leaf after $from, got $to" }
+            device.waitForMushafLeafAtRest(to)
             logBenchmark("mushafPageTurn $from -> $to")
         }
     }
