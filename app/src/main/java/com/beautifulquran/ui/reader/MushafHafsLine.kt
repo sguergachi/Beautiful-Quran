@@ -235,6 +235,71 @@ internal fun MushafHafsLine(
 }
 
 /**
+ * What one display row's words measure, before any fit: each cell's advance
+ * and ink at the size it is set, unnarrowed, and what each join between two
+ * cells offers. It depends on the words, the face and the size — not on the
+ * measure — so a row's fit to any width ([mushafLineGeometry]) and its own set
+ * width on an opening leaf ([mushafLineSetWidthPx]) share one measurement.
+ */
+internal class MushafLineMetrics(
+    val cells: List<MushafCell>,
+    val joinsEm: List<MushafInkJoin>,
+)
+
+private data class MushafLineMetricsKey(
+    val page: Int,
+    val line: Int,
+    val fontPxBits: Int,
+    val typefaceId: Int,
+    val contentKey: Int,
+)
+
+private val lineMetricsCache =
+    object : LinkedHashMap<MushafLineMetricsKey, MushafLineMetrics>(64, 0.75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<MushafLineMetricsKey, MushafLineMetrics>,
+        ) = size > 512
+    }
+
+/**
+ * [MushafLineMetrics] from the process-wide cache, measured on a miss: ink
+ * profiles render each word to a bitmap and the joins derive from them. Safe
+ * off the UI thread; the lock covers the map only.
+ */
+internal fun mushafLineMetrics(
+    page: Int,
+    line: MushafLine,
+    typeface: android.graphics.Typeface?,
+    fontPx: Float,
+): MushafLineMetrics {
+    val key = MushafLineMetricsKey(
+        page = page,
+        line = line.number,
+        fontPxBits = fontPx.toRawBits(),
+        typefaceId = System.identityHashCode(typeface),
+        contentKey = mushafLineContentKey(line),
+    )
+    synchronized(lineMetricsCache) { lineMetricsCache[key] }?.let { return it }
+    val texts = mushafLineTexts(line)
+    val metrics = MushafLineMetrics(
+        cells = mushafLineCells(texts.map { it.text }, typeface, fontPx, condense = 1f),
+        joinsEm = mushafLineJoins(texts, typeface),
+    )
+    return synchronized(lineMetricsCache) { lineMetricsCache.getOrPut(key) { metrics } }
+}
+
+/**
+ * Drops every line measured in [typeface]: [MushafQcfFonts] calls it when a
+ * page face leaves its window, since a rebuilt face is a new typeface whose
+ * keys these entries would never match again.
+ */
+internal fun forgetMushafLineMeasures(typeface: android.graphics.Typeface) {
+    val id = System.identityHashCode(typeface)
+    synchronized(lineMetricsCache) { lineMetricsCache.keys.removeAll { it.typefaceId == id } }
+    synchronized(lineGeometryCache) { lineGeometryCache.keys.removeAll { it.typefaceId == id } }
+}
+
+/**
  * Measured geometry for one mushaf line, cacheable across leaf compositions.
  *
  * Swiping back to a visited leaf re-composes its lines, and the measure is
@@ -336,10 +401,9 @@ internal fun mushafLineGeometry(
     val key = lineGeometryKey(page, line, pageTypeface, linePx, measureWidthPx, allowShort)
     synchronized(lineGeometryCache) { lineGeometryCache[key] }?.let { return it }
     val geometry = com.beautifulquran.DevProfiling.trace("lineGeometryMiss") {
-        val texts = mushafLineTexts(line)
-        val glyphs = texts.map { it.text }
-        val rawCells = mushafLineCells(glyphs, pageTypeface, linePx, condense = 1f)
-        val joinsEm = mushafLineJoins(texts, pageTypeface)
+        val metrics = mushafLineMetrics(page, line, pageTypeface, linePx)
+        val rawCells = metrics.cells
+        val joinsEm = metrics.joinsEm
         val fit = if (!justify) {
             MushafLineFit(
                 scale = 1f,
@@ -368,7 +432,7 @@ internal fun mushafLineGeometry(
         val drawnCells = if (fit.scale == 1f) {
             rawCells
         } else {
-            mushafLineCells(glyphs, pageTypeface, linePx, fit.scale)
+            mushafLineCells(mushafLineTexts(line).map { it.text }, pageTypeface, linePx, fit.scale)
         }
         MushafLineGeometry(rawCells, joinsEm, fit, drawnCells)
     }
@@ -720,15 +784,16 @@ private fun mushafLineJoins(
  * face has loaded.
  */
 internal fun mushafLineSetWidthPx(
+    page: Int,
     line: MushafLine,
     typeface: android.graphics.Typeface?,
     fontPx: Float,
 ): Float? {
     if (typeface == null || fontPx <= 0f) return null
-    val texts = mushafLineTexts(line)
-    val cells = mushafLineCells(texts.map { it.text }, typeface, fontPx, condense = 1f)
+    val metrics = mushafLineMetrics(page, line, typeface, fontPx)
+    val cells = metrics.cells
     if (cells.isEmpty()) return null
-    val joins = mushafLineJoins(texts, typeface)
+    val joins = metrics.joinsEm
     if (!mushafLineJustifies(line.tokens.size) || joins.isEmpty() || joins.size != cells.size - 1) {
         // Set as [lineGeometry] sets such a line: the face's own advances,
         // a word gap between cells, unnarrowed.

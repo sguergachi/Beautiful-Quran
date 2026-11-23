@@ -106,7 +106,7 @@ internal fun mushafMedallion(
     val widths = FloatArray(displayPage.lines.size) { i ->
         // The Hafs stand-in, before the page face lands, has no set widths: it
         // takes the circle's chords.
-        (mushafLineSetWidthPx(displayPage.lines[i], typeface, fontPx)
+        (mushafLineSetWidthPx(displayPage.page, displayPage.lines[i], typeface, fontPx)
             ?: (MUSHAF_MEDALLION_DIAMETER_EM * fontPx * chords[i + basmalahRows]))
             .coerceAtMost(frame.lineMeasurePx)
     }

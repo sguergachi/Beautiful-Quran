@@ -127,6 +127,11 @@ internal fun mushafDisplayPage(page: MushafPage, typeface: android.graphics.Type
     return display
 }
 
+/** Drops the pages reflowed with [typeface]; see [forgetMushafLineMeasures]. */
+internal fun forgetMushafDisplayPages(typeface: android.graphics.Typeface) {
+    synchronized(displayPages) { displayPages.values.removeAll { it.typeface === typeface } }
+}
+
 private data class DisplayPageKey(val page: Int, val typefaceId: Int)
 
 private class DisplayPage(

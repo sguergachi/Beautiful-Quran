@@ -45,14 +45,25 @@ internal object MushafQcfFonts {
             eldest: MutableMap.MutableEntry<Int, MushafQcfFace>,
         ): Boolean {
             if (size <= MAX_RESIDENT) return false
-            // Its laid-out cells hold the same native font; let them go with it.
-            MushafWordLayouts.forget(eldest.value.family)
+            forgetDerived(eldest.value)
             return true
         }
     }
 
     @Synchronized
     fun cached(page: Int): MushafQcfFace? = families[page]
+
+    /**
+     * Everything measured from a face goes with it: its laid-out cells hold
+     * the same native font, and a rebuilt face is a new typeface that the
+     * measures and reflows keyed on this one would never match again — they
+     * only sat in their caches until the caches' own limits pushed them out.
+     */
+    private fun forgetDerived(face: MushafQcfFace) {
+        MushafWordLayouts.forget(face.family)
+        forgetMushafLineMeasures(face.typeface)
+        forgetMushafDisplayPages(face.typeface)
+    }
 
     fun face(context: Context, page: Int): MushafQcfFace? {
         cached(page)?.let { return it }
