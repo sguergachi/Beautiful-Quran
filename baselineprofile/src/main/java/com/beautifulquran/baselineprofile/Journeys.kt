@@ -297,6 +297,17 @@ internal fun UiDevice.waitForMushafPage(page: Int) {
     error("Mushaf page $page did not reach the viewport centre")
 }
 
+/**
+ * Waits until leaf [page] has stopped moving, then a reader's beat. The page
+ * number under the viewport centre changes halfway through a turn; a swipe
+ * begun there lands on a leaf still flinging, and the pager snaps to whichever
+ * page is nearer, which is not a turn.
+ */
+internal fun UiDevice.waitForMushafLeafAtRest(page: Int) {
+    waitForSettled(By.descStartsWith("Mushaf page $page,"), "Mushaf page $page at rest")
+    idleBriefly(MushafReadingPauseMs)
+}
+
 /** RTL pager: a rightward swipe, sized from the display, turns toward later pages. */
 internal fun UiDevice.turnMushafTowardLaterPages() {
     swipeAcross(fromX = 0.20f, toX = 0.80f, y = displayHeight / 2)
@@ -323,6 +334,8 @@ internal fun UiDevice.returnToMushafPage(page: Int) {
 internal fun UiDevice.idleBriefly(ms: Long = 500) {
     SystemClock.sleep(ms)
 }
+
+private const val MushafReadingPauseMs = 1_000L
 
 internal fun logBenchmark(message: String) {
     Log.i(BenchmarkLog, message)

@@ -16,6 +16,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerScope
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
@@ -106,6 +107,9 @@ import com.beautifulquran.ui.theme.letterFadeIn
 import com.beautifulquran.ui.theme.quietClickable
 import com.beautifulquran.ui.theme.setManagedColor
 import com.beautifulquran.ui.theme.oneSpace
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.flow.collectLatest
+import kotlin.math.abs
 
 /**
  * What the leaf needs to know about playback, in one place so it can be handed
@@ -479,6 +483,34 @@ internal fun mushafTailTurnAllowed(
 internal fun mushafLeafAcceptsTap(pageIndex: Int, currentPage: Int): Boolean =
     pageIndex == currentPage
 
+/** Leaves held composed either side of the settled one while the pager rests. */
+internal const val MushafHeldNeighbours = 2
+
+/** Still frames after a turn before the pager counts as resting. */
+internal const val MushafRestFrames = 2
+
+/**
+ * True while a leaf the pager has composed should stay blank paper: it is
+ * beyond the [held] neighbours of the page the pager rests on, neither in view
+ * nor beside a leaf that is, and not where a turn is going. The pager composes
+ * such leaves on its own — the one that joins its window halfway through a
+ * turn, and the one it prefetches past the window at rest, whose lines it then
+ * measured on the next swipe's first frame. A turn from rest only ever shows
+ * leaves within the held two, so it composes nothing. A second swipe begun
+ * before the first settled brings the next leaf into view; the one beyond it
+ * is set then, a turn ahead of being seen.
+ */
+internal fun mushafDefersLeaf(
+    pageIndex: Int,
+    restPage: Int,
+    held: Int,
+    targetPage: Int,
+    nearView: Boolean,
+): Boolean =
+    abs(pageIndex - restPage) > held &&
+        pageIndex != targetPage &&
+        !nearView
+
 /**
  * A tap pins the leaf until the seek's word arrives on it. Auto-follow —
  * including the last-word lead turn — must not steal that leaf while the
@@ -597,7 +629,7 @@ internal fun mushafReturnWay(
     }
 }
 
-private const val MushafLeafFadeMs = 220
+internal const val MushafLeafFadeMs = 220
 
 /**
  * How long a leaf waits for its own face before showing itself in the Hafs
@@ -617,6 +649,9 @@ private const val MushafLeafFaceWaitMs = 450L
  * over; a turn taken inside that window simply composes its leaf on demand.
  */
 private const val MushafNeighbourHoldDelayMs = 520L
+
+/** Between the near pair of held leaves and the outer pair. */
+private const val MushafOuterNeighbourDelayMs = 260L
 
 /**
  * The page's own hand, as the chrome sees it: the size a line of revelation is
@@ -1161,7 +1196,6 @@ internal fun MushafPager(
     LaunchedEffect(followEnabled) {
         if (!followEnabled) waitingPage = 0
     }
-    val currentPageNow = rememberUpdatedState(pagerState.currentPage)
     val onWordClickNow = rememberUpdatedState(onWordClick)
     val onWordLongClickNow = rememberUpdatedState(onWordLongClick)
     val onAyahClickNow = rememberUpdatedState(onAyahClick)
@@ -1170,30 +1204,401 @@ internal fun MushafPager(
     val onBasmalahClickNow = rememberUpdatedState(onBasmalahClick)
     val onTappedLeafNow = rememberUpdatedState(onTappedLeaf)
     val paper = MaterialTheme.colorScheme.background
-    // Opening a chapter should cost one leaf, not three. Holding a neighbour
+    // Opening a chapter should cost one leaf, not five. Holding neighbours
     // composed either side is what makes a page turn smooth, but doing it
     // before the first frame means ~450 word nodes are composed, measured and
     // indexed while the reader is still coming up — profiled as the reader's
     // worst frames by a wide margin, most of the time inside Compose's own
     // spatial index walking the tree. The neighbours are composed one frame
     // later instead: the open is a single leaf, and the turn is still warm.
-    var holdNeighbours by remember { mutableStateOf(false) }
+    // They come back in two pairs — the leaves a turn away, then the two
+    // beyond, a beat later — so no one frame composes four of them, here or
+    // when a dial landing hands its parked neighbours back.
+    val parkNeighboursNow = rememberUpdatedState(parkNeighbours)
+    var heldNeighbours by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         delay(MushafNeighbourHoldDelayMs)
-        holdNeighbours = true
+        snapshotFlow { parkNeighboursNow.value() }.collectLatest { parked ->
+            if (parked) {
+                heldNeighbours = 0
+                return@collectLatest
+            }
+            if (heldNeighbours == 0) {
+                heldNeighbours = 1
+                delay(MushafOuterNeighbourDelayMs)
+            }
+            heldNeighbours = MushafHeldNeighbours
+        }
     }
     // High only while the leaf moves. Recitation redraws the wash every frame,
     // and a standing vote kept the panel at its top rate through a whole
     // listening session for a page that was not turning. Read inside its own
     // scope, so a turn starting or settling recomposes the pager call alone
     // and not the whole of this function.
+    val turnSnapshots = rememberMushafTurnSnapshots()
+    // The page the pager rests on, and whether it does. settledPage moves on
+    // the frame a finger lifts — the drag's scroll ends there and the fling's
+    // begins — while the leaf still has half the screen to travel, and every
+    // leaf keyed on it recomposed mid-fling. This one waits until the pager
+    // has stayed still.
+    val restPage = remember(pagerState) { mutableIntStateOf(pagerState.settledPage) }
+    val atRest = remember(pagerState) { mutableStateOf(!pagerState.isScrollInProgress) }
+    // One value for "a turn is under way", read by the leaves' turn pictures in
+    // draw. Derived, so the frame a finger lifts — scrolling false for a frame
+    // between the drag and the fling, never at rest — does not redraw them.
+    val leafTurning = remember(pagerState) {
+        derivedStateOf { pagerState.isScrollInProgress || !atRest.value }
+    }
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.isScrollInProgress to pagerState.settledPage }
+            .collectLatest { (scrolling, settledPage) ->
+                if (scrolling) {
+                    atRest.value = false
+                    return@collectLatest
+                }
+                repeat(MushafRestFrames) { withFrameNanos { } }
+                restPage.intValue = settledPage
+                atRest.value = true
+            }
+    }
+    // The leaves, built outside the frame-rate vote below. Written inline in
+    // its content, every vote change (a turn starting, ending, or the frame a
+    // finger lifts) handed the pager a new block, which recomposed every leaf
+    // and re-recorded it mid-turn.
+    val leafContent: @Composable PagerScope.(Int) -> Unit = { pageIndex ->
+        val bookLeaf = book?.leaf(pageIndex)
+        val page = catalog.page(bookLeaf?.page ?: (pageIndex + 1))
+        // Halfway through a turn the pager's window moves on, and the leaf
+        // that joined it at the far end was composed and measured on that
+        // very frame — ~150 word nodes, 28–48 ms on the emulator; the leaf
+        // it prefetches past the window at rest had its lines measured on
+        // the next swipe's first frame, 40–70 ms. Two leaves are held
+        // either side at rest, so whatever a turn can show is ready, and a
+        // leaf further out stays blank paper until the pager rests within
+        // reach of it (see mushafDefersLeaf). A leaf in or beside the view
+        // or a jump's destination is composed at once, and a leaf once
+        // composed stays so.
+        var leafComposed by remember(pageIndex) { mutableStateOf(false) }
+        val deferLeaf by remember(pageIndex) {
+            derivedStateOf {
+                !leafComposed &&
+                    mushafDefersLeaf(
+                        pageIndex = pageIndex,
+                        restPage = restPage.intValue,
+                        held = heldNeighbours,
+                        targetPage = pagerState.targetPage,
+                        nearView = pagerState.layoutInfo.visiblePagesInfo.any { abs(it.index - pageIndex) <= 1 },
+                    )
+            }
+        }
+        if (page == null || deferLeaf) {
+            Box(Modifier.fillMaxSize())
+        } else {
+            SideEffect { leafComposed = true }
+            val settled by remember {
+                derivedStateOf { pageIndex == restPage.intValue }
+            }
+            // Only a leaf a turn from here can be shown by one.
+            val besideSettled by remember {
+                derivedStateOf { abs(pageIndex - restPage.intValue) == 1 }
+            }
+            // Keyed on [voiceLeaf] itself: it is rebuilt when the loaded chapter
+            // changes, and a derivation remembered on the page alone kept
+            // reading the old chapter's. Playing an unloaded chapter from its
+            // leaf then left that leaf disowned through the basmalah and in
+            // every gap between verses — the whole page at full ink, with no
+            // wash — until the leaf was composed again.
+            val pageOwnsVoice by remember(pageIndex, voiceLeaf) {
+                derivedStateOf { voiceLeaf.value == pageIndex + 1 }
+            }
+            val pageHasActiveWord by remember(pageIndex, catalog, loadedSurahId, english, book) {
+                derivedStateOf {
+                    val word = activeWordState.value ?: return@derivedStateOf false
+                    val page = catalog.readingPageOf(
+                        loadedSurahId,
+                        word.ayah,
+                        word.wordPosition,
+                        wholeVerses = english,
+                    )
+                    val timedLeaf = timedThrough(word)?.let { through ->
+                        mushafLeafNumber(book, loadedSurahId, word.ayah, page, through)
+                    }
+                    (timedLeaf ?: mushafWordLeafNumber(
+                        book = book,
+                        surahId = loadedSurahId,
+                        word = word,
+                        page = page,
+                        wordCount = contentNow.value.wordsIn(word.ayah),
+                        alignment = if (english) alignments.alignment(word.ayah) else null,
+                    )) == pageIndex + 1
+                }
+            }
+            val waitingForVoice by remember(pageIndex, heldPage) {
+                derivedStateOf {
+                    mushafLeafWaitingForVoice(
+                        pageNumber = pageIndex + 1,
+                        waitingPage = waitingPage,
+                        heldPage = heldPage,
+                    )
+                }
+            }
+            // Every input's own state object is a key: each of them is
+            // remembered on keys of its own, and a capture of a replaced one
+            // goes on answering for a chapter that is no longer loaded.
+            val liveInk by remember(pageIndex, voiceLeaf, catalog, loadedSurahId, english, book, heldPage) {
+                derivedStateOf {
+                    mushafUsesLiveInk(
+                        settled,
+                        pageOwnsVoice,
+                        waitingForVoice,
+                        pageHasActiveWord,
+                    )
+                }
+            }
+            val leafWordClick = remember(pageIndex, page.page) {
+                { token: MushafToken ->
+                    if (mushafLeafAcceptsTap(pageIndex, pagerState.currentPage)) {
+                        waitingPage = pageIndex + 1
+                        onTappedLeafNow.value(pageIndex + 1)
+                        onWordClickNow.value(token)
+                    }
+                }
+            }
+            val leafWordLongClick = remember(pageIndex) {
+                { token: MushafToken ->
+                    if (mushafLeafAcceptsTap(pageIndex, pagerState.currentPage)) {
+                        onWordLongClickNow.value(token)
+                    }
+                }
+            }
+            val leafAyahClick = remember(pageIndex, page.page) {
+                { token: MushafToken ->
+                    if (mushafLeafAcceptsTap(pageIndex, pagerState.currentPage)) {
+                        waitingPage = pageIndex + 1
+                        onTappedLeafNow.value(pageIndex + 1)
+                        onAyahClickNow.value(token)
+                    }
+                }
+            }
+            val leafVerseSeek = remember(pageIndex, page.page) {
+                { surahId: Int, ayah: Int, through: Float ->
+                    if (mushafLeafAcceptsTap(pageIndex, pagerState.currentPage)) {
+                        waitingPage = pageIndex + 1
+                        onTappedLeafNow.value(pageIndex + 1)
+                        onVerseSeekNow.value(surahId, ayah, through)
+                    }
+                }
+            }
+            val leafVerseLongPress = remember(pageIndex) {
+                { surahId: Int, ayah: Int, through: Float ->
+                    if (mushafLeafAcceptsTap(pageIndex, pagerState.currentPage)) {
+                        onVerseLongPressNow.value(surahId, ayah, through)
+                    }
+                }
+            }
+            val leafBasmalahClick = remember(pageIndex, page.page) {
+                { surahId: Int ->
+                    if (mushafLeafAcceptsTap(pageIndex, pagerState.currentPage)) {
+                        waitingPage = pageIndex + 1
+                        onTappedLeafNow.value(pageIndex + 1)
+                        onBasmalahClickNow.value(surahId)
+                    }
+                }
+            }
+            // Every Madinah page the leaf draws from — two or three, since the
+            // English book paginates itself and its leaves do not stop where
+            // the Arabic ones do.
+            val leafPages = bookLeaf?.pages ?: page.page..page.page
+            val leafRuns = bookLeaf?.runs.orEmpty()
+            val leafVerses = bookLeaf?.verses.orEmpty()
+            // The Arabic word each verse of the leaf opens with — what a tap on
+            // an English sentence plays from. Gathered here rather than in the
+            // sheet because it is the pager that holds the catalog, and a leaf
+            // spanning two pages needs both of them.
+            val leafTokens = remember(leafPages, english) {
+                if (!english) {
+                    emptyMap()
+                } else {
+                    buildMap {
+                        leafPages.forEach { number ->
+                            catalog.page(number)?.lines?.forEach { line ->
+                                line.tokens.forEach { token ->
+                                    if (token.word.position == 1) {
+                                        put(token.surahId to token.ayah, token)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // One description for the leaf, not ~450 word nodes: the QCF
+            // glyphs are private-use artwork — meaningless to a screen reader
+            // — and an active accessibility service re-sorted and re-geometried
+            // every one of them per frame of a swipe, which was the mushaf's
+            // swipe lag. Taps are pointer-based and unaffected.
+            // The chapter the leaf opens in. For English that is its first
+            // verse's, not the page's — a leaf may open partway down a page
+            // whose "primary" chapter it never reaches.
+            val leafSurahId = if (english) {
+                leafVerses.firstOrNull()?.first ?: page.primarySurahId
+            } else {
+                page.primarySurahId
+            }
+            val leafSurah = surahsById[leafSurahId]?.nameTransliteration
+            val leafDescription = remember(page, leafSurah, english, leafText, leafVerses) {
+                buildString {
+                    append("Mushaf page ")
+                    append(page.page)
+                    if (leafSurah != null) {
+                        append(", ")
+                        append(leafSurah)
+                    }
+                    append(", Juz ")
+                    append(page.juz)
+                    val verses = leafText
+                    if (english) {
+                        leafVerses.forEach { (surahId, ayah) ->
+                            append(". ")
+                            append(verses[quranWordKey(surahId, ayah, 1)].orEmpty())
+                        }
+                    } else {
+                        page.lines.forEach { line ->
+                            if (line.tokens.isNotEmpty()) append(". ")
+                            line.tokens.forEach { token ->
+                                append(token.word.arabic)
+                                append(' ')
+                            }
+                        }
+                    }
+                }.trimEnd()
+            }
+            BoxWithConstraints(
+                Modifier
+                    .fillMaxSize()
+                    .clearAndSetSemantics {
+                        contentDescription = leafDescription
+                    }
+                    // Each leaf gets a surface of its own, so turning the page
+                    // moves something already recorded instead of drawing it
+                    // again. Without this the pager's offset dirtied the leaf's
+                    // display list on every frame of a swipe and all ~150 of its
+                    // word nodes were re-recorded: measured, that was the whole
+                    // of the hitch — 99th percentile 101ms against 38 with it,
+                    // and half as many frames blamed on the UI thread.
+                    .graphicsLayer { }
+                    .mushafTurnSnapshot(
+                        snapshots = turnSnapshots,
+                        pictured = !english && besideSettled && !liveInk,
+                        turning = { leafTurning.value },
+                        bleed = LeafFootBleed,
+                    )
+                    .clipLeafSides()
+                    .padding(horizontal = MushafPageMargin),
+            ) {
+                val density = LocalDensity.current
+                // Both hands spend the same frame; English fills it with prose.
+                val bands = mushafLeafBands(english)
+                // One unit for the whole leaf — see MushafGrid. Both bands below
+                // are a whole number of them, so the head and the well sit on the
+                // same rhythm as the lines of revelation.
+                val unit = with(density) {
+                    bands.unitPx(constraints.maxHeight.toFloat()).toDp()
+                }
+                // The leaf's own size, from the paper it is set on — the same
+                // chain the app's root walks before any of this is composed, so
+                // the book it paginated is the book this leaf draws.
+                val englishSlot = if (english) {
+                    englishLeafSlotPx(constraints.maxWidth, constraints.maxHeight, density)
+                } else {
+                    null
+                }
+                Column(Modifier.fillMaxSize()) {
+                    MushafPageHeader(
+                        surahNameArabic = surahsById[leafSurahId]?.nameArabic,
+                        surahNameLatin = surahsById[leafSurahId]?.nameTransliteration,
+                        unit = unit,
+                        glyphSize = leafGlyphSize(unit),
+                        page = if (english) pageIndex + 1 else page.page,
+                        pageNumberScript = pageNumberScript,
+                    )
+                    Spacer(Modifier.height(unit * bands.headGutter))
+                    val wellModifier = Modifier
+                        .height(unit * bands.well)
+                        .fillMaxWidth()
+                    if (english) {
+                        MushafEnglishSheet(
+                            page = page,
+                            leafText = leafText,
+                            content = content,
+                            basmalahWash = proseBasmalahWash,
+                            surahsById = surahsById,
+                            liveInk = liveInk,
+                            pageOwnsVoice = pageOwnsVoice,
+                            waitingForVoice = waitingForVoice,
+                            pageHasActiveWord = pageHasActiveWord,
+                            activeWordState = activeWordState,
+                            washClock = englishWashClock,
+                            playback = playback,
+                            playbackSpeed = playbackSpeed,
+                            flashAyah = flashAyah.takeIf { settled },
+                            flashWordPosition = flashWordPosition.takeIf { settled },
+                            flashWordPositions = flashWordPositions.takeIf { settled }.orEmpty(),
+                            searchFocusActive = searchFocusActive && settled,
+                            onMetrics = onLeafMetrics,
+                            measured = bookMeasured,
+                            verseNumberScript = verseNumberScript,
+                            wellPx = englishSlot?.get(0) ?: 1f,
+                            measurePx = englishSlot?.get(1) ?: 1f,
+                            leafRuns = leafRuns,
+                            leafTokens = leafTokens,
+                            alignments = alignments,
+                            onVerseSeek = leafVerseSeek,
+                            onVerseLongPress = leafVerseLongPress,
+                            onBasmalahClick = leafBasmalahClick,
+                            modifier = wellModifier,
+                        )
+                    } else {
+                        MushafPageSheet(
+                            basmalahWash = basmalahWash,
+                            page = page,
+                            content = content,
+                            surahsById = surahsById,
+                            liveInk = liveInk,
+                            pageOwnsVoice = pageOwnsVoice,
+                            waitingForVoice = waitingForVoice,
+                            pageHasActiveWord = pageHasActiveWord,
+                            activeWordState = activeWordState,
+                            playback = playback,
+                            playbackSpeed = playbackSpeed,
+                            flashAyah = flashAyah.takeIf { settled },
+                            flashWordPosition = flashWordPosition.takeIf { settled },
+                            flashWordPositions = flashWordPositions.takeIf { settled }.orEmpty(),
+                            searchFocusActive = searchFocusActive && settled,
+                            onWordClick = leafWordClick,
+                            onWordLongClick = leafWordLongClick,
+                            onAyahClick = leafAyahClick,
+                            onBasmalahClick = leafBasmalahClick,
+                            unit = unit,
+                            modifier = wellModifier,
+                        )
+                    }
+                    // Zero on both hands now: the folio is in the running
+                    // head, the well runs to the leaf's bottom edge and the
+                    // dial's own head air is the foot (see clipLeafSides).
+                    Spacer(Modifier.height(unit * bands.tail))
+                }
+            }
+        }
+    }
     TurningFrameRate(pagerState) { turningRate ->
         HorizontalPager(
             state = pagerState,
             // A distant dial jump composes one selected leaf first. Its neighbours
-            // return two frames later; asking Compose to build all three at once
-            // was the visible pause between release and the new folio.
-            beyondViewportPageCount = if (holdNeighbours && !parkNeighbours()) 1 else 0,
+            // return two frames later, a pair at a time; asking Compose to build
+            // them all at once was the visible pause between release and the
+            // new folio.
+            beyondViewportPageCount = if (parkNeighbours()) 0 else heldNeighbours,
             // The leaf, the rule and the folio turn together — see
             // mushafTurnsRightToLeft, which is the only thing that decides it, and
             // is handed the same `english` the sheet's rule is.
@@ -1207,298 +1612,8 @@ internal fun MushafPager(
                 // turning.
                 .then(turningRate)
                 .mushafForeEdgeFade(paper, MushafForeEdgeFade),
-        ) { pageIndex ->
-            val bookLeaf = book?.leaf(pageIndex)
-            val page = catalog.page(bookLeaf?.page ?: (pageIndex + 1))
-            if (page == null) {
-                Box(Modifier.fillMaxSize())
-            } else {
-                val settled by remember {
-                    derivedStateOf { pageIndex == pagerState.settledPage }
-                }
-                // Keyed on [voiceLeaf] itself: it is rebuilt when the loaded chapter
-                // changes, and a derivation remembered on the page alone kept
-                // reading the old chapter's. Playing an unloaded chapter from its
-                // leaf then left that leaf disowned through the basmalah and in
-                // every gap between verses — the whole page at full ink, with no
-                // wash — until the leaf was composed again.
-                val pageOwnsVoice by remember(pageIndex, voiceLeaf) {
-                    derivedStateOf { voiceLeaf.value == pageIndex + 1 }
-                }
-                val pageHasActiveWord by remember(pageIndex, catalog, loadedSurahId, english, book) {
-                    derivedStateOf {
-                        val word = activeWordState.value ?: return@derivedStateOf false
-                        val page = catalog.readingPageOf(
-                            loadedSurahId,
-                            word.ayah,
-                            word.wordPosition,
-                            wholeVerses = english,
-                        )
-                        val timedLeaf = timedThrough(word)?.let { through ->
-                            mushafLeafNumber(book, loadedSurahId, word.ayah, page, through)
-                        }
-                        (timedLeaf ?: mushafWordLeafNumber(
-                            book = book,
-                            surahId = loadedSurahId,
-                            word = word,
-                            page = page,
-                            wordCount = contentNow.value.wordsIn(word.ayah),
-                            alignment = if (english) alignments.alignment(word.ayah) else null,
-                        )) == pageIndex + 1
-                    }
-                }
-                val waitingForVoice by remember(pageIndex, heldPage) {
-                    derivedStateOf {
-                        mushafLeafWaitingForVoice(
-                            pageNumber = pageIndex + 1,
-                            waitingPage = waitingPage,
-                            heldPage = heldPage,
-                        )
-                    }
-                }
-                // Every input's own state object is a key: each of them is
-                // remembered on keys of its own, and a capture of a replaced one
-                // goes on answering for a chapter that is no longer loaded.
-                val liveInk by remember(pageIndex, voiceLeaf, catalog, loadedSurahId, english, book, heldPage) {
-                    derivedStateOf {
-                        mushafUsesLiveInk(
-                            settled,
-                            pageOwnsVoice,
-                            waitingForVoice,
-                            pageHasActiveWord,
-                        )
-                    }
-                }
-                val leafWordClick = remember(pageIndex, page.page) {
-                    { token: MushafToken ->
-                        if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
-                            waitingPage = pageIndex + 1
-                            onTappedLeafNow.value(pageIndex + 1)
-                            onWordClickNow.value(token)
-                        }
-                    }
-                }
-                val leafWordLongClick = remember(pageIndex) {
-                    { token: MushafToken ->
-                        if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
-                            onWordLongClickNow.value(token)
-                        }
-                    }
-                }
-                val leafAyahClick = remember(pageIndex, page.page) {
-                    { token: MushafToken ->
-                        if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
-                            waitingPage = pageIndex + 1
-                            onTappedLeafNow.value(pageIndex + 1)
-                            onAyahClickNow.value(token)
-                        }
-                    }
-                }
-                val leafVerseSeek = remember(pageIndex, page.page) {
-                    { surahId: Int, ayah: Int, through: Float ->
-                        if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
-                            waitingPage = pageIndex + 1
-                            onTappedLeafNow.value(pageIndex + 1)
-                            onVerseSeekNow.value(surahId, ayah, through)
-                        }
-                    }
-                }
-                val leafVerseLongPress = remember(pageIndex) {
-                    { surahId: Int, ayah: Int, through: Float ->
-                        if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
-                            onVerseLongPressNow.value(surahId, ayah, through)
-                        }
-                    }
-                }
-                val leafBasmalahClick = remember(pageIndex, page.page) {
-                    { surahId: Int ->
-                        if (mushafLeafAcceptsTap(pageIndex, currentPageNow.value)) {
-                            waitingPage = pageIndex + 1
-                            onTappedLeafNow.value(pageIndex + 1)
-                            onBasmalahClickNow.value(surahId)
-                        }
-                    }
-                }
-                // Every Madinah page the leaf draws from — two or three, since the
-                // English book paginates itself and its leaves do not stop where
-                // the Arabic ones do.
-                val leafPages = bookLeaf?.pages ?: page.page..page.page
-                val leafRuns = bookLeaf?.runs.orEmpty()
-                val leafVerses = bookLeaf?.verses.orEmpty()
-                // The Arabic word each verse of the leaf opens with — what a tap on
-                // an English sentence plays from. Gathered here rather than in the
-                // sheet because it is the pager that holds the catalog, and a leaf
-                // spanning two pages needs both of them.
-                val leafTokens = remember(leafPages, english) {
-                    if (!english) {
-                        emptyMap()
-                    } else {
-                        buildMap {
-                            leafPages.forEach { number ->
-                                catalog.page(number)?.lines?.forEach { line ->
-                                    line.tokens.forEach { token ->
-                                        if (token.word.position == 1) {
-                                            put(token.surahId to token.ayah, token)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                // One description for the leaf, not ~450 word nodes: the QCF
-                // glyphs are private-use artwork — meaningless to a screen reader
-                // — and an active accessibility service re-sorted and re-geometried
-                // every one of them per frame of a swipe, which was the mushaf's
-                // swipe lag. Taps are pointer-based and unaffected.
-                // The chapter the leaf opens in. For English that is its first
-                // verse's, not the page's — a leaf may open partway down a page
-                // whose "primary" chapter it never reaches.
-                val leafSurahId = if (english) {
-                    leafVerses.firstOrNull()?.first ?: page.primarySurahId
-                } else {
-                    page.primarySurahId
-                }
-                val leafSurah = surahsById[leafSurahId]?.nameTransliteration
-                val leafDescription = remember(page, leafSurah, english, leafText, leafVerses) {
-                    buildString {
-                        append("Mushaf page ")
-                        append(page.page)
-                        if (leafSurah != null) {
-                            append(", ")
-                            append(leafSurah)
-                        }
-                        append(", Juz ")
-                        append(page.juz)
-                        val verses = leafText
-                        if (english) {
-                            leafVerses.forEach { (surahId, ayah) ->
-                                append(". ")
-                                append(verses[quranWordKey(surahId, ayah, 1)].orEmpty())
-                            }
-                        } else {
-                            page.lines.forEach { line ->
-                                if (line.tokens.isNotEmpty()) append(". ")
-                                line.tokens.forEach { token ->
-                                    append(token.word.arabic)
-                                    append(' ')
-                                }
-                            }
-                        }
-                    }.trimEnd()
-                }
-                BoxWithConstraints(
-                    Modifier
-                        .fillMaxSize()
-                        .clearAndSetSemantics {
-                            contentDescription = leafDescription
-                        }
-                        // Each leaf gets a surface of its own, so turning the page
-                        // moves something already recorded instead of drawing it
-                        // again. Without this the pager's offset dirtied the leaf's
-                        // display list on every frame of a swipe and all ~150 of its
-                        // word nodes were re-recorded: measured, that was the whole
-                        // of the hitch — 99th percentile 101ms against 38 with it,
-                        // and half as many frames blamed on the UI thread.
-                        .graphicsLayer { }
-                        .clipLeafSides()
-                        .padding(horizontal = MushafPageMargin),
-                ) {
-                    val density = LocalDensity.current
-                    // Both hands spend the same frame; English fills it with prose.
-                    val bands = mushafLeafBands(english)
-                    // One unit for the whole leaf — see MushafGrid. Both bands below
-                    // are a whole number of them, so the head and the well sit on the
-                    // same rhythm as the lines of revelation.
-                    val unit = with(density) {
-                        bands.unitPx(constraints.maxHeight.toFloat()).toDp()
-                    }
-                    // The leaf's own size, from the paper it is set on — the same
-                    // chain the app's root walks before any of this is composed, so
-                    // the book it paginated is the book this leaf draws.
-                    val englishSlot = if (english) {
-                        englishLeafSlotPx(constraints.maxWidth, constraints.maxHeight, density)
-                    } else {
-                        null
-                    }
-                    Column(Modifier.fillMaxSize()) {
-                        MushafPageHeader(
-                            surahNameArabic = surahsById[leafSurahId]?.nameArabic,
-                            surahNameLatin = surahsById[leafSurahId]?.nameTransliteration,
-                            unit = unit,
-                            glyphSize = leafGlyphSize(unit),
-                            page = if (english) pageIndex + 1 else page.page,
-                            pageNumberScript = pageNumberScript,
-                        )
-                        Spacer(Modifier.height(unit * bands.headGutter))
-                        val wellModifier = Modifier
-                            .height(unit * bands.well)
-                            .fillMaxWidth()
-                        if (english) {
-                            MushafEnglishSheet(
-                                page = page,
-                                leafText = leafText,
-                                content = content,
-                                basmalahWash = proseBasmalahWash,
-                                surahsById = surahsById,
-                                liveInk = liveInk,
-                                pageOwnsVoice = pageOwnsVoice,
-                                waitingForVoice = waitingForVoice,
-                                pageHasActiveWord = pageHasActiveWord,
-                                activeWordState = activeWordState,
-                                washClock = englishWashClock,
-                                playback = playback,
-                                playbackSpeed = playbackSpeed,
-                                flashAyah = flashAyah.takeIf { settled },
-                                flashWordPosition = flashWordPosition.takeIf { settled },
-                                flashWordPositions = flashWordPositions.takeIf { settled }.orEmpty(),
-                                searchFocusActive = searchFocusActive && settled,
-                                onMetrics = onLeafMetrics,
-                                measured = bookMeasured,
-                                verseNumberScript = verseNumberScript,
-                                wellPx = englishSlot?.get(0) ?: 1f,
-                                measurePx = englishSlot?.get(1) ?: 1f,
-                                leafRuns = leafRuns,
-                                leafTokens = leafTokens,
-                                alignments = alignments,
-                                onVerseSeek = leafVerseSeek,
-                                onVerseLongPress = leafVerseLongPress,
-                                onBasmalahClick = leafBasmalahClick,
-                                modifier = wellModifier,
-                            )
-                        } else {
-                            MushafPageSheet(
-                                basmalahWash = basmalahWash,
-                                page = page,
-                                content = content,
-                                surahsById = surahsById,
-                                liveInk = liveInk,
-                                pageOwnsVoice = pageOwnsVoice,
-                                waitingForVoice = waitingForVoice,
-                                pageHasActiveWord = pageHasActiveWord,
-                                activeWordState = activeWordState,
-                                playback = playback,
-                                playbackSpeed = playbackSpeed,
-                                flashAyah = flashAyah.takeIf { settled },
-                                flashWordPosition = flashWordPosition.takeIf { settled },
-                                flashWordPositions = flashWordPositions.takeIf { settled }.orEmpty(),
-                                searchFocusActive = searchFocusActive && settled,
-                                onWordClick = leafWordClick,
-                                onWordLongClick = leafWordLongClick,
-                                onAyahClick = leafAyahClick,
-                                onBasmalahClick = leafBasmalahClick,
-                                unit = unit,
-                                modifier = wellModifier,
-                            )
-                        }
-                        // Zero on both hands now: the folio is in the running
-                        // head, the well runs to the leaf's bottom edge and the
-                        // dial's own head air is the foot (see clipLeafSides).
-                        Spacer(Modifier.height(unit * bands.tail))
-                    }
-                }
-            }
-        }
+            pageContent = leafContent,
+        )
     }
 }
 
@@ -2130,7 +2245,11 @@ private fun MushafBasmalahLine(
  * over the dial. A whole-box clip cut the feet off the English leaf's last
  * line.
  */
-private fun Modifier.clipLeafSides(): Modifier = drawWithContent {
+private fun Modifier.clipLeafSides(): Modifier = this.then(ClipLeafSides)
+
+// One instance, so a recomposed leaf hands Compose an equal modifier: a fresh
+// draw lambda each time re-recorded the leaf, and retired its turn picture.
+private val ClipLeafSides = Modifier.drawWithContent {
     val bleed = LeafFootBleed.toPx()
     clipRect(top = -bleed, bottom = size.height + bleed) {
         this@drawWithContent.drawContent()
@@ -2153,3 +2272,4 @@ private fun TurningFrameRate(
         },
     )
 }
+

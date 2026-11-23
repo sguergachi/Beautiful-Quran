@@ -593,6 +593,46 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   completed ayahs use a static full-ink pack and later ayahs share a motionless
   recess pack. One page-level accessibility node exposes the canonical
   Arabic instead of hundreds of private-use glyphs.
+- A turn slides pictures, not type (`MushafTurnSnapshot.kt`). Every Madinah
+  page has its own face and each word is one large glyph, so a leaf's glyphs
+  fill about half of HWUI's GPU glyph atlas (its size follows the screen's).
+  Two leaves on screen at once did not fit: every frame of a turn evicted one
+  leaf's glyphs to draw the other's and uploaded them again — ~130 ms of
+  `glTexSubImage2D` per swipe on the emulator, spread over every frame of it.
+  So an Arabic leaf one turn from the resting one, carrying static ink, is
+  pictured once it has been still for longer than any fade it may have begun
+  (`InkEngine` ink fade / recess, the leaf's face fade, plus 120 ms): its
+  recorded layer is rendered asynchronously on the render thread into a
+  hardware bitmap — `HardwareBufferRenderer` in the window's colour space
+  (Display P3 on a wide window, whose accents are P3), or, before API 34, an
+  `ImageReader` surface on sRGB windows only (a wide window there is never
+  pictured). During a turn that leaf draws its picture; the settled leaf keeps
+  setting live type and has the atlas to itself. Any re-record of a pictured
+  leaf retires its picture, mid-turn included, so a changed leaf is never shown
+  stale. A picture is pixel-identical to the live leaf (screenshot diff on the
+  emulator: only the status-bar clock differed). Forcing `Offscreen`
+  compositing on the leaf is still wrong: its layers are re-rendered inside
+  the turn, a whole page's uploads in one 90 ms frame.
+- Leaves hold two neighbours either side at rest (`MushafHeldNeighbours`),
+  returned a pair at a time after an open or a dial landing. Whatever a turn
+  can show is therefore composed and measured before it starts. The pager
+  still composes leaves of its own accord — the one joining its window halfway
+  through a turn (28–48 ms of composition and measure on that frame) and the
+  one it prefetches past the window at rest, whose lines `BoxWithConstraints`
+  then measured on the next swipe's first frame (40–70 ms). Both stay blank
+  paper (`mushafDefersLeaf`) until the pager rests within reach, unless in or
+  beside the view or a jump's destination.
+- "Resting" is its own state (`restPage`), two still frames after the scroll
+  ends. `settledPage` moves on the frame a finger lifts, between the drag's
+  scroll and the fling's, while the leaf has half the screen to go: every leaf
+  keyed on it (live ink, flash, search focus) recomposed mid-fling.
+- The pager's page content is built outside `TurningFrameRate`. Written inline
+  in its content, each frame-rate vote change handed `HorizontalPager` a new
+  block, recomposing every leaf at a turn's start, its end and at finger lift.
+  Taps read `pagerState.currentPage` when they land rather than holding it in
+  composition, which recomposed the whole pager halfway through each turn.
+  `clipLeafSides` is one modifier instance, so a recomposed leaf is not
+  re-recorded.
 - Chrome (`MushafReadingSheet`) keys the gilt seed on `settledPage`, not
   `currentPage`, so a fling does not regenerate ornaments mid-turn.
 - QCF word and verse-mark cells are `MushafWordText` nodes. They are laid out
@@ -631,6 +671,19 @@ Page 5's text and controls were pixel-identical below the changed running
 head. Forced `Offscreen` page caching was rejected: its 95th percentile rose
 to 113 ms. These are a same-host 60 Hz comparison, not a physical-device
 120 Hz result; cold page measure still exceeds the 8.3 ms frame budget.
+
+2026-11-22, same emulator (60 Hz panel, so frame work is held to 120 Hz's
+8.3 ms budget), release benchmark APKs, `mushafPageTurn` letting each leaf
+rest before the next swipe, display-queue waits (`dequeueBuffer`,
+`postAndWait`) excluded. Before, over ~400 turn frames per run: UI thread one
+frame over 8.3 ms (47 ms, the swipe-start measure); render thread 39 over,
+95th percentile 10.3 ms, max 22 ms, almost all glyph uploads. After, three
+runs, ~1,220 turn frames: UI thread max 2.0 ms; render thread 99th percentile
+≤ 6.8 ms, max 8.1 ms; none over 8.3 ms. The work moved to rest: the outer
+leaf's composition (~50 ms UI) and two pictures (~100 ms of render-thread
+time, asynchronous) once a turn settles. A turn begun within about a second
+of opening a chapter, or one of a rapid series begun before the last settled,
+has no pictures yet and draws live as before.
 
 ### 6. R8 release builds are what ships
 
@@ -817,7 +870,9 @@ Until a physical trace shows a stall, leave the wash and startup order alone.
   mushaf mode).
 - Gapless surah-file playback (single MediaItem + absolute-offset segments)
   to remove inter-ayah stream startup entirely.
-- Mushaf glyph-atlas uploads (2026-11-21, not fixed). Every Madinah page has
+- Mushaf glyph-atlas uploads (2026-11-21; turns fixed 2026-11-22 by turn
+  pictures, see 5b — the uploads now happen at rest, and still on a dial
+  landing's first frames). Every Madinah page has
   its own face, so a leaf's first visible frames rasterise and upload its
   glyphs. One page-turn run spent 1.4 s in `glTexSubImage2D`; a dial landing
   frame took 80 ms, ~25 ms of it uploads. One attempt warmed each held
@@ -829,8 +884,9 @@ Until a physical trace shows a stall, leave the wash and startup order alone.
   not found. A future attempt needs on-device proof that HWUI renders an
   off-screen layer, and must not draw a leaf's content layer into a second
   parent.
-- Neighbour leaf composition. Bringing a leaf into the pager's window still
-  composes ~150 word nodes in one frame (16–44 ms of composition on the
+- Neighbour leaf composition (turns fixed 2026-11-22: leaves joining the
+  window mid-turn stay blank until rest, see 5b). Bringing a leaf into the
+  pager's window still composes ~150 word nodes in one frame (16–44 ms of composition on the
   emulator, on top of first-visit measure). Splitting it with pausable
   composition needs a pager prefetch hook that `HorizontalPager` does not
   expose. Drawing a line's static words from one node would cut the node
