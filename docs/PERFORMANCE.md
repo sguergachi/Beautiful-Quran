@@ -610,10 +610,13 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   thread's upload path. A leaf composed static is pictured as soon as its
   entrance fade is done; one that carried live ink first waits out any fade it
   may have begun (`InkEngine` ink fade / recess, the leaf's face fade, plus
-  120 ms). During a turn a pictured leaf draws its picture — one arriving
-  mid-turn is swapped in — and the settled leaf keeps setting live type. Any
-  re-record of a pictured leaf retires its picture, mid-turn included, so a
-  changed leaf is never shown stale.
+  120 ms). A pictured leaf draws its picture whenever it holds a valid one —
+  off screen at rest as well as mid-turn, so a turn starting or ending never
+  redraws it (a redraw there could not be told from a change: it threw away
+  pictures still rasterising, and had to assume the turn's end changed
+  nothing) — and the settled leaf keeps setting live type. Any redraw of a
+  leaf showing its picture means the leaf changed: it goes live and its
+  picture is retired, so a changed leaf is never shown stale.
   Software rasterises a QCF word exactly as the GPU does — screenshot diffs of
   forced pictures against the live leaf, light and Nightfall, sRGB and P3,
   differ by at most 1/255 (2/255 through P3) — but not everything else. The

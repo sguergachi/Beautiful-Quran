@@ -67,7 +67,7 @@ import kotlin.math.ceil
  * re-record of a pictured leaf retires its picture until it is taken again.
  *
  * A picture never touches the render thread, which is drawing the turn: the
- * leaf's next draw records itself into a [Picture] as well, which is
+* leaf's next draw records itself into a [Picture] as well, which is
  * rasterised in software on a background thread, in the window's colour space
  * (Display P3 on a wide window, whose accents are P3), and uploaded from there.
  */
@@ -124,23 +124,28 @@ private class LeafPicture {
 internal fun rememberMushafTurnSnapshots(): MushafTurnSnapshots = remember { MushafTurnSnapshots() }
 
 /**
- * Draws the leaf from its picture while [turning], when it is [pictured] and a
- * picture of its current content exists; otherwise draws it live and, once it
- * is [still], takes one. [turning] is read in draw: it must only change when a
- * turn starts or ends.
+ * Draws the leaf from its picture when it is [pictured] and a picture of its
+ * current content exists; otherwise draws it live and, once it is [still],
+ * takes one.
+ *
+ * Whether a turn is under way is deliberately not read here. A pictured leaf
+ * is a neighbour — off screen at rest — so it can show its picture at rest as
+ * well as mid-turn, and a turn starting or ending never redraws it. When it
+ * did, that redraw could not be told from a change to the leaf: the start of
+ * a turn threw away a picture still being rasterised, and the end of one had
+ * to be assumed to change nothing, which a change landing on the same frame
+ * would have turned into a stale picture.
  */
 @Composable
 internal fun Modifier.mushafTurnSnapshot(
     snapshots: MushafTurnSnapshots,
     pictured: Boolean,
-    turning: () -> Boolean,
     still: () -> Boolean,
     overlay: LeafOverlay,
     bleed: Dp,
 ): Modifier {
     val layer = rememberGraphicsLayer()
     val picture = remember { LeafPicture() }
-    val turningNow = rememberUpdatedState(turning)
     val stillNow = rememberUpdatedState(still)
     val density = LocalDensity.current
     val wideGamut = LocalWideGamut.current
@@ -181,8 +186,8 @@ internal fun Modifier.mushafTurnSnapshot(
                     if (bitmap != null && at == picture.generation) {
                         picture.bitmap = bitmap
                         picture.bitmapGeneration = at
-                        // Mid-turn the leaf is sliding live; show it the picture.
-                        if (turningNow.value()) picture.arrived.intValue++
+                        // The leaf is drawing live until now; show it the picture.
+                        picture.arrived.intValue++
                     }
                 } finally {
                     if (picture.takingGeneration == at) picture.takingGeneration = -1
@@ -196,14 +201,13 @@ internal fun Modifier.mushafTurnSnapshot(
             Modifier.onPlaced { overlay.leaf = it }.drawWithContent {
                 val bleedX = ceil(SideBleed.toPx()).toInt()
                 val bleedY = ceil(bleed.toPx()).toInt()
-                val moving = pictured && turningNow.value()
                 val request = picture.request.intValue
                 picture.arrived.intValue
                 val bitmap = picture.bitmap
-                if (moving && bitmap != null &&
+                if (pictured && bitmap != null &&
                     picture.bitmapGeneration == picture.generation &&
-                    // Asked to draw again mid-turn with nothing of ours
-                    // changed: something on the leaf did. Live from here.
+                    // Asked to draw again with nothing of ours changed:
+                    // something on the leaf did. Live from here.
                     !picture.lastDrawWasPicture
                 ) {
                     drawImage(bitmap, topLeft = Offset(-bleedX.toFloat(), -bleedY.toFloat()))
@@ -211,9 +215,9 @@ internal fun Modifier.mushafTurnSnapshot(
                     picture.lastDrawWasPicture = true
                     return@drawWithContent
                 }
-                // The turn ending is the one live record that changes nothing.
-                val unchanged = picture.lastDrawWasPicture && !moving
-                if (!unchanged) picture.generation++
+                // Every live record may carry new content: nothing of ours
+                // redraws a leaf showing a valid picture.
+                picture.generation++
                 picture.lastDrawWasPicture = false
                 val width = size.width.toInt() + 2 * bleedX
                 val height = size.height.toInt() + 2 * bleedY

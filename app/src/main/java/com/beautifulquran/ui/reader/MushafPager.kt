@@ -1,6 +1,5 @@
 package com.beautifulquran.ui.reader
 
-import android.graphics.Paint
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,6 +25,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalLocaleList
@@ -72,28 +72,20 @@ import com.beautifulquran.data.model.Ayah
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.data.model.SurahContent
 import com.beautifulquran.domain.MUSHAF_LINE_PITCH_EM
-import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
-import com.beautifulquran.domain.mushafDisplayFontPx
 import com.beautifulquran.domain.MushafCatalog
 import com.beautifulquran.domain.MushafPage
 import com.beautifulquran.domain.MushafToken
 import com.beautifulquran.domain.mushafFontPreloadPages
-import com.beautifulquran.domain.MushafGrid
 import com.beautifulquran.domain.mushafLeafBands
 import com.beautifulquran.domain.MushafType
 import com.beautifulquran.domain.mushafDisplayGridSlots
-import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafIsOpeningLeaf
 import com.beautifulquran.domain.mushafMedallionChords
 import com.beautifulquran.domain.mushafLineMayStandShort
-import com.beautifulquran.domain.mushafUniformFontPx
-import com.beautifulquran.domain.qcfTrailingMark
-import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.domain.EnglishBook
 import com.beautifulquran.domain.EnglishVerseAlignments
 import com.beautifulquran.domain.EnglishAlignment
 import com.beautifulquran.domain.quranWordKey
-import com.beautifulquran.domain.reflowMushafPage
 import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import androidx.compose.foundation.Canvas
 import androidx.core.content.res.ResourcesCompat
@@ -1246,29 +1238,21 @@ internal fun MushafPager(
     // scope, so a turn starting or settling recomposes the pager call alone
     // and not the whole of this function.
     val turnSnapshots = rememberMushafTurnSnapshots()
-    // The page the pager rests on, and whether it does. settledPage moves on
+    // The leaves publish their setting for the warm-up; it goes with the
+    // reader, so a rotation or a density change never warms by a stale one.
+    DisposableEffect(Unit) { onDispose { MushafLeafWarmup.setting = null } }
+    // The page the pager rests on. settledPage moves on
     // the frame a finger lifts — the drag's scroll ends there and the fling's
     // begins — while the leaf still has half the screen to travel, and every
     // leaf keyed on it recomposed mid-fling. This one waits until the pager
     // has stayed still.
     val restPage = remember(pagerState) { mutableIntStateOf(pagerState.settledPage) }
-    val atRest = remember(pagerState) { mutableStateOf(!pagerState.isScrollInProgress) }
-    // One value for "a turn is under way", read by the leaves' turn pictures in
-    // draw. Derived, so the frame a finger lifts — scrolling false for a frame
-    // between the drag and the fling, never at rest — does not redraw them.
-    val leafTurning = remember(pagerState) {
-        derivedStateOf { pagerState.isScrollInProgress || !atRest.value }
-    }
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.isScrollInProgress to pagerState.settledPage }
             .collectLatest { (scrolling, settledPage) ->
-                if (scrolling) {
-                    atRest.value = false
-                    return@collectLatest
-                }
+                if (scrolling) return@collectLatest
                 repeat(MushafRestFrames) { withFrameNanos { } }
                 restPage.intValue = settledPage
-                atRest.value = true
             }
     }
     // The leaves, built outside the frame-rate vote below. Written inline in
@@ -1500,7 +1484,6 @@ internal fun MushafPager(
                     .mushafTurnSnapshot(
                         snapshots = turnSnapshots,
                         pictured = !english && !liveInk,
-                        turning = { leafTurning.value },
                         still = { leafStill.value },
                         overlay = leafOverlay,
                         bleed = LeafFootBleed,
