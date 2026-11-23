@@ -25,7 +25,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalLocaleList
+import com.beautifulquran.ui.theme.LocalQuranAccents
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -1181,14 +1185,20 @@ internal fun MushafPager(
                 }
             }
     }
-    LaunchedEffect(pagerState, context, catalog.pageCount, book) {
-        snapshotFlow { pagerState.settledPage }
-            .collect { settled ->
+    // Page faces for the leaves around the resting one, and the leaves a turn
+    // is heading for set ahead of it (see [MushafLeafWarmup]). Followed by the
+    // page in view and the turn's target, not only the settled page: a run of
+    // quick flips never settles, and the leaves it reaches were composed cold.
+    LaunchedEffect(pagerState, context, catalog, book, surahsById) {
+        snapshotFlow { Triple(pagerState.settledPage, pagerState.currentPage, pagerState.targetPage) }
+            .collectLatest { (settled, current, target) ->
                 val pages = mushafFontPreloadPages(settled, catalog.pageCount)
                 withContext(Dispatchers.Default) {
                     MushafQcfFonts.preload(context, pages)
-                    if (book == null) pages.forEach { page ->
-                        warmMushafInkProfiles(catalog.page(page), MushafQcfFonts.cached(page)?.typeface)
+                    if (book != null) return@withContext
+                    mushafWarmOrder(settled, current, target, catalog.pageCount).forEach { number ->
+                        val leaf = catalog.page(number) ?: return@forEach
+                        MushafLeafWarmup.warm(context, leaf) { surahsById[it]?.ayahCount }
                     }
                 }
             }
@@ -1298,10 +1308,10 @@ internal fun MushafPager(
             val settled by remember {
                 derivedStateOf { pageIndex == restPage.intValue }
             }
-            // Only a leaf a turn from here can be shown by one.
-            val besideSettled by remember {
-                derivedStateOf { abs(pageIndex - restPage.intValue) == 1 }
-            }
+            // Whether the leaf's own entrance has finished: a picture taken
+            // partway through it would keep it half-inked.
+            val leafStill = remember(pageIndex) { mutableStateOf(false) }
+            val leafOverlay = remember(pageIndex) { LeafOverlay() }
             // Keyed on [voiceLeaf] itself: it is rebuilt when the loaded chapter
             // changes, and a derivation remembered on the page alone kept
             // reading the old chapter's. Playing an unloaded chapter from its
@@ -1489,8 +1499,10 @@ internal fun MushafPager(
                     .graphicsLayer { }
                     .mushafTurnSnapshot(
                         snapshots = turnSnapshots,
-                        pictured = !english && besideSettled && !liveInk,
+                        pictured = !english && !liveInk,
                         turning = { leafTurning.value },
+                        still = { leafStill.value },
+                        overlay = leafOverlay,
                         bleed = LeafFootBleed,
                     )
                     .clipLeafSides()
@@ -1560,6 +1572,8 @@ internal fun MushafPager(
                         )
                     } else {
                         MushafPageSheet(
+                            leafStill = leafStill,
+                            leafOverlay = leafOverlay,
                             basmalahWash = basmalahWash,
                             page = page,
                             content = content,
@@ -1619,6 +1633,10 @@ internal fun MushafPager(
 
 @Composable
 private fun MushafPageSheet(
+    /** Told whether the leaf's entrance has finished. */
+    leafStill: MutableState<Boolean>,
+    /** Where the leaf's live-drawn ornaments register (see [drawnLiveOverPicture]). */
+    leafOverlay: LeafOverlay,
     page: MushafPage,
     content: SurahContent,
     basmalahWash: StateFlow<Float?>,
@@ -1738,22 +1756,7 @@ private fun MushafPageSheet(
     }
     val pageFont = pageFace?.family
     val pageTypeface = pageFace?.typeface
-    val displayPage = remember(page, pageTypeface) {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = pageTypeface
-            textSize = 100f
-        }
-        reflowMushafPage(page) { token ->
-            val qcf = token.word.qcfV2
-            val word = if (qcf.isEmpty()) {
-                token.word.arabic
-            } else {
-                qcfWordGlyphs(qcf, token.endsAyah)
-            }
-            val mark = if (qcf.isEmpty()) "" else qcfTrailingMark(qcf, token.endsAyah)
-            paint.measureText(word) + paint.measureText(mark) + MUSHAF_WORD_GAP_EM * paint.textSize
-        }
-    }
+    val displayPage = remember(page, pageTypeface) { mushafDisplayPage(page, pageTypeface) }
     val leafReady = pageFace != null || faceOverdue
     // A face already resident cannot reflow, so there is nothing for this fade
     // to hide and the leaf starts fully inked. The chapter's own entrance is
@@ -1764,6 +1767,7 @@ private fun MushafPageSheet(
     // reading an Animatable in composition would recompose the whole leaf on
     // every frame of its own entrance.
     var leafSettled by remember(page.page) { mutableStateOf(residentFace != null) }
+    SideEffect { leafStill.value = leafSettled }
     LaunchedEffect(page.page, leafReady) {
         if (leafSettled || !leafReady) return@LaunchedEffect
         DevProfiling.mark("leafFadeStart p${page.page}")
@@ -1807,9 +1811,7 @@ private fun MushafPageSheet(
                 .coerceAtLeast(1f)
             // Every chapter opening costs the grid a line for its title band,
             // and another for the basmalah under it where the chapter takes one.
-            val fitSlotCount = (page.lines.size + page.surahStarts.size +
-                page.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) })
-                .coerceAtLeast(1)
+            val fitSlotCount = mushafLeafFitSlotCount(page)
             val displaySlotCount = (displayPage.lines.size + displayPage.surahStarts.size +
                 displayPage.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) })
                 .coerceAtLeast(1)
@@ -1818,20 +1820,7 @@ private fun MushafPageSheet(
             // shrink as the pages turned.
             val unitPx = with(density) { unit.toPx() }
             val fontPx = remember(unitPx, availableW, fitSlotCount) {
-                mushafDisplayFontPx(
-                    mushafUniformFontPx(
-                        measureWidthPx = availableW,
-                        // The well is the grid's fifteen units, whatever the page
-                        // holds: a leaf carrying a chapter's opening asks for more
-                        // slots than that and packs them into the same paper. Both
-                        // arguments used to be scaled by the slot count, which
-                        // cancelled and left the guard unable to bite — a chapter
-                        // opening kept type cut for a full slot while its slot had
-                        // shrunk to about 0.88 of one.
-                        wellHeightPx = unitPx * MushafGrid.TEXT_LINES,
-                        slots = mushafGridSlots(fitSlotCount),
-                    ),
-                )
+                mushafLeafFontPx(page, availableW, unitPx)
             }
             val fontSp = with(density) { fontPx.toSp() }
             // Every line on the leaf is set to this one measure — the leaf
@@ -1839,6 +1828,18 @@ private fun MushafPageSheet(
             // BoxWithConstraints per line (see [MushafHafsLine]).
             val lineMeasurePx = (constraints.maxWidth.toFloat() - edgeGutterPx * 2)
                 .coerceAtLeast(1f)
+            // Handed to the leaves still to come, which are set from it in the
+            // background before they are composed (see [MushafLeafWarmup]).
+            val wordInk = rememberWordInkPalette().fullInkColor
+            val markInk = LocalQuranAccents.current.gold
+            val resolver = LocalFontFamilyResolver.current
+            val locales = LocalLocaleList.current
+            if (pageFont != null && !mushafIsOpeningLeaf(page.page)) {
+                val setting = remember(availableW, unitPx, lineMeasurePx, density, resolver, locales, wordInk, markInk) {
+                    MushafLeafSetting(availableW, unitPx, lineMeasurePx, density, resolver, locales, wordInk, markInk)
+                }
+                SideEffect { MushafLeafWarmup.setting = setting }
+            }
             // One slot is one unit of the leaf's grid, whatever the page holds.
             val lineSlot = with(density) {
                 (availableH / mushafDisplayGridSlots(displaySlotCount)).toDp()
@@ -1879,6 +1880,7 @@ private fun MushafPageSheet(
             }
             CompositionLocalProvider(
                 LocalLayoutDirection provides LayoutDirection.Rtl,
+                LocalLeafOverlay provides leafOverlay,
             ) {
                 Column(
                     modifier = Modifier
@@ -1900,7 +1902,8 @@ private fun MushafPageSheet(
                             Box(
                                 Modifier
                                     .fillMaxWidth()
-                                    .height(lineSlot),
+                                    .height(lineSlot)
+                                    .drawnLiveOverPicture(),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 MushafSurahTitleBand(
@@ -1913,7 +1916,8 @@ private fun MushafPageSheet(
                                 Box(
                                     Modifier
                                         .fillMaxWidth()
-                                        .height(lineSlot),
+                                        .height(lineSlot)
+                                        .drawnLiveOverPicture(),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     MushafBasmalahLine(

@@ -2,62 +2,53 @@ package com.beautifulquran.ui.reader
 
 import android.graphics.Bitmap
 import android.graphics.ColorSpace
-import android.graphics.HardwareBufferRenderer
-import android.graphics.HardwareRenderer
-import android.graphics.PixelFormat
-import android.graphics.RenderNode
-import android.hardware.HardwareBuffer
-import android.media.ImageReader
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
-import androidx.annotation.RequiresApi
+import android.graphics.Picture
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.graphics.drawscope.draw
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.beautifulquran.ui.theme.LocalWideGamut
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.time.Duration
-import kotlin.coroutines.resume
+import kotlinx.coroutines.launch
 import kotlin.math.ceil
 
 /**
- * Pictures of the pager's still leaves, taken while nothing moves, so a turn
- * slides pictures instead of setting type.
+ * Pictures of the pager's still leaves, so a turn slides pictures instead of
+ * setting type.
  *
  * Every Madinah page has its own face, and each word is one large glyph. A
  * leaf's glyphs are about half of the glyph atlas HWUI keeps on the GPU (its
@@ -65,159 +56,41 @@ import kotlin.math.ceil
  * every frame of a turn evicted one leaf's glyphs to draw the other's and
  * uploaded them again — ~130 ms of `glTexSubImage2D` per swipe on the
  * emulator, spread over every frame of it, a render-thread 95th percentile of
- * 10 ms against the 8.3 ms a 120 Hz frame has. Drawn from its picture, the
- * incoming leaf asks the atlas for nothing, and the settled leaf, which goes
- * on setting live type, has the atlas to itself.
+ * 10 ms against the 8.3 ms a 120 Hz frame has. Drawn from its picture, a leaf
+ * asks the atlas for nothing.
  *
- * Only an Arabic leaf one turn from the resting one, carrying static ink, is
- * ever pictured, so a wash, a search flash or a selection — all of which live
- * on the resting or the voice's leaf — always draw live. English prose shares
- * small glyphs across leaves and never overran the atlas; its leaves fade in
- * on layers of their own as the book is measured, and are left alone. Any re-record of a
- * pictured leaf, at rest or mid-turn, retires its picture until it has been
- * still again for [quietMs].
+ * Every Arabic leaf not carrying live ink is pictured: a run of quick flips
+ * never rests, and each leaf it reaches has to be a picture by the time it
+ * slides in. A wash, a search flash or a selection live on the resting or the
+ * voice's leaf, which always draw live. English prose shares small glyphs
+ * across leaves and never overran the atlas; its leaves are left alone. Any
+ * re-record of a pictured leaf retires its picture until it is taken again.
  *
- * A picture is rendered the way the window is — Display P3 on a wide window,
- * whose accents are P3, sRGB otherwise — and asynchronously on the render
- * thread: the UI thread only hands over the display list.
+ * A picture never touches the render thread, which is drawing the turn: the
+ * leaf's next draw records itself into a [Picture] as well, which is
+ * rasterised in software on a background thread, in the window's colour space
+ * (Display P3 on a wide window, whose accents are P3), and uploaded from there.
  */
 internal class MushafTurnSnapshots {
-    /** One picture at a time, each on a frame of its own. */
+    /** One recording a frame, so taking pictures never stacks up on one draw. */
     val capture = Mutex()
 
-    /**
-     * Bumped after a picture is taken. Taking it ran the pictured leaf's glyphs
-     * through the atlas; the settled leaf reads this while drawing, so it is
-     * recorded and drawn once more at rest and its own glyphs are the freshest
-     * in the atlas when the next turn begins.
-     */
-    val warmEpoch = mutableIntStateOf(0)
+    private val raster = Dispatchers.Default.limitedParallelism(1)
 
-    private val root = RenderNode("MushafTurnPicture")
-    private var renderer: HardwareRenderer? = null
-
-    /**
-     * Renders [layer], [width] × [height] px, into a hardware bitmap in the
-     * window's colour space; null where the platform cannot, which leaves the
-     * leaf drawing live. Only API 34's buffer renderer takes a colour space,
-     * so an older wide-gamut window is never pictured: a P3 accent rendered
-     * into sRGB would turn the page clipped.
-     */
-    suspend fun take(
-        layer: GraphicsLayer,
-        width: Int,
-        height: Int,
-        density: Density,
-        wideGamut: Boolean,
-    ): ImageBitmap? {
-        val wide = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
-        if (wideGamut && !wide) return null
-        return withContext(NonCancellable) {
+    /** [picture], [width] × [height] px, as a hardware bitmap; null if the platform declines. */
+    suspend fun rasterize(picture: Picture, width: Int, height: Int, wideGamut: Boolean): ImageBitmap? =
+        withContext(raster) {
+            val space = ColorSpace.get(if (wideGamut) ColorSpace.Named.DISPLAY_P3 else ColorSpace.Named.SRGB)
+            val soft = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888, true, space)
             try {
-                root.setPosition(0, 0, width, height)
-                val canvas = root.beginRecording(width, height)
-                try {
-                    canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.BlendMode.CLEAR)
-                    CanvasDrawScope().draw(
-                        density,
-                        LayoutDirection.Ltr,
-                        Canvas(canvas),
-                        Size(width.toFloat(), height.toFloat()),
-                    ) { drawLayer(layer) }
-                } finally {
-                    root.endRecording()
-                }
-                if (wide) {
-                    renderToBuffer(width, height, ColorSpace.get(
-                        if (wideGamut) ColorSpace.Named.DISPLAY_P3 else ColorSpace.Named.SRGB,
-                    ))
-                } else {
-                    renderThroughReader(width, height)
-                }
+                android.graphics.Canvas(soft).drawPicture(picture)
+                // Uploaded here, on the platform's uploader rather than on
+                // the render thread the first time it is drawn.
+                soft.copy(Bitmap.Config.HARDWARE, false)?.asImageBitmap()
             } finally {
-                // The leaf's layer must not stay parented here between pictures.
-                root.discardDisplayList()
+                soft.recycle()
             }
         }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    private suspend fun renderToBuffer(width: Int, height: Int, colorSpace: ColorSpace): ImageBitmap? {
-        val buffer = HardwareBuffer.create(
-            width,
-            height,
-            HardwareBuffer.RGBA_8888,
-            1,
-            HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE or HardwareBuffer.USAGE_GPU_COLOR_OUTPUT,
-        )
-        val bufferRenderer = HardwareBufferRenderer(buffer)
-        try {
-            bufferRenderer.setContentRoot(root)
-            val drawn = suspendCancellableCoroutine { done ->
-                bufferRenderer.obtainRenderRequest()
-                    .setColorSpace(colorSpace)
-                    .draw(Dispatchers.Default.asExecutor()) { result ->
-                        // Waited for here, off the UI thread: the bitmap is
-                        // sampled by HWUI, which knows nothing of this fence.
-                        val fence = result.fence
-                        val ready = try {
-                            result.status == HardwareBufferRenderer.RenderResult.SUCCESS &&
-                                (!fence.isValid || fence.await(FenceTimeout))
-                        } finally {
-                            fence.close()
-                        }
-                        done.resume(ready)
-                    }
-            }
-            if (!drawn) return null
-            return Bitmap.wrapHardwareBuffer(buffer, colorSpace)?.asImageBitmap()
-        } finally {
-            bufferRenderer.close()
-            buffer.close()
-        }
-    }
-
-    /** API 30–33, sRGB windows only: HWUI renders an ImageReader surface in sRGB. */
-    private suspend fun renderThroughReader(width: Int, height: Int): ImageBitmap? {
-        val reader = ImageReader.newInstance(
-            width,
-            height,
-            PixelFormat.RGBA_8888,
-            1,
-            HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE or HardwareBuffer.USAGE_GPU_COLOR_OUTPUT,
-        )
-        val renderer = renderer ?: HardwareRenderer().also {
-            // Transparent: the picture is laid over the same paper the leaf is.
-            it.isOpaque = false
-            it.setContentRoot(root)
-            renderer = it
-        }
-        try {
-            renderer.setSurface(reader.surface)
-            val image = suspendCancellableCoroutine<android.media.Image?> { done ->
-                reader.setOnImageAvailableListener(
-                    { ready -> done.resume(ready.acquireLatestImage()) },
-                    Handler(Looper.getMainLooper()),
-                )
-                renderer.createRenderRequest().setWaitForPresent(true).syncAndDraw()
-            } ?: return null
-            return image.use { frame ->
-                val buffer = frame.hardwareBuffer ?: return null
-                buffer.use { hardware ->
-                    Bitmap.wrapHardwareBuffer(hardware, ColorSpace.get(ColorSpace.Named.SRGB))?.asImageBitmap()
-                }
-            }
-        } finally {
-            renderer.setSurface(null)
-            reader.close()
-        }
-    }
-
-    fun release() {
-        renderer?.destroy()
-        renderer = null
-        root.discardDisplayList()
-    }
 }
 
 private class LeafPicture {
@@ -226,69 +99,106 @@ private class LeafPicture {
     /** The record generation [bitmap] was taken from. */
     var bitmapGeneration = -1
 
+    /** The generation being rasterised now; -1 when none is. */
+    var takingGeneration = -1
+
     /** Bumped by every live record whose content may differ from the last. */
     var generation = 0
     var lastDrawWasPicture = false
 
     /** The generation of the last live record; -1 before the first. */
     val recorded = MutableStateFlow(-1)
+
+    /** Bumped to ask the next draw for a recording; read in draw. */
+    val request = mutableIntStateOf(0)
+    var handled = 0
+
+    /** Bumped to draw a picture that arrived mid-turn; read in draw. */
+    val arrived = mutableIntStateOf(0)
+
+    /** Whether the leaf has drawn unpictured — live ink — since it was composed. */
+    var wasLive = false
 }
 
-/** Releases [snapshots]' renderer when the pager leaves composition. */
 @Composable
-internal fun rememberMushafTurnSnapshots(): MushafTurnSnapshots {
-    val snapshots = remember { MushafTurnSnapshots() }
-    DisposableEffect(snapshots) { onDispose { snapshots.release() } }
-    return snapshots
-}
+internal fun rememberMushafTurnSnapshots(): MushafTurnSnapshots = remember { MushafTurnSnapshots() }
 
 /**
  * Draws the leaf from its picture while [turning], when it is [pictured] and a
  * picture of its current content exists; otherwise draws it live and, once it
- * has been still, takes one. [turning] is read in draw: it must only change
- * when a turn starts or ends.
+ * is [still], takes one. [turning] is read in draw: it must only change when a
+ * turn starts or ends.
  */
 @Composable
 internal fun Modifier.mushafTurnSnapshot(
     snapshots: MushafTurnSnapshots,
     pictured: Boolean,
     turning: () -> Boolean,
+    still: () -> Boolean,
+    overlay: LeafOverlay,
     bleed: Dp,
 ): Modifier {
     val layer = rememberGraphicsLayer()
     val picture = remember { LeafPicture() }
     val turningNow = rememberUpdatedState(turning)
+    val stillNow = rememberUpdatedState(still)
     val density = LocalDensity.current
     val wideGamut = LocalWideGamut.current
+    if (!pictured) SideEffect { picture.wasLive = true }
     LaunchedEffect(picture, pictured, density, wideGamut) {
         picture.bitmap = null
         picture.bitmapGeneration = -1
         if (!pictured) return@LaunchedEffect
+        // A leaf that carried live ink may still be finishing a fade it began
+        // then (see [quietMs]); one pictured from its first frame has none.
+        val settle = picture.wasLive
         picture.recorded.collectLatest { generation ->
             if (generation < 0) return@collectLatest
-            if (picture.bitmap != null && picture.bitmapGeneration == generation) return@collectLatest
-            delay(quietMs())
-            snapshotFlow { turningNow.value() }.first { !it }
+            if (picture.bitmapGeneration == generation || picture.takingGeneration == generation) {
+                return@collectLatest
+            }
+            if (settle) delay(quietMs())
+            snapshotFlow { stillNow.value() }.first { it }
+            // The draw this asks for records the leaf and hands the recording
+            // to [take]; holding the lock across that frame keeps it the only
+            // recording made in it.
             snapshots.capture.withLock {
                 withFrameNanos { }
-                if (generation != picture.generation || turningNow.value()) return@withLock
-                val size = layer.size
-                if (size.width <= 0 || size.height <= 0) return@withLock
-                val taken = snapshots.take(layer, size.width, size.height, density, wideGamut)
-                if (taken != null && generation == picture.generation) {
-                    picture.bitmap = taken
-                    picture.bitmapGeneration = generation
-                    snapshots.warmEpoch.intValue++
-                }
+                picture.request.intValue++
+                withFrameNanos { }
             }
         }
     }
+    val scope = rememberCoroutineScope()
+    // Launched by the draw, not by the collector above: the draw's own record
+    // emits a new generation, which restarts the collector.
+    val take = remember(picture, scope, snapshots, wideGamut) {
+        { recording: Picture, at: Int ->
+            picture.takingGeneration = at
+            scope.launch {
+                try {
+                    val bitmap = snapshots.rasterize(recording, recording.width, recording.height, wideGamut)
+                    if (bitmap != null && at == picture.generation) {
+                        picture.bitmap = bitmap
+                        picture.bitmapGeneration = at
+                        // Mid-turn the leaf is sliding live; show it the picture.
+                        if (turningNow.value()) picture.arrived.intValue++
+                    }
+                } finally {
+                    if (picture.takingGeneration == at) picture.takingGeneration = -1
+                }
+            }
+            Unit
+        }
+    }
     return this.then(
-        remember(snapshots, picture, layer, pictured, bleed) {
-            Modifier.drawWithContent {
+        remember(snapshots, picture, layer, pictured, overlay, bleed, take) {
+            Modifier.onPlaced { overlay.leaf = it }.drawWithContent {
                 val bleedX = ceil(SideBleed.toPx()).toInt()
                 val bleedY = ceil(bleed.toPx()).toInt()
                 val moving = pictured && turningNow.value()
+                val request = picture.request.intValue
+                picture.arrived.intValue
                 val bitmap = picture.bitmap
                 if (moving && bitmap != null &&
                     picture.bitmapGeneration == picture.generation &&
@@ -297,42 +207,117 @@ internal fun Modifier.mushafTurnSnapshot(
                     !picture.lastDrawWasPicture
                 ) {
                     drawImage(bitmap, topLeft = Offset(-bleedX.toFloat(), -bleedY.toFloat()))
+                    overlay.drawOver(this)
                     picture.lastDrawWasPicture = true
                     return@drawWithContent
                 }
-                if (!pictured) snapshots.warmEpoch.intValue
                 // The turn ending is the one live record that changes nothing.
                 val unchanged = picture.lastDrawWasPicture && !moving
                 if (!unchanged) picture.generation++
                 picture.lastDrawWasPicture = false
-                layer.record(
-                    size = IntSize(size.width.toInt() + 2 * bleedX, size.height.toInt() + 2 * bleedY),
-                ) {
+                val width = size.width.toInt() + 2 * bleedX
+                val height = size.height.toInt() + 2 * bleedY
+                layer.record(size = IntSize(width, height)) {
                     translate(bleedX.toFloat(), bleedY.toFloat()) {
                         this@drawWithContent.drawContent()
                     }
                 }
                 layer.topLeft = IntOffset(-bleedX, -bleedY)
                 drawLayer(layer)
-                if (pictured) picture.recorded.value = picture.generation
+                if (!pictured) return@drawWithContent
+                if (request != picture.handled && width > 0 && height > 0) {
+                    picture.handled = request
+                    // The same content again, into a recording the background
+                    // can rasterise: a software canvas, so the leaf's own
+                    // layers draw their content into it rather than a node.
+                    val recording = Picture()
+                    MushafPicturePass.recording = true
+                    try {
+                        draw(this, layoutDirection, Canvas(recording.beginRecording(width, height)), Size(width.toFloat(), height.toFloat())) {
+                            translate(bleedX.toFloat(), bleedY.toFloat()) {
+                                this@drawWithContent.drawContent()
+                            }
+                        }
+                    } finally {
+                        MushafPicturePass.recording = false
+                        recording.endRecording()
+                    }
+                    take(recording, picture.generation)
+                }
+                picture.recorded.value = picture.generation
             }
         },
     )
 }
 
 /**
- * How long a leaf must go unrecorded before it is pictured: past the longest
- * fade it may have begun on that record. Those fades run on layers of their
- * own, whose frames never record the leaf again, so a picture taken partway
- * through one would keep it half-done for the next turn.
+ * What a leaf's picture leaves out, drawn live over it instead.
+ *
+ * Its words rasterise in software exactly as the GPU sets them (the largest
+ * difference measured is 1/255), but its ornaments do not: the title band's
+ * hairline weave is anti-aliased differently, and the basmalah — one glyph
+ * the width of the measure — came out in visibly different strokes. Neither
+ * troubles the glyph atlas, so each keeps a layer of its own, left out of the
+ * picture and drawn over it, exactly as recorded live.
+ */
+internal class LeafOverlay {
+    /** The leaf's coordinates, where its picture is drawn. */
+    var leaf: LayoutCoordinates? = null
+    val items = mutableListOf<LeafOverlayItem>()
+
+    fun drawOver(scope: DrawScope) {
+        val leaf = leaf?.takeIf { it.isAttached } ?: return
+        items.forEach { item ->
+            val coords = item.coords?.takeIf { it.isAttached } ?: return@forEach
+            val at = leaf.localPositionOf(coords, Offset.Zero)
+            scope.translate(at.x, at.y) { drawLayer(item.layer) }
+        }
+    }
+}
+
+internal class LeafOverlayItem(val layer: GraphicsLayer) {
+    var coords: LayoutCoordinates? = null
+}
+
+internal val LocalLeafOverlay = staticCompositionLocalOf<LeafOverlay?> { null }
+
+/** Set while a leaf records its picture; UI thread only. */
+internal object MushafPicturePass {
+    var recording = false
+}
+
+/**
+ * Keeps this node out of its leaf's picture: it draws through a layer of its
+ * own, which the leaf draws over the picture while it shows one.
+ */
+@Composable
+internal fun Modifier.drawnLiveOverPicture(): Modifier {
+    val overlay = LocalLeafOverlay.current ?: return this
+    val layer = rememberGraphicsLayer()
+    val item = remember(layer) { LeafOverlayItem(layer) }
+    DisposableEffect(overlay, item) {
+        overlay.items += item
+        onDispose { overlay.items -= item }
+    }
+    return this
+        .onPlaced { item.coords = it }
+        .drawWithContent {
+            if (MushafPicturePass.recording) return@drawWithContent
+            layer.record { this@drawWithContent.drawContent() }
+            drawLayer(layer)
+        }
+}
+
+/**
+ * How long a leaf that carried live ink must go unrecorded before it is
+ * pictured: past the longest fade it may have begun on that record. Those
+ * fades run on layers of their own, whose frames never record the leaf again,
+ * so a picture taken partway through one would keep it half-done.
  */
 private fun quietMs(): Long =
     maxOf(InkEngine.tuning.inkFadeMs, InkEngine.tuning.recessMs, MushafLeafFadeMs).toLong() + QuietMarginMs
 
 private const val QuietMarginMs = 120L
-
-/** Longer than any render; a picture not ready by then is not used. */
-private val FenceTimeout = Duration.ofSeconds(2)
 
 /** Room either side of the leaf for a glyph that overhangs its margin. */
 private val SideBleed = 8.dp

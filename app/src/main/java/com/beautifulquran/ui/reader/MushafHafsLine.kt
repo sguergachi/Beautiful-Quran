@@ -252,6 +252,8 @@ internal class MushafLineGeometry(
     val cells: List<MushafCell>,
     val joinsEm: List<MushafInkJoin>,
     val fit: MushafLineFit,
+    /** [cells] as drawn: measured again at the fit's narrowing. */
+    val drawnCells: List<MushafCell>,
 )
 
 private data class MushafLineGeometryKey(
@@ -312,38 +314,90 @@ private fun lineGeometry(
 ): MushafLineGeometry {
     val key = lineGeometryKey(page, line, pageTypeface, linePx, measureWidthPx, allowShort)
     return remember(key) {
-        lineGeometryCache.getOrPut(key) {
-            com.beautifulquran.DevProfiling.trace("lineGeometryMiss") {
-                val texts = mushafLineTexts(line)
-                val glyphs = texts.map { it.text }
-                val rawCells = mushafLineCells(glyphs, pageTypeface, linePx, condense = 1f)
-                val joinsEm = mushafLineJoins(texts, pageTypeface)
-                val fit = if (!justify) {
-                    MushafLineFit(
-                        scale = 1f,
-                        gapPx = MUSHAF_WORD_GAP_EM * linePx,
-                        flush = false,
-                    )
-                } else if (joinsEm.size == (rawCells.size - 1).coerceAtLeast(0) && joinsEm.isNotEmpty()) {
-                    mushafInkLineFit(
-                        inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
-                        joins = joinsEm,
-                        measureWidthPx = measureWidthPx,
-                        fontPx = linePx,
-                        allowShort = allowShort,
-                    )
-                } else {
-                    mushafLineFit(
-                        inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
-                        gapCount = (rawCells.size - 1).coerceAtLeast(0),
-                        measureWidthPx = measureWidthPx,
-                        fontPx = linePx,
-                        allowShort = allowShort,
-                    )
-                }
-                MushafLineGeometry(rawCells, joinsEm, fit)
-            }
+        mushafLineGeometry(page, line, pageTypeface, linePx, measureWidthPx, justify, allowShort)
+    }
+}
+
+/**
+ * [MushafLineGeometry] from the process-wide cache, measured on a miss. Safe
+ * off the UI thread, which is where [MushafLeafWarmup] calls it from: the lock
+ * covers the map only, and two threads measuring one line both get the same
+ * answer.
+ */
+internal fun mushafLineGeometry(
+    page: Int,
+    line: MushafLine,
+    pageTypeface: android.graphics.Typeface?,
+    linePx: Float,
+    measureWidthPx: Float,
+    justify: Boolean,
+    allowShort: Boolean,
+): MushafLineGeometry {
+    val key = lineGeometryKey(page, line, pageTypeface, linePx, measureWidthPx, allowShort)
+    synchronized(lineGeometryCache) { lineGeometryCache[key] }?.let { return it }
+    val geometry = com.beautifulquran.DevProfiling.trace("lineGeometryMiss") {
+        val texts = mushafLineTexts(line)
+        val glyphs = texts.map { it.text }
+        val rawCells = mushafLineCells(glyphs, pageTypeface, linePx, condense = 1f)
+        val joinsEm = mushafLineJoins(texts, pageTypeface)
+        val fit = if (!justify) {
+            MushafLineFit(
+                scale = 1f,
+                gapPx = MUSHAF_WORD_GAP_EM * linePx,
+                flush = false,
+            )
+        } else if (joinsEm.size == (rawCells.size - 1).coerceAtLeast(0) && joinsEm.isNotEmpty()) {
+            mushafInkLineFit(
+                inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
+                joins = joinsEm,
+                measureWidthPx = measureWidthPx,
+                fontPx = linePx,
+                allowShort = allowShort,
+            )
+        } else {
+            mushafLineFit(
+                inkWidthPx = rawCells.sumOf { it.inkWidth.toDouble() }.toFloat(),
+                gapCount = (rawCells.size - 1).coerceAtLeast(0),
+                measureWidthPx = measureWidthPx,
+                fontPx = linePx,
+                allowShort = allowShort,
+            )
         }
+        // Measured again at the size they are drawn, not scaled arithmetically
+        // from the unscaled measurement: see [MushafQcfPageLine].
+        val drawnCells = if (fit.scale == 1f) {
+            rawCells
+        } else {
+            mushafLineCells(glyphs, pageTypeface, linePx, fit.scale)
+        }
+        MushafLineGeometry(rawCells, joinsEm, fit, drawnCells)
+    }
+    return synchronized(lineGeometryCache) { lineGeometryCache.getOrPut(key) { geometry } }
+}
+
+/**
+ * The style a QCF line sets its cells in. Shared with [MushafLeafWarmup], whose
+ * laid-out cells are only found again if the style is equal to this one.
+ */
+internal fun mushafQcfLineStyle(fontSize: TextUnit, pageFont: FontFamily, condense: Float): TextStyle =
+    TextStyle(
+        fontFamily = pageFont,
+        fontSize = fontSize,
+        lineHeight = MUSHAF_LINE_EM.em,
+        textDirection = TextDirection.Rtl,
+        textGeometricTransform = TextGeometricTransform(scaleX = condense),
+        platformStyle = PlatformTextStyle(includeFontPadding = false),
+        // AB: linear metrics + subpixel positioning (no grid fitting)
+        textMotion = TextMotion.Animated,
+    )
+
+/** What each QCF cell of [line] sets: a word's glyphs, then its verse mark if it closes one. */
+internal fun mushafQcfCellTexts(line: MushafLine): List<Pair<String, Boolean>> = buildList {
+    line.tokens.forEach { token ->
+        val raw = token.word.qcfV2
+        add((if (raw.isNotEmpty()) qcfWordGlyphs(raw, token.endsAyah) else token.word.arabic) to false)
+        val mark = raw.takeIf { it.isNotEmpty() }?.let { qcfTrailingMark(it, token.endsAyah) }.orEmpty()
+        if (mark.isNotEmpty()) add(mark to true)
     }
 }
 
@@ -381,26 +435,15 @@ private fun MushafQcfPageLine(
     // the UI thread otherwise — ink profiles render each word to a bitmap,
     // and the fit runs a bisection per line. See [lineGeometry].
     val geometry = lineGeometry(page, line, pageTypeface, linePx, measureWidthPx, justify, allowShort)
-    val rawCells = geometry.cells
     val joinsEm = geometry.joinsEm
     val fit = geometry.fit
     val condense = fit.scale
     val texts = remember(line) { mushafLineTexts(line) }
-    val glyphs = remember(texts) { texts.map { it.text } }
     // Condensed, never resized. A line brought inside the measure keeps its
     // height, weight and colour — the page still reads as one hand — where a
     // line set at a different size reads as a fault.
     val style = remember(fontSize, pageFont, condense) {
-        TextStyle(
-            fontFamily = pageFont,
-            fontSize = fontSize,
-            lineHeight = MUSHAF_LINE_EM.em,
-            textDirection = TextDirection.Rtl,
-            textGeometricTransform = TextGeometricTransform(scaleX = condense),
-            platformStyle = PlatformTextStyle(includeFontPadding = false),
-            // AB: linear metrics + subpixel positioning (no grid fitting)
-            textMotion = TextMotion.Animated,
-        )
+        mushafQcfLineStyle(fontSize, pageFont, condense)
     }
     // Coloured once for the line. A Material [Text] resolves the ambient text
     // style and content colour on every call, and a leaf carries ~150 word
@@ -423,9 +466,7 @@ private fun MushafQcfPageLine(
     // the unscaled measurement: the rasteriser's ink at a given textScaleX is
     // not exactly that many times its ink at 1, and over nine cells the
     // difference left a line sixty pixels short of its own margin.
-    val cells = remember(glyphs, pageTypeface, linePx, condense) {
-        if (condense == 1f) rawCells else mushafLineCells(glyphs, pageTypeface, linePx, condense)
-    }
+    val cells = geometry.drawnCells
     // A narrowing scales a join's pocket exactly as it scales the strokes
     // either side of it, so the em measurement holds at any width and only the
     // size of the em changes.
@@ -487,9 +528,12 @@ private fun MushafQcfPageLine(
                 )
             },
         content = {
+            var cell = 0
             line.tokens.forEach { token ->
+                val wordCell = cells.getOrNull(cell++)
                 MushafQcfWord(
                     token = token,
+                    liveOverPicture = wordCell != null && mushafCellDrawnAsPath(wordCell),
                     style = wordStyle,
                     packs = packs,
                     liveInk = liveInk,
@@ -499,6 +543,7 @@ private fun MushafQcfPageLine(
                 )
                 val mark = token.word.qcfV2.takeIf { it.isNotEmpty() }
                     ?.let { qcfTrailingMark(it, token.endsAyah) }.orEmpty()
+                if (mark.isNotEmpty()) cell++
                 if (mark.isNotEmpty()) {
                     // The mark is its own cell, so it sits outside the word's
                     // ink node. markAlpha already expresses the verse's focus
@@ -545,16 +590,36 @@ private fun MushafQcfPageLine(
     }
 }
 
+/**
+ * Whether the GPU draws this cell's glyph as an outline rather than from its
+ * glyph atlas: Skia sends a glyph whose mask would run past 256 px either way
+ * to the path renderer, while a software canvas still rasterises it as a mask,
+ * and the two differ visibly at the edges. Such a word — a few on a leaf at
+ * most, like the wide سَتُغۡلَبُونَ on page 51 — is kept out of the leaf's turn
+ * picture and drawn live over it. Erring wide only draws a word live.
+ */
+internal fun mushafCellDrawnAsPath(cell: MushafCell): Boolean =
+    cell.inkWidth >= MushafPathGlyphPx || cell.inkHeight >= MushafPathGlyphPx
+
+/** Under Skia's 256 px atlas limit, with room for a mask's padding and rounding. */
+private const val MushafPathGlyphPx = 232f
+
 internal fun mushafAyahMarkInkAlpha(liveInk: Boolean, markAlpha: Float?): Float =
     if (liveInk && markAlpha != null) markAlpha.coerceIn(0f, 1f) else 1f
 
 /** A cell's advance and where its ink sits inside it, in px. */
-internal class MushafCell(val advance: Float, val inkLeft: Float, val inkRight: Float) {
+internal class MushafCell(
+    val advance: Float,
+    val inkLeft: Float,
+    val inkRight: Float,
+    /** The ink's height, px. */
+    val inkHeight: Float = 0f,
+) {
     val inkWidth: Float get() = (inkRight - inkLeft).coerceAtLeast(0f)
 
     /** The same cell with its letterforms narrowed — scaleX scales ink and
      * advance alike, so the measurements scale with them. */
-    fun scaled(k: Float) = MushafCell(advance * k, inkLeft * k, inkRight * k)
+    fun scaled(k: Float) = MushafCell(advance * k, inkLeft * k, inkRight * k, inkHeight)
 }
 
 /**
@@ -612,7 +677,7 @@ internal fun mushafLineCells(
         } else {
             val advance = paint.measureText(text)
             paint.getTextBounds(text, 0, text.length, bounds)
-            MushafCell(advance, bounds.left.toFloat(), bounds.right.toFloat())
+            MushafCell(advance, bounds.left.toFloat(), bounds.right.toFloat(), bounds.height().toFloat())
         }
     }
 }
@@ -877,6 +942,8 @@ internal fun mushafInkLineFit(
 @Composable
 private fun MushafQcfWord(
     token: MushafToken,
+    /** Kept out of the leaf's turn picture (see [mushafCellDrawnAsPath]). */
+    liveOverPicture: Boolean,
     style: TextStyle,
     packs: SnapshotStateMap<Pair<Int, Int>, AyahInkPack>,
     liveInk: Boolean,
@@ -1020,6 +1087,7 @@ private fun MushafQcfWord(
         text = word,
         style = style,
         modifier = Modifier
+            .then(if (liveOverPicture) Modifier.drawnLiveOverPicture() else Modifier)
             .then(
                 if (hasMotionInk && palette.paperInk != null) {
                     with(paperNode) {

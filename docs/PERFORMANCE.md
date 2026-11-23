@@ -599,18 +599,32 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   Two leaves on screen at once did not fit: every frame of a turn evicted one
   leaf's glyphs to draw the other's and uploaded them again — ~130 ms of
   `glTexSubImage2D` per swipe on the emulator, spread over every frame of it.
-  So an Arabic leaf one turn from the resting one, carrying static ink, is
-  pictured once it has been still for longer than any fade it may have begun
-  (`InkEngine` ink fade / recess, the leaf's face fade, plus 120 ms): its
-  recorded layer is rendered asynchronously on the render thread into a
-  hardware bitmap — `HardwareBufferRenderer` in the window's colour space
-  (Display P3 on a wide window, whose accents are P3), or, before API 34, an
-  `ImageReader` surface on sRGB windows only (a wide window there is never
-  pictured). During a turn that leaf draws its picture; the settled leaf keeps
-  setting live type and has the atlas to itself. Any re-record of a pictured
-  leaf retires its picture, mid-turn included, so a changed leaf is never shown
-  stale. A picture is pixel-identical to the live leaf (screenshot diff on the
-  emulator: only the status-bar clock differed). Forcing `Offscreen`
+  So every Arabic leaf not carrying live ink is pictured — a run of quick
+  flips never rests, and each leaf it reaches must be a picture by the time
+  it slides in. The picture never touches the render thread, which is drawing
+  the turn: the leaf's next draw records itself a second time into an
+  `android.graphics.Picture` (a software canvas, so Compose draws the leaf's
+  own layers' content into it), which is rasterised on a background thread
+  into a bitmap in the window's colour space (Display P3 on a wide window,
+  whose accents are P3) and copied to a hardware bitmap there, off the render
+  thread's upload path. A leaf composed static is pictured as soon as its
+  entrance fade is done; one that carried live ink first waits out any fade it
+  may have begun (`InkEngine` ink fade / recess, the leaf's face fade, plus
+  120 ms). During a turn a pictured leaf draws its picture — one arriving
+  mid-turn is swapped in — and the settled leaf keeps setting live type. Any
+  re-record of a pictured leaf retires its picture, mid-turn included, so a
+  changed leaf is never shown stale.
+  Software rasterises a QCF word exactly as the GPU does — screenshot diffs of
+  forced pictures against the live leaf, light and Nightfall, sRGB and P3,
+  differ by at most 1/255 (2/255 through P3) — but not everything else. The
+  title band's hairline weave anti-aliases differently (up to 119/255 apart),
+  and Skia's GPU path draws a glyph past 256 px (the basmalah, a wide word like
+  سَتُغۡلَبُونَ on page 51) as an outline where software keeps a mask, visibly
+  different strokes. Those (`drawnLiveOverPicture`: the band, the basmalah,
+  any word whose ink reaches 232 px, `mushafCellDrawnAsPath`) are left out of
+  the picture and drawn over it from layers of their own; none of them uses the
+  glyph atlas. Each picture holds a leaf-sized bitmap (~11 MB) for as long as
+  its leaf stays composed. Forcing `Offscreen`
   compositing on the leaf is still wrong: its layers are re-rendered inside
   the turn, a whole page's uploads in one 90 ms frame.
 - Leaves hold two neighbours either side at rest (`MushafHeldNeighbours`),
@@ -622,6 +636,19 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   then measured on the next swipe's first frame (40–70 ms). Both stay blank
   paper (`mushafDefersLeaf`) until the pager rests within reach, unless in or
   beside the view or a jump's destination.
+- Leaves are set before they are composed (`MushafLeafWarmup.kt`). Composing a
+  leaf nobody had opened measured everything on the UI thread — its reflow,
+  each word's ink profile and bounds, the line fit, then a paragraph per word:
+  ~75 ms on the emulator, paid at the start of nearly every swipe of a quick
+  run, which never settles and so never warmed the leaves it reached. The
+  warm-up follows the page in view and the turn's target, not only the settled
+  page, and sets the target and the three leaves beyond it in the direction of
+  travel, then the ones behind (`mushafWarmOrder`), on `Dispatchers.Default`.
+  It fills the caches the composition reads — the display reflow
+  (`mushafDisplayPage`), line geometry (`mushafLineGeometry`) and the cell
+  layouts (`MushafWordLayouts`) — under the keys the composition uses, from
+  the setting the last composed leaf published (`MushafLeafSetting`). A miss
+  only means the composition measures as it always did.
 - "Resting" is its own state (`restPage`), two still frames after the scroll
   ends. `settledPage` moves on the frame a finger lifts, between the drag's
   scroll and the fling's, while the leaf has half the screen to go: every leaf
@@ -684,6 +711,19 @@ leaf's composition (~50 ms UI) and two pictures (~100 ms of render-thread
 time, asynchronous) once a turn settles. A turn begun within about a second
 of opening a chapter, or one of a rapid series begun before the last settled,
 has no pictures yet and draws live as before.
+
+2026-11-23, quick flips (`mushafRapidFlip`: eight short swipes, each starting
+while the last turn still slides), same emulator and method. Before, five
+runs: UI thread 40 of ~1,500 frames over 8.3 ms (max 83 ms — a leaf composed
+and measured cold at each swipe's start, 33 ms of it word ink profiles and
+bounds); render thread 140 over, 95th percentile 13.1 ms, max 121 ms (two
+live leaves thrashing the atlas, and each newly composed leaf's first draw).
+After warm-ups and every still leaf pictured: UI thread 10 over (max 13 ms,
+the leaf joining the window, now composed from warm caches in 6–10 ms);
+render thread 17 over, 95th percentile 5.9 ms — of those, one per run is the
+landing leaf going live at rest (50–65 ms of glyph uploads, nothing moving)
+and one per run a first-draw shader compile. At reading pace the turn frames
+stay as before (UI max 4.6 ms; render thread 4 of ~1,240 over, max 11.4 ms).
 
 ### 6. R8 release builds are what ships
 

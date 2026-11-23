@@ -314,6 +314,14 @@ internal fun UiDevice.turnMushafTowardLaterPages() {
     waitForIdle()
 }
 
+/** A quick rightward flick, not waited out: the next one lands mid-turn. */
+internal fun UiDevice.flickMushafTowardLaterPages() {
+    swipeAcross(fromX = 0.25f, toX = 0.75f, y = displayHeight / 2, steps = 12)
+    SystemClock.sleep(RapidFlipGapMs)
+}
+
+private const val RapidFlipGapMs = 180L
+
 /**
  * A leftward stroke along the dial's own grab strip (21 dp tall), aimed at its
  * centre line. The strip's bounds come from its test tag, not from the
