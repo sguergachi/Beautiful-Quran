@@ -113,7 +113,7 @@ class PlaybackService : MediaLibraryService() {
             }
 
         player.addListener(PrefetchListener(player, prefetcher))
-        player.addListener(SeamBridgeListener(player) { seamProcessor?.bridgeSeams = it })
+        player.addListener(SeamBridgeListener(player) { seamProcessor?.sampleExactSeams = it })
         // Observe the actual service player only during an explicit log capture.
         // The reader's MediaController samples and these samples share nanoTime.
         serviceScope.launch {
@@ -223,12 +223,12 @@ class PlaybackService : MediaLibraryService() {
 
     /**
      * Tells the seam processor whether this playlist's files are verses cut
-     * from a surah recording, whose seams must not be bridged. A playlist is
-     * one reciter, so the first item decides for all.
+     * from a surah recording, whose seams continue the recording sample-exact.
+     * A playlist is one reciter, so the current item decides for all.
      */
     private class SeamBridgeListener(
         private val player: Player,
-        private val setBridging: (Boolean) -> Unit,
+        private val setSampleExact: (Boolean) -> Unit,
     ) : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = update(mediaItem)
 
@@ -236,7 +236,7 @@ class PlaybackService : MediaLibraryService() {
 
         private fun update(item: MediaItem?) {
             val host = item?.localConfiguration?.uri?.host ?: return
-            setBridging(host != VERSE_CLIP_HOST)
+            setSampleExact(host == VERSE_CLIP_HOST)
         }
     }
 

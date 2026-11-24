@@ -101,7 +101,7 @@ export function verseClip(ref: VerseClipRef): VerseClip | undefined {
     verseClipsCache = new Map()
     for (const [key, clip] of queryAll(
       `SELECT r.slug, c.surah_id, c.ayah_number, c.source_url, c.source_bytes,
-              c.start_byte, c.end_byte, c.lead_bytes
+              c.start_byte, c.end_byte, c.lead_bytes, c.trim_samples
        FROM audio_clips c JOIN reciters r ON r.id = c.reciter_id`,
       [],
       (r): [string, VerseClip] => [
@@ -112,6 +112,7 @@ export function verseClip(ref: VerseClipRef): VerseClip | undefined {
           startByte: Number(r.start_byte),
           endByte: Number(r.end_byte),
           leadBytes: Number(r.lead_bytes),
+          trimSamples: Number(r.trim_samples),
         },
       ],
     )) {

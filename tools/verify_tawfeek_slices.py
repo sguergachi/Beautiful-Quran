@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Prove every Tawfeek verse slice decodes exactly as the surah MP3 does.
+"""Prove Tawfeek's verses, played back to back, are the surah recording.
 
 For each verse in tools/timing_sources/tawfeek-verse-index.json this takes the
-byte range the app will request, decodes it on its own, and compares it with
-the same stretch of the fully decoded surah. Past the decoder's warm-up frames
-the two must be bit-identical; before them the slice is allowed to differ (it
-only primes the decoder). It also reports how loud that warm-up region is, which
-is the only audible cost of cutting a surah file into verses.
+byte range the app will request, silences its reservoir-only lead as the app
+does, decodes it on its own, drops the first `trimSamples` (as the player's
+gapless trim does) and compares what is left with the same stretch of the fully
+decoded surah. It must be bit-identical from its first sample to its last, and
+each verse must begin exactly where the one before it ended: no sample heard
+twice, none skipped, so a seam inside connected recitation is inaudible.
 
     tools/verify_tawfeek_slices.py --source DIR_OF_NNN.mp3 [--surahs 1-114]
 """
@@ -37,20 +38,10 @@ def decode(data, fmt):
     )
 
 
-def lead_samples(raw, clip):
-    """Samples of reservoir-only lead: walk the frames in clip's lead bytes."""
-    pos, frames = clip["startByte"], 0
-    while pos < clip["startByte"] + clip["leadBytes"]:
-        header = int.from_bytes(raw[pos:pos + 4], "big")
-        pos += 144 * index_tool.BITRATES_K[(header >> 12) & 15] * 1000 // index_tool.RATE + ((header >> 9) & 1)
-        frames += 1
-    return frames * SPF
-
-
-def cut_level_db(out, lead, rate=index_tool.RATE):
-    """How loud the slice's last 20 ms are, relative to the verse's own loud level (dB)."""
+def cut_level_db(heard, rate=index_tool.RATE):
+    """How loud a verse's first and last 20 ms are, relative to its own loud level (dB)."""
     hop = int(0.02 * rate)
-    body = out[lead:].astype(np.float64)
+    body = heard.astype(np.float64)
     if len(body) < 4 * hop:
         return 0.0, 0.0
     frames = body[:len(body) // hop * hop].reshape(-1, hop)
@@ -68,46 +59,41 @@ def verify_surah(surah, source_dir, index, record):
         return surah, [("source", "does not match the pinned hash")], {}
     full = decode(None, str(path))
     stats = {}
-    # Playing verses back to back must never replay source audio: a verse ends no later than
-    # the next one's first audible frame (the silenced lead before it is not audible).
-    ordered = sorted((c["ayah"] if "ayah" in c else int(k.split(":")[1]), k, c)
-                     for k, c in index["clips"].items() if c["surah"] == surah)
+    ordered = sorted((c["originSamples"], k, c) for k, c in index["clips"].items() if c["surah"] == surah)
     for (_, ka, a), (_, kb, b) in zip(ordered, ordered[1:]):
-        end = a["originSamples"] + a["durationSamples"]
-        audible = b["originSamples"] + lead_samples(raw, b)
-        if end > audible:
-            problems.append((kb, f"opens {round((end - audible) * 1000 / index_tool.RATE)} ms before {ka} ends: "
-                                 "the previous verse's last sound would play twice"))
+        gap = b["originSamples"] - (a["originSamples"] + a["durationSamples"])
+        if gap < 0:
+            problems.append((kb, f"begins {round(-gap * 1000 / index_tool.RATE)} ms before {ka} ends: "
+                                 "that sound would play twice"))
     for key, clip in index["clips"].items():
         if clip["surah"] != surah:
             continue
         data = bytearray(raw[clip["startByte"]:clip["endByte"]])
         index_tool.silence_lead(data, clip["leadBytes"])
         out = decode(bytes(data), "stdin")
-        origin = clip["originSamples"]
-        lead = lead_samples(raw, clip)
-        warm = lead + 2 * SPF  # the first frame or two after the lead lack their predecessor's overlap
-        ref = full[origin:origin + len(out)]
-        n = min(len(out), len(ref))
-        if n != len(out) or abs(len(out) - clip["durationSamples"]) > SPF:
-            problems.append((key, f"decoded {len(out)} samples, expected {clip['durationSamples']}"))
+        trim, origin, duration = clip["trimSamples"], clip["originSamples"], clip["durationSamples"]
+        heard = out[trim:]
+        if len(heard) != duration:
+            problems.append((key, f"decodes to {len(heard)} heard samples, expected {duration}"))
             continue
-        exact = np.array_equal(out[warm:n], ref[warm:n])
-        if not exact:
-            bad = int(np.abs(out[warm:n].astype(int) - ref[warm:n].astype(int)).max())
-            problems.append((key, f"not bit-exact after warm-up (max error {bad})"))
-        # Every sound of the verse, as the alignment measured it, must lie inside the slice.
+        ref = full[origin:origin + duration]
+        if len(ref) != duration:
+            problems.append((key, "runs past the end of the recording"))
+            continue
+        if not np.array_equal(heard, ref):
+            diff = np.nonzero(heard != ref)[0]
+            problems.append((key, f"differs from the recording at {len(diff)} samples, first at {diff[0]}"
+                                  f" (max error {int(np.abs(heard.astype(int) - ref.astype(int)).max())})"))
+        # Every sound of the verse, as the alignment measured it, must lie inside what is heard.
         all_runs = record["runs"]
-        begin_ms = (origin + lead) * 1000 / index_tool.RATE
-        finish_ms = (origin + len(out)) * 1000 / index_tool.RATE
+        begin_ms = origin * 1000 / index_tool.RATE
+        finish_ms = (origin + duration) * 1000 / index_tool.RATE
+        words = record["words"]
         for i, r in enumerate(all_runs):
             if f"{surah}:{r['ayah']}" != key:
                 continue
-            # Where a neighbour's sound begins, the sound beyond that point is the neighbour's: the
-            # detected edge of a verse that touches the next is only bounded by it.
-            # A verse's own words say how far its sound can reach: the detected edge of one that runs
-            # into the next is only a bound, never later than a quarter second past its last word.
-            words = record["words"]
+            # A neighbour's sound bounds this verse's detected edge, and so do its own words:
+            # the edge of a verse that runs into the next is never later than 250 ms past its last word.
             onset = max(r["onsetMs"], words[r["first"]][2] - 250)
             offset = min(r["offsetMs"], words[r["last"]][3] + 250)
             if i:
@@ -117,17 +103,8 @@ def verify_surah(surah, source_dir, index, record):
             if onset < begin_ms - SEAM_TOLERANCE_MS or offset > finish_ms + SEAM_TOLERANCE_MS:
                 problems.append((key, f"sound {onset}-{offset} ms outside slice "
                                       f"{begin_ms:.0f}-{finish_ms:.0f} ms"))
-        silent = out[:lead]
-        if lead and int(np.abs(silent).max()):
-            problems.append((key, f"lead not silent (peak {int(np.abs(silent).max())})"))
-        shaped = out[lead:warm].astype(np.float64) - ref[lead:warm].astype(np.float64)
-        stats[key] = {
-            "leadMs": round(lead * 1000 / index_tool.RATE),
-            "shapedRms": float(np.sqrt(np.mean(shaped * shaped))) if len(shaped) else 0.0,
-            "refRms": float(np.sqrt(np.mean(ref[lead:warm].astype(np.float64) ** 2))) if warm > lead else 0.0,
-            "cutIn": cut_level_db(out, lead)[0],
-            "cutOut": cut_level_db(out, lead)[1],
-        }
+        cut_in, cut_out = cut_level_db(heard)
+        stats[key] = {"trimMs": round(trim * 1000 / index_tool.RATE), "cutIn": cut_in, "cutOut": cut_out}
     return surah, problems, stats
 
 
@@ -153,22 +130,12 @@ def main():
             all_stats.update(stats)
             print(f"  surah {surah}: {len(stats)} verses, {len(problems)} problems", flush=True)
     print(f"{len(all_stats)} verses verified, {len(all_problems)} problems")
-    leads = sorted(v["leadMs"] for v in all_stats.values())
-    print(f"silent lead: median {leads[len(leads) // 2]} ms, max {leads[-1]} ms")
-    # How much the two frames after the lead differ from the full decode, relative to their level.
-    ratios = sorted(
-        (v["shapedRms"] / v["refRms"] if v["refRms"] > 50 else 0.0, k) for k, v in all_stats.items()
-    )
-    print(f"shaped opening error/level: median {ratios[len(ratios) // 2][0]:.3f}, "
-          f"p99 {ratios[int(len(ratios) * .99)][0]:.3f}, max {ratios[-1]}")
-    voiced = [(k, v) for k, v in all_stats.items() if v["refRms"] > 800 and v["shapedRms"] > 0.2 * v["refRms"]]
-    print(f"{len(voiced)} verses open on voiced sound that the missing overlap shapes noticeably")
-    for k, v in sorted(voiced, key=lambda kv: -kv[1]["refRms"])[:10]:
-        print(f"  {k}: opening level {v['refRms']:.0f}, error {v['shapedRms']:.0f}")
+    trims = sorted(v["trimMs"] for v in all_stats.values())
+    print(f"decoded before each verse and trimmed: median {trims[len(trims) // 2]} ms, max {trims[-1]} ms")
     for edge in ("cutIn", "cutOut"):
         loud = [k for k, v in all_stats.items() if v[edge] > -12]
         print(f"{len(loud)} slices have their {edge[3:].lower()}side cut inside sound within 12 dB of the verse's level"
-              f" (touching verses share a seam; the rest need review)")
+              f" (verses that run together share an exact seam)")
     for problem in all_problems[:20]:
         print("  !!", *problem)
     return 1 if all_problems else 0

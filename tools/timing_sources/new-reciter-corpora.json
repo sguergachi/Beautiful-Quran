@@ -123,7 +123,7 @@
       "reciter": "Tawfeek_As-Sawaigh_128kbps",
       "verdict": "accept",
       "expectedRows": 6236,
-      "corpusPayloadSha256": "487a2cdc3a18da503ca8caa2a6f3ba43b7a84cc4d305ba031736562c82d2d34e",
+      "corpusPayloadSha256": "f41e24f50b491ec48b68708914a157a8fd72a6c333449f5ea9c2424fc2acab66",
       "evidence": {
         "kind": "pinned_corpus_bootstrap",
         "summary": "Complete own-alignment corpus (tools/reciter_align: MMS-300m CTC, route search for openings and repeats, XLSR-53 audit, MMS-1b arbiter) rebased onto the exact verse byte ranges streamed from the public surah recordings; every insertion supported by two models.",

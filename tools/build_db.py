@@ -1931,9 +1931,11 @@ def load_tawfeek_index(path=TAWFEEK_INDEX_FILE):
     """Load how each Tawfeek verse is cut from his surah recording.
 
     Every verse is a byte range of one public surah MP3 (see
-    tools/build_tawfeek_verse_index.py): its origin and length in source samples
-    give the slice's own clock, and `leadBytes` is the reservoir-only prefix the
-    player silences.
+    tools/build_tawfeek_verse_index.py): `originSamples` and `durationSamples` are
+    where the heard verse begins in the recording and how long it is (its word
+    times' clock), `leadBytes` is the reservoir-only prefix the player silences,
+    and `trimSamples` how much decoded audio precedes the verse, which the
+    player drops so verses join sample-exact.
     """
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -1942,7 +1944,7 @@ def load_tawfeek_index(path=TAWFEEK_INDEX_FILE):
                 name: int(clip[name])
                 for name in (
                     "surah", "startByte", "endByte", "originSamples",
-                    "durationSamples", "leadBytes",
+                    "durationSamples", "leadBytes", "trimSamples",
                 )
             }
             for key, clip in payload["clips"].items()
@@ -1951,7 +1953,7 @@ def load_tawfeek_index(path=TAWFEEK_INDEX_FILE):
         template = payload["sourceUrlTemplate"]
     except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
         raise SystemExit(f"invalid Tawfeek verse index: {e}") from e
-    if (payload.get("schema") != 2 or payload.get("reciterSlug") != TAWFEEK_SLUG
+    if (payload.get("schema") != 3 or payload.get("reciterSlug") != TAWFEEK_SLUG
             or payload.get("sampleRateHz") != 44_100
             or payload.get("samplesPerFrame") != 1_152
             or len(clips) != 6_236 or len(sources) != 114):
@@ -1962,7 +1964,8 @@ def load_tawfeek_index(path=TAWFEEK_INDEX_FILE):
     for key, clip in clips.items():
         source = sources[key[0]]
         if (clip["surah"] != key[0] or not 0 <= clip["leadBytes"] < clip["endByte"] - clip["startByte"]
-                or clip["endByte"] > source["audioBytes"]):
+                or clip["endByte"] > source["audioBytes"]
+                or not 1_152 <= clip["trimSamples"] <= 4_095 or clip["trimSamples"] % 1_152):
             raise SystemExit(f"Tawfeek verse {key} falls outside its source recording")
     return clips, sources, template
 
@@ -1974,6 +1977,7 @@ def tawfeek_audio_clip_rows(path=TAWFEEK_INDEX_FILE):
         (
             TAWFEEK_RECITER_ID, surah, ayah, template.format(surah=surah),
             sources[surah]["bytes"], clip["startByte"], clip["endByte"], clip["leadBytes"],
+            clip["trimSamples"],
         )
         for (surah, ayah), clip in sorted(clips.items())
     ]
@@ -3165,6 +3169,7 @@ CREATE TABLE audio_clips (
   start_byte INTEGER NOT NULL,
   end_byte INTEGER NOT NULL,
   lead_bytes INTEGER NOT NULL,
+  trim_samples INTEGER NOT NULL,
   PRIMARY KEY (reciter_id, surah_id, ayah_number)
 ) WITHOUT ROWID;
 CREATE TABLE timings (
@@ -3927,7 +3932,7 @@ def main(argv=None):
     db.executemany("INSERT INTO words VALUES (?,?,?,?,?,?,?,?,?,?)", words)
     db.executemany("INSERT INTO reciters VALUES (?,?,?,?,?)", reciter_rows)
     db.executemany(
-        "INSERT INTO audio_clips VALUES (?,?,?,?,?,?,?,?)", tawfeek_audio_clip_rows()
+        "INSERT INTO audio_clips VALUES (?,?,?,?,?,?,?,?,?)", tawfeek_audio_clip_rows()
     )
     db.executemany(
         "INSERT INTO timings VALUES (?,?,?,?,?)",

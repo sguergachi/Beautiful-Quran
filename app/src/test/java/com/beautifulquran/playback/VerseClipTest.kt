@@ -110,12 +110,44 @@ class VerseClipTest {
         val before = ByteArray(5000) { 7 }
         val after = ByteArray(300) { 9 }
         val file = before + slice + after
-        val clip = VerseClip("https://example.invalid/002.mp3", file.size.toLong(), 5000, 5000L + slice.size, lead)
-        // Build the expected served bytes the plain way: silence a copy of the lead, keep the rest.
-        val served = slice.copyOf()
+        val clip = VerseClip("https://example.invalid/002.mp3", file.size.toLong(), 5000, 5000L + slice.size, lead, 3 * 1152)
+        // Build the expected served bytes the plain way: the gapless tag, then a
+        // copy of the range with its lead silenced.
+        val body = slice.copyOf()
         val head = slice.copyOf(lead).also { Mp3LeadSilencer.silence(it, lead) }
-        System.arraycopy(head, 0, served, 0, lead)
-        return Triple(file, clip, served)
+        System.arraycopy(head, 0, body, 0, lead)
+        return Triple(file, clip, gaplessHeaderFor(clip) + body)
+    }
+
+    /** Bytes of the gapless tag ahead of every verse's range. */
+    private val H = gaplessId3Tag(0, 0).size
+
+    @Test fun theGaplessTagTrimsTheLeadAndTheDecoderPadding() {
+        val clip = VerseClip("https://example.invalid/002.mp3", 1, 0, 1, 0, 2 * 1152)
+        val tag = String(gaplessHeaderFor(clip), Charsets.ISO_8859_1)
+        assertTrue(tag.startsWith("ID3\u0003"))
+        assertTrue(tag.contains("COMM"))
+        // Delay in decoder output: the platform decoder already withheld 529 of the 2304.
+        assertTrue(tag, tag.endsWith("iTunSMPB\u0000 00000000 000006EF 00000211 0000000000000000"))
+        assertEquals(H, tag.length)
+    }
+
+    @Test fun aRequestInsideTheTagServesItThenTheVerse() {
+        val (file, clip, served) = verse()
+        val source = FakeRecording(file)
+        val stream = VerseClipStream(source, clip)
+        assertEquals(served.size - 5L, stream.open(5, -1))
+        assertArrayEquals(served.copyOfRange(5, served.size), readAll(stream))
+        assertEquals(listOf(5000L to clip.length), source.requests)
+    }
+
+    @Test fun aRequestForTheTagAloneTouchesNoRecording() {
+        val (file, clip, served) = verse()
+        val source = FakeRecording(file)
+        val stream = VerseClipStream(source, clip)
+        assertEquals(H.toLong(), stream.open(0, H.toLong()))
+        assertArrayEquals(served.copyOf(H), readAll(stream))
+        assertTrue(source.requests.isEmpty())
     }
 
     private fun readAll(stream: VerseClipStream, bufferSize: Int = 64): ByteArray {
@@ -133,7 +165,7 @@ class VerseClipTest {
         val (file, clip, served) = verse()
         val source = FakeRecording(file)
         val stream = VerseClipStream(source, clip)
-        assertEquals(clip.length, stream.open(0, -1))
+        assertEquals(served.size.toLong(), stream.open(0, -1))
         assertArrayEquals(served, readAll(stream))
         assertEquals(listOf(5000L to clip.length), source.requests)
         stream.close()
@@ -144,8 +176,9 @@ class VerseClipTest {
         val (file, clip, served) = verse()
         val source = FakeRecording(file)
         val stream = VerseClipStream(source, clip)
-        assertEquals(clip.length - 300, stream.open(300, -1))
-        assertArrayEquals(served.copyOfRange(300, served.size), readAll(stream))
+        val at = H + 300
+        assertEquals(served.size - at.toLong(), stream.open(at.toLong(), -1))
+        assertArrayEquals(served.copyOfRange(at, served.size), readAll(stream))
         assertEquals(5000L, source.requests.single().first)
     }
 
@@ -153,8 +186,8 @@ class VerseClipTest {
         val (file, clip, served) = verse()
         val source = FakeRecording(file)
         val stream = VerseClipStream(source, clip)
-        assertEquals(200, stream.open(1300, 200))
-        assertArrayEquals(served.copyOfRange(1300, 1500), readAll(stream))
+        assertEquals(200, stream.open(H + 1300L, 200))
+        assertArrayEquals(served.copyOfRange(H + 1300, H + 1500), readAll(stream))
         assertEquals(listOf(6300L to 200L), source.requests)
     }
 
@@ -162,17 +195,17 @@ class VerseClipTest {
         val (file, clip, served) = verse()
         val source = FakeRecording(file)
         val stream = VerseClipStream(source, clip)
-        assertEquals(50, stream.open(10, 50))
-        assertArrayEquals(served.copyOfRange(10, 60), readAll(stream))
+        assertEquals(50, stream.open(H + 10L, 50))
+        assertArrayEquals(served.copyOfRange(H + 10, H + 60), readAll(stream))
         assertEquals(listOf(5000L to clip.leadBytes.toLong()), source.requests)
     }
 
     @Test fun anOpenThatOutrunsTheVerseIsClampedToItsEnd() {
         val (file, clip, served) = verse()
         val stream = VerseClipStream(FakeRecording(file), clip)
-        assertEquals(10, stream.open(clip.length - 10, 1000))
+        assertEquals(10, stream.open(stream.length - 10, 1000))
         assertArrayEquals(served.copyOfRange(served.size - 10, served.size), readAll(stream))
-        assertEquals(0, stream.open(clip.length, -1))
+        assertEquals(0, stream.open(stream.length, -1))
         assertEquals(-1, stream.read(ByteArray(8), 0, 8))
     }
 
@@ -188,7 +221,7 @@ class VerseClipTest {
         val (file, clip, _) = verse()
         val stream = VerseClipStream(FakeRecording(file), clip)
         assertThrows(IOException::class.java) { stream.open(-1, -1) }
-        assertThrows(IOException::class.java) { stream.open(clip.length + 1, -1) }
+        assertThrows(IOException::class.java) { stream.open(stream.length + 1, -1) }
     }
 
     @Test fun aTruncatedRecordingFailsRatherThanEndingEarly() {

@@ -8,7 +8,11 @@ import com.beautifulquran.data.model.VERSE_CLIP_HOST
  * range of that file, starting on an MP3 frame header.
  *
  * The first [leadBytes] are whole frames kept only so the bit reservoir the
- * first real frame reads from is present; `VerseClipDataSource` silences them.
+ * frames after them read from is present; `VerseClipDataSource` silences them.
+ * The verse itself is preceded by one more frame, decoded for real so the
+ * verse's first frame decodes as it does in the whole recording. Decoded,
+ * [trimSamples] samples come before the verse; the player drops exactly those
+ * (gapless trim), so back to back verses continue the recording sample for sample.
  * [sourceBytes] pins the size of the recording the range was measured on.
  */
 data class VerseClip(
@@ -17,6 +21,7 @@ data class VerseClip(
     val startByte: Long,
     val endByte: Long,
     val leadBytes: Int,
+    val trimSamples: Int,
 ) {
     val length: Long get() = endByte - startByte
 }
@@ -50,7 +55,7 @@ internal fun readVerseClips(db: SQLiteDatabase): Map<String, VerseClip> {
     db.rawQuery(
         """
         SELECT r.slug, c.surah_id, c.ayah_number, c.source_url, c.source_bytes,
-               c.start_byte, c.end_byte, c.lead_bytes
+               c.start_byte, c.end_byte, c.lead_bytes, c.trim_samples
         FROM audio_clips c JOIN reciters r ON r.id = c.reciter_id
         """.trimIndent(),
         null,
@@ -63,11 +68,15 @@ internal fun readVerseClips(db: SQLiteDatabase): Map<String, VerseClip> {
                     startByte = cursor.getLong(5),
                     endByte = cursor.getLong(6),
                     leadBytes = cursor.getInt(7),
+                    trimSamples = cursor.getInt(8),
                 )
         }
     }
     return out
 }
+
+/** Bumped whenever the bytes `VerseClipStream` serves for the same range change. */
+internal const val VERSE_CLIP_FORMAT = 2
 
 /** One range-sourced reciter's slicing, reduced to what decides whether a cached verse is still the right audio. */
 data class VerseClipStamp(val slug: String, val reciterId: Int, val fingerprint: String)
@@ -82,7 +91,8 @@ internal fun readVerseClipStamps(db: SQLiteDatabase): List<VerseClipStamp> {
     val out = ArrayList<VerseClipStamp>()
     db.rawQuery(
         """
-        SELECT r.slug, r.id, c.surah_id, c.ayah_number, c.source_bytes, c.start_byte, c.end_byte, c.lead_bytes
+        SELECT r.slug, r.id, c.surah_id, c.ayah_number, c.source_bytes, c.start_byte, c.end_byte, c.lead_bytes,
+               c.trim_samples
         FROM audio_clips c JOIN reciters r ON r.id = c.reciter_id
         ORDER BY r.id, c.surah_id, c.ayah_number
         """.trimIndent(),
@@ -101,7 +111,8 @@ internal fun readVerseClipStamps(db: SQLiteDatabase): List<VerseClipStamp> {
                 id = cursor.getInt(1)
                 digest = java.security.MessageDigest.getInstance("SHA-256")
             }
-            val row = (2..7).joinToString(":") { cursor.getLong(it).toString() }
+            // Prefixed with how the stream is served (gapless header), so a change there drops old copies too.
+            val row = "$VERSE_CLIP_FORMAT:" + (2..8).joinToString(":") { cursor.getLong(it).toString() }
             digest.update("$row\n".toByteArray())
         }
         finish()

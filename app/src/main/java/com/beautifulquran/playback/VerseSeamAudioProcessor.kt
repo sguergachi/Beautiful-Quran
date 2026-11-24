@@ -26,15 +26,15 @@ import java.nio.ByteBuffer
 class VerseSeamAudioProcessor : BaseAudioProcessor() {
 
     /**
-     * Whether a gapless seam may be bridged. Off for verses cut from a surah
-     * recording ([com.beautifulquran.data.model.VERSE_CLIP_HOST]): their opening
-     * silence is the cut's own reservoir lead, not encoder priming, and the
-     * recording carries no hole there to fill. Bridging it replays the end of
-     * the verse before, reversed, in front of the next one: heard as a word
-     * said twice at a seam.
+     * True while the playlist's files are verses cut from one surah recording
+     * ([com.beautifulquran.data.model.VERSE_CLIP_HOST]). Their gapless seams are
+     * sample-exact (the player trims each verse's decoded lead), so the recording
+     * simply continues across them: no fade, which would carve a dip into
+     * connected recitation, and no bridge, which would replay the end of the
+     * verse before, reversed, as if a word were said twice.
      */
     @Volatile
-    var bridgeSeams: Boolean = true
+    var sampleExactSeams: Boolean = false
 
     private var seam: VerseSeamFade? = null
 
@@ -66,8 +66,9 @@ class VerseSeamAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun onQueueEndOfStream() {
-        bridge = if (nextFileConfigured && bridgeSeams) seam?.bridgeSource() else null
-        val tail = seam?.endOfStream() ?: return
+        val exact = nextFileConfigured && sampleExactSeams
+        bridge = if (nextFileConfigured && !exact) seam?.bridgeSource() else null
+        val tail = seam?.endOfStream(fade = !exact) ?: return
         if (tail.isEmpty()) return
         replaceOutputBuffer(tail.size).put(tail).flip()
     }

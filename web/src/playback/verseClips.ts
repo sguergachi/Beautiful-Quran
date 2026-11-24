@@ -8,9 +8,12 @@
  * such URL into a byte range of the real surah MP3 and returns the verse as an
  * ordinary 200 response; nothing else crosses the wire.
  *
- *  - A verse's first `leadBytes` hold the bit reservoir its first real frame
- *    needs. They are fetched, silenced ([silenceLead]) and kept at the front,
- *    so the verse does not open on a replay of the one before it.
+ *  - A verse's first `leadBytes` hold the bit reservoir the frames after them
+ *    need, and one warm-up frame follows (Android decodes it so the verse opens
+ *    sample-exact, then trims both; see `trimSamples`). The browser has no such
+ *    trim, so every frame before the verse is silenced ([silenceLead]) and
+ *    kept at the front: the verse never opens on a replay of the one before.
+ *    Its word clock then runs `trimSamples` early, about 50 ms.
  *  - The surah file's total size must be what the range was measured on
  *    (`Content-Range`); a re-encoded upstream file would shift every range, so
  *    the shim fails instead of serving the wrong words.
@@ -26,6 +29,8 @@ export interface VerseClip {
   startByte: number
   endByte: number
   leadBytes: number
+  /** Decoded samples ahead of the verse itself: whole frames, reservoir lead and warm-up. */
+  trimSamples: number
 }
 
 export interface VerseClipRef {
@@ -95,6 +100,19 @@ export function silenceLead(data: Uint8Array, leadBytes: number): Uint8Array {
   return data
 }
 
+const SAMPLES_PER_FRAME = 1_152
+
+/** Bytes of the whole frames that decode to [samples] samples at the front of [data]. */
+export function headBytes(data: Uint8Array, samples: number): number {
+  let pos = 0
+  for (let frame = 0; frame < samples / SAMPLES_PER_FRAME; frame++) {
+    const length = mp3FrameLength(data, pos)
+    if (length <= 0) throw new Error(`no MP3 frame at byte ${pos} of the verse's head`)
+    pos += length
+  }
+  return pos
+}
+
 export type VerseClipLookup = (ref: VerseClipRef) => VerseClip | undefined
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
@@ -130,7 +148,7 @@ export async function fetchVerseClip(
   if (bytes.length !== clip.endByte - clip.startByte) {
     throw new Error(`Verse is ${bytes.length} bytes, expected ${clip.endByte - clip.startByte}`)
   }
-  silenceLead(bytes, clip.leadBytes)
+  silenceLead(bytes, headBytes(bytes, clip.trimSamples))
   return new Response(bytes, {
     status: 200,
     headers: { 'Content-Type': 'audio/mpeg', 'Content-Length': String(bytes.length) },

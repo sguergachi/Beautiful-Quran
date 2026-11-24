@@ -118,8 +118,11 @@ internal class VerseSeamFade(
         return out
     }
 
-    /** Ramp whatever is still held. A seek uses [clear] instead. */
-    fun endOfStream(): ByteArray {
+    /**
+     * Release whatever is still held, ramped to silence unless [fade] is false
+     * (a seam that continues the same recording). A seek uses [clear] instead.
+     */
+    fun endOfStream(fade: Boolean = true): ByteArray {
         val aligned = size - size % frameBytes
         if (aligned <= 0) {
             size = 0
@@ -127,7 +130,7 @@ internal class VerseSeamFade(
         }
         val tail = buffered.copyOf(aligned)
         size = 0
-        fadeOutPcm16(tail, frameBytes / 2)
+        if (fade) fadeOutPcm16(tail, frameBytes / 2)
         return tail
     }
 

@@ -94,7 +94,9 @@ describe('fetchVerseClip', () => {
     sourceBytes: file.length,
     startByte: 5000,
     endByte: 5000 + slice.length,
-    leadBytes: lead,
+    // Two reservoir frames, then the warm-up frame: the browser silences all three.
+    leadBytes: 417 + 418,
+    trimSamples: 3 * 1152,
   }
   const lookup = () => clip
   const expected = slice.slice()
@@ -114,7 +116,7 @@ describe('fetchVerseClip', () => {
     return { calls, upstream }
   }
 
-  it('returns the verse as one ordinary response with its lead silenced', async () => {
+  it('returns the verse as one ordinary response with everything before it silenced', async () => {
     const { calls, upstream } = serving()
     const response = await fetchVerseClip('https://verse-clips.invalid/data/x/002005.mp3', lookup, upstream)
     expect(response.status).toBe(200)

@@ -81,7 +81,7 @@ internal class VerseClipDataSource(
         val verse = VerseClipStream(source, clip)
         stream = verse
         val position = dataSpec.position
-        if (position < 0 || position > clip.length) {
+        if (position < 0 || position > verse.length) {
             throw DataSourceException(PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
         }
         return verse.open(position, if (dataSpec.length == C.LENGTH_UNSET.toLong()) -1 else dataSpec.length)

@@ -72,12 +72,27 @@ class VerseSeamAudioProcessorTest {
     fun `verses cut from a surah recording are never bridged`() {
         // Their opening silence is the cut's lead, not a hole in the recording:
         // filling it replays the previous verse's last word, reversed.
-        val out = playThenSilence(gapless = true, bridgeSeams = false)
+        val out = playThenSilence(gapless = true, sampleExact = true)
         assertTrue(out.all { it.toInt() == 0 })
     }
 
-    private fun playThenSilence(gapless: Boolean, bridgeSeams: Boolean = true): ByteArray {
-        val processor = VerseSeamAudioProcessor().also { it.bridgeSeams = bridgeSeams }
+    @Test
+    fun `a sample-exact seam hands the ending on unfaded`() {
+        val processor = VerseSeamAudioProcessor().also { it.sampleExactSeams = true }
+        val format = AudioProcessor.AudioFormat(1_000, 1, C.ENCODING_PCM_16BIT)
+        processor.configure(format)
+        processor.flush(AudioProcessor.StreamMetadata.DEFAULT)
+        processor.queueInput(ByteBuffer.wrap(pcm16(18, 8_000)))
+        copy(processor.getOutput())
+        processor.configure(format)
+        processor.queueEndOfStream()
+        val tail = copy(processor.getOutput())
+        assertEquals(8, tail.size / 2)
+        assertTrue((0 until 8).all { sampleAt(tail, it) == 8_000 })
+    }
+
+    private fun playThenSilence(gapless: Boolean, sampleExact: Boolean = false): ByteArray {
+        val processor = VerseSeamAudioProcessor().also { it.sampleExactSeams = sampleExact }
         val format = AudioProcessor.AudioFormat(1_000, 1, C.ENCODING_PCM_16BIT)
         processor.configure(format)
         processor.flush(AudioProcessor.StreamMetadata.DEFAULT)

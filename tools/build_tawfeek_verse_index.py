@@ -15,14 +15,18 @@ For every verse it:
      constant bitrate per file; anything else aborts) so a cut can only fall on a frame boundary;
   2. places the cut where the audio is quiet: inside the silence between two
      verses, or at the quietest instant within +-40 ms when verses touch;
-  3. backs the start up by the frames that hold the bit reservoir the first
-     wanted frame draws on (`main_data_begin`). Their bytes must be present
-     but their sound must not be: the app zeroes those frames' granule data
-     (`silence_lead`, mirrored in Kotlin and TypeScript) so they decode as
-     silence instead of replaying the previous verse's tail;
-  4. records start/end byte, the slice's origin in source samples, its length
-     and how many leading bytes are reservoir-only, in
-     tools/timing_sources/tawfeek-verse-index.json.
+  3. backs the start up by one warm-up frame, decoded but never heard, so the
+     verse's first frame decodes exactly as in the whole recording, and by the
+     frames that hold the bit reservoir that warm-up frame draws on
+     (`main_data_begin`). Reservoir frames' bytes must be present but their
+     sound must not be: the app zeroes their granule data (`silence_lead`,
+     mirrored in Kotlin and TypeScript);
+  4. records start/end byte, where the heard verse begins in source samples
+     (`originSamples`, the clock of its word times), its heard length, the
+     reservoir-only leading bytes, and `trimSamples`: how many decoded samples
+     come before the verse. The app drops exactly those (gapless trim), so
+     verses played back to back continue the recording sample for sample.
+     Written to tools/timing_sources/tawfeek-verse-index.json.
 
 The source MP3 hashes and byte sizes are pinned. The app refuses a source
 whose size differs, because a re-encoded upstream file would silently shift
@@ -159,6 +163,9 @@ def lead_frames(begin, payload, wanted):
         need -= payload[wanted - count]
     return count
 
+
+# Frames decoded only to warm the decoder before a verse's first heard frame.
+WARM_FRAMES = 1
 
 SEAM_SEARCH = 3   # frames either side a shared cut may move to find the quietest start
 
@@ -311,13 +318,18 @@ def index_surah(surah, source_dir, record):
     out = {}
     for key, (wanted, last) in plan_cuts(surah, pcm, units_of(surah, record), frames).items():
         wanted = min(wanted, frames - 1)
-        first = max(0, wanted - lead_frames(begin, payload, wanted))
+        # One whole frame before the verse is decoded for real (never heard), so the
+        # decoder reaches the verse's first frame in the state continuous playback
+        # would: its first granule overlaps the true previous one, sample-exact.
+        warm = max(0, wanted - WARM_FRAMES)
+        first = max(0, warm - lead_frames(begin, payload, warm))
         out[key] = {
             "startByte": offsets[first],
             "endByte": offsets[last],
-            "originSamples": first * SAMPLES_PER_FRAME,
-            "durationSamples": (last - first) * SAMPLES_PER_FRAME,
-            "leadBytes": offsets[wanted] - offsets[first],
+            "originSamples": wanted * SAMPLES_PER_FRAME,
+            "durationSamples": (last - wanted) * SAMPLES_PER_FRAME,
+            "leadBytes": offsets[warm] - offsets[first],
+            "trimSamples": (wanted - first) * SAMPLES_PER_FRAME,
         }
     return surah, {"sourceBytes": offsets[-1], "clips": out}
 
@@ -362,7 +374,7 @@ def main():
             print(f"  surah {surah}: {len(result['clips'])} verses", flush=True)
 
     index = {
-        "schema": 2,
+        "schema": 3,
         "reciterSlug": SLUG,
         "sampleRateHz": RATE,
         "samplesPerFrame": SAMPLES_PER_FRAME,

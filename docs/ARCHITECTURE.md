@@ -207,14 +207,24 @@ use committed two-model forced-alignment evidence instead.
 **Tawfeek As-Sawaigh** is on no per-verse source. His public whole-surah MP3s
 (mp3quran.net) are never re-hosted or re-encoded: each verse is a byte range of
 the one source file, listed in the `audio_clips` table (`start_byte`, `end_byte`,
-`lead_bytes`; `reciters.rangeSourced`). `tools/build_tawfeek_verse_index.py`
+`lead_bytes`, `trim_samples`; `reciters.rangeSourced`). `tools/build_tawfeek_verse_index.py`
 cuts only at MP3 frame boundaries, in silence where the recording has any. The
 player asks the CDN for that range (`VerseClipDataSource` on Android,
-`installVerseClipFetch` on web), and the few frames that exist only to seed the
-bit reservoir are silenced on the fly (`Mp3LeadSilencer`; `silenceLead` on web), so
-a slice decodes exactly as the surah file does. The URL pinned for each surah
-carries its byte size, and playback refuses a source that has changed.
-`tools/verify_tawfeek_slices.py` proves the exactness for all 6,236 slices.
+`installVerseClipFetch` on web). Each range starts with the frames that seed the
+bit reservoir, silenced on the fly (`Mp3LeadSilencer`; `silenceLead` on web), and
+one warm-up frame decoded for real, so the verse's first frame decodes exactly
+as in the surah file. On Android the stream is prefixed with an ID3 `iTunSMPB`
+tag (`gaplessHeaderFor`): Media3 trims the decoded lead and the platform
+decoder's 529-sample padding, and verses played back to back are the recording,
+sample for sample, so a seam inside connected recitation cannot be heard. Their
+seams also skip `VerseSeamAudioProcessor`'s fade and bridge, which exist for
+separately recorded EveryAyah files. The web has no such trim and silences the
+whole head instead (its word clock runs that ~50 ms early). The URL pinned for
+each surah carries its byte size, and playback refuses a source that has changed.
+`tools/verify_tawfeek_slices.py` proves the exactness for all 6,236 slices, and
+`VerseClipSeamCaptureTest` + `tools/check_verse_seams.py` prove it for the real
+player and decoder on a device. Cached verses are keyed by URL, so a change to the
+ranges (or to `VERSE_CLIP_FORMAT`) drops the cached copies on next launch.
 
 His word times are our own: `tools/reciter_align` (see its README) aligns the same
 recordings to the canonical text with MMS-300m CTC, finds the istiadha and basmala
