@@ -1,0 +1,5 @@
+numpy
+torch
+transformers
+uroman
+ctc-forced-aligner @ git+https://github.com/MahmoudAshraf97/ctc-forced-aligner.git
