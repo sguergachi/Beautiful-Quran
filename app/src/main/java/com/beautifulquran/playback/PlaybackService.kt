@@ -63,11 +63,14 @@ class PlaybackService : MediaLibraryService() {
         super.onCreate()
 
         RecitationCache.prepare(this)
-        val upstream = DefaultHttpDataSource.Factory()
-            .setUserAgent("BeautifulQuran/1.0")
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(15_000)
-            .setAllowCrossProtocolRedirects(true)
+        val upstream = VerseClipDataSource.Factory(
+            DefaultHttpDataSource.Factory()
+                .setUserAgent("BeautifulQuran/1.0")
+                .setConnectTimeoutMs(15_000)
+                .setReadTimeoutMs(15_000)
+                .setAllowCrossProtocolRedirects(true),
+            (application as QuranApp).repository.verseClips,
+        )
         val playerDataSource = RecitationCache.playbackDataSourceFactory(this, upstream)
 
         val prefetcher = AudioPrefetcher(

@@ -27,6 +27,7 @@ import {
   type SearchConcept,
 } from '../domain/WordSearch'
 import { assetUrl } from '../assetUrl'
+import { installVerseClipFetch, type VerseClip, type VerseClipRef } from '../playback/verseClips'
 
 let surahsCache: Surah[] | null = null
 let recitersCache: Reciter[] | null = null
@@ -53,6 +54,7 @@ export async function ensureReady(
   onProgress?: (p: LoadProgress) => void,
 ): Promise<void> {
   await openDatabase(undefined, onProgress)
+  installVerseClipFetch(verseClip)
 }
 
 export function surahs(): Surah[] {
@@ -75,7 +77,9 @@ export function surahs(): Surah[] {
 export function reciters(): Reciter[] {
   if (recitersCache) return recitersCache
   recitersCache = queryAll(
-    'SELECT id, slug, name, style, has_timings FROM reciters ORDER BY id',
+    `SELECT id, slug, name, style, has_timings,
+            EXISTS (SELECT 1 FROM audio_clips WHERE reciter_id = reciters.id) AS range_sourced
+     FROM reciters ORDER BY id`,
     [],
     (r) => ({
       id: Number(r.id),
@@ -83,9 +87,38 @@ export function reciters(): Reciter[] {
       name: String(r.name),
       style: String(r.style),
       hasTimings: Number(r.has_timings) === 1,
+      rangeSourced: Number(r.range_sourced) === 1,
     }),
   )
   return recitersCache
+}
+
+let verseClipsCache: Map<string, VerseClip> | null = null
+
+/** Where a range-sourced reciter's verse lives in its surah recording, if it is one. */
+export function verseClip(ref: VerseClipRef): VerseClip | undefined {
+  if (!verseClipsCache) {
+    verseClipsCache = new Map()
+    for (const [key, clip] of queryAll(
+      `SELECT r.slug, c.surah_id, c.ayah_number, c.source_url, c.source_bytes,
+              c.start_byte, c.end_byte, c.lead_bytes
+       FROM audio_clips c JOIN reciters r ON r.id = c.reciter_id`,
+      [],
+      (r): [string, VerseClip] => [
+        `${String(r.slug)}/${Number(r.surah_id)}:${Number(r.ayah_number)}`,
+        {
+          sourceUrl: String(r.source_url),
+          sourceBytes: Number(r.source_bytes),
+          startByte: Number(r.start_byte),
+          endByte: Number(r.end_byte),
+          leadBytes: Number(r.lead_bytes),
+        },
+      ],
+    )) {
+      verseClipsCache.set(key, clip)
+    }
+  }
+  return verseClipsCache.get(`${ref.slug}/${ref.surah}:${ref.ayah}`)
 }
 
 export function surahContent(surahId: number): SurahContent {

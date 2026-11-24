@@ -32,12 +32,18 @@ export interface Reciter {
   name: string
   style: string
   hasTimings: boolean
+  /** Each verse is a byte range of a whole-surah recording (`audio_clips`), not an EveryAyah file. */
+  rangeSourced?: boolean
 }
+
+/** Host of a range-sourced reciter's per-verse URLs; never resolves (see playback/verseClips.ts). */
+export const VERSE_CLIP_HOST = 'verse-clips.invalid'
 
 export function audioUrl(reciter: Reciter, surah: number, ayah: number): string {
   const s = String(surah).padStart(3, '0')
   const a = String(ayah).padStart(3, '0')
-  return `https://everyayah.com/data/${reciter.slug}/${s}${a}.mp3`
+  const host = reciter.rangeSourced ? VERSE_CLIP_HOST : 'everyayah.com'
+  return `https://${host}/data/${reciter.slug}/${s}${a}.mp3`
 }
 
 export function basmalahAudioUrl(reciter: Reciter): string {

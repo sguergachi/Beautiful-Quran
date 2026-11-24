@@ -194,7 +194,7 @@ only when its word timings match the exact EveryAyah recording the app streams.
 The 2026 expansion therefore keeps Yasser Al-Dosari, Abu Bakr Al-Shatri,
 Mohammad Al-Tablawi, and the available Mujawwad / Muallim performances while
 excluding popular voices whose complete timing corpus uses a different audio
-clock. The result is 13 recitations, all with word highlighting. New corpora
+clock. The result is 14 recitations, all with word highlighting. New corpora
 are pinned by source SHA-256 and by one hash over all 6,236 output rows; later
 edits to any shipped row still require the ordinary per-row acoustic verdict.
 
@@ -203,6 +203,26 @@ EveryAyah files. `tools/timing_sources/yasser-everyayah-clock.json` records the
 exact source-frame origin of 6,231 clips and retains every full or partial
 occurrence physically inside each clip. Five clips that cannot be byte-matched
 use committed two-model forced-alignment evidence instead.
+
+**Tawfeek As-Sawaigh** is on no per-verse source. His public whole-surah MP3s
+(mp3quran.net) are never re-hosted or re-encoded: each verse is a byte range of
+the one source file, listed in the `audio_clips` table (`start_byte`, `end_byte`,
+`lead_bytes`; `reciters.rangeSourced`). `tools/build_tawfeek_verse_index.py`
+cuts only at MP3 frame boundaries, in silence where the recording has any. The
+player asks the CDN for that range (`VerseClipDataSource` on Android,
+`installVerseClipFetch` on web), and the few frames that exist only to seed the
+bit reservoir are silenced on the fly (`Mp3LeadSilencer`; `silenceLead` on web), so
+a slice decodes exactly as the surah file does. The URL pinned for each surah
+carries its byte size, and playback refuses a source that has changed.
+`tools/verify_tawfeek_slices.py` proves the exactness for all 6,236 slices.
+
+His word times are our own: `tools/reciter_align` (see its README) aligns the same
+recordings to the canonical text with MMS-300m CTC, finds the istiadha and basmala
+he says at section breaks and the phrases he repeats, audits every verse with a
+second model (XLSR-53 Arabic), and commits one hash-pinned artifact,
+`tools/timing_sources/tawfeek-alignment.json.gz`. No third-party timing data is
+involved, so the result ships in the public repo, the APK and the web build.
+Audio is from mp3quran.net, credited in-app.
 
 The **canonical word segmentation** is the space-split of the Uthmani text.
 The other two sources are mapped onto it by position:

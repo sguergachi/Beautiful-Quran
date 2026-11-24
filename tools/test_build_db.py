@@ -695,7 +695,10 @@ def audit_bundled_db(database_path=ROOT / "data/quran.db"):
             )
     for path in AUDIO_ONSETS_DIR.glob("*.json"):
         payload = json.loads(path.read_text(encoding="utf-8"))
-        exact &= payload["detector"] == {
+        # A range-sliced reciter has no audio to scan: its ceilings are the cut lengths in the
+        # verse index, so there is no detector to pin (the durations are still checked below).
+        derived = "source" in payload["detector"]
+        exact &= derived or payload["detector"] == {
             "noiseDb": onset_detector.NOISE_DB,
             "sustainedMs": onset_detector.SUSTAINED_MS,
             "minimumOffsetMs": onset_detector.MIN_OFFSET_MS,
@@ -854,7 +857,10 @@ def check_audit_holds():
             # against the exact removed corpus, never an arbitrary older row.
             manifest = json.loads((ROOT / "data/qf-timing-transition.json").read_text())
             archived = read_git_timing_rows(manifest["baselineCommit"])
-            verify_asset_transition(archived, baseline, manifest)
+            verify_asset_transition(
+                archived, baseline, manifest,
+                check_retained=len(baseline) == manifest["retainedTimingRows"],
+            )
             baseline.update({key: row for key, row in archived.items()
                              if key[0] in QF_TIMING_SLUGS})
         for row in payload.get("rows") or []:

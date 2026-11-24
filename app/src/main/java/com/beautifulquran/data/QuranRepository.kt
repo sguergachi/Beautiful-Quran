@@ -139,6 +139,9 @@ class QuranRepository(
 
     private val runtimeViews = CacheGeneration()
 
+    /** Where each range-sourced reciter's verses live in their surah recordings. */
+    val verseClips: VerseClipIndex = VerseClipIndex { readVerseClips(database.db) }
+
     /** Drop derived views after a runtime refresh so they rebuild from it. */
     fun invalidateRuntimeMushafViews() = runtimeViews.invalidate {
         wordSearchIndex = null
@@ -217,9 +220,16 @@ class QuranRepository(
 
     suspend fun reciters(): List<Reciter> = withContext(Dispatchers.IO) {
         recitersCache ?: queryList(
-            "SELECT id, slug, name, style, has_timings FROM reciters ORDER BY id",
+            """
+            SELECT id, slug, name, style, has_timings,
+                   EXISTS (SELECT 1 FROM audio_clips WHERE reciter_id = reciters.id)
+            FROM reciters ORDER BY id
+            """.trimIndent(),
         ) { c ->
-            Reciter(c.getInt(0), c.getString(1), c.getString(2), c.getString(3), c.getInt(4) == 1)
+            Reciter(
+                c.getInt(0), c.getString(1), c.getString(2), c.getString(3),
+                c.getInt(4) == 1, rangeSourced = c.getInt(5) == 1,
+            )
         }.also { recitersCache = it }
     }
 

@@ -454,7 +454,7 @@ sets the same sizes on the same widths. Masthead 34/40, chapter rows
 48 px icon targets around 24 px glyphs, transport 48 / 56 / 48 with a 34 px
 play glyph, chapter opening as `سُورَةُ name` (32 px) · transliteration ·
 meaning · `Chapter N · Place · N ayahs`. Settings keeps Android's order:
-the favorite reciters, a "Show all 13 reciters" link, then Customize. Favorites persist separately
+the favorite reciters, a "Show all N reciters" link, then Customize. Favorites persist separately
 from the selected voice and migrate existing installs to Android's original
 seven. The Reciters leaf shows the same 13 performances from the shared database,
 sorted by name, with Mujawwad / Muallim subtitles and independent star targets.

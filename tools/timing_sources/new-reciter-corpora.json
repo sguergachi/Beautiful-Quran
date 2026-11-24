@@ -118,6 +118,475 @@
           "sha256": "5eeb045d8a7895208c94d2d7ec243567f8f550728835411527c4ffa1e789c9b7"
         }]
       }
+    },
+    {
+      "reciter": "Tawfeek_As-Sawaigh_128kbps",
+      "verdict": "accept",
+      "expectedRows": 6236,
+      "corpusPayloadSha256": "db9298f5fff01b5bb248444c7dbcf410419c65372bfc18f27cc18bbaf194e144",
+      "evidence": {
+        "kind": "pinned_corpus_bootstrap",
+        "summary": "Complete own-alignment corpus (tools/reciter_align: MMS-300m CTC, route search for openings and repeats, XLSR-53 audit, MMS-1b arbiter) rebased onto the exact verse byte ranges streamed from the public surah recordings; every insertion supported by two models.",
+        "artifact": "tools/timing_sources/tawfeek-alignment.json.gz",
+        "sources": [
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/001.mp3",
+            "sha256": "7ba3bc95b630498ad197742dd7380b82ea299ef62596a340d912e8b82baec821"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/002.mp3",
+            "sha256": "60a9e0d4920d0bac5372544944000d42d65f87412a9d90c879cd66491e36744a"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/003.mp3",
+            "sha256": "35fdfa09b99455b9d6262b2d6f8917cbaa77c3a1aba03064fdc3e4b5eb31a7e6"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/004.mp3",
+            "sha256": "4998ad81bfae38585af815e8b7a7117a5050f4052c8cc4cd8c4a1c661cb0b7ae"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/005.mp3",
+            "sha256": "60e7143407f49ecdf53e2d4f802b25b3832335b1fa1d4b29b9f32c93c65a1f7b"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/006.mp3",
+            "sha256": "365743de115a7bee9d983fada0243d24fe2a61c13d0e3984953e76900316e285"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/007.mp3",
+            "sha256": "7e15c30fd155848c716b4e9a11b7b6044fa66f14f94dd2f8d113a9f6e9f4f0d3"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/008.mp3",
+            "sha256": "f26dfb13c0ac030105fb6f0c4355d0db8108097e4bd7aac399de1be48cc6aa72"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/009.mp3",
+            "sha256": "b629b7a0a898e89a2d153e4546dfeffa0d9afb9e1f53dcb0afa368ceceadc5b5"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/010.mp3",
+            "sha256": "018fd29e6108dbd6868f6992547d53ff0ed12e8cc56d44e3682b44dc351a702b"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/011.mp3",
+            "sha256": "b49554fe8c6ee7005c9658b24cbc20991dd65be852e49b67d33ea920a612afc3"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/012.mp3",
+            "sha256": "3df0bed2f31d3ceddbc52876e10234268cf6634e6d027210fdee7ce4723ffd82"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/013.mp3",
+            "sha256": "733a21a874dca8017f428e31dd4b9caa28e756c9a13af165fdaf13347a0d229a"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/014.mp3",
+            "sha256": "865f744966a8498f17b55e912d1e617c508854b5d361f3862563c2ee062df3a6"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/015.mp3",
+            "sha256": "cfcfa68ed49b8b48ca5254344beb43a3ee84e4590f191414ba6ef37a60b16c9c"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/016.mp3",
+            "sha256": "64ef07fa72e10492c5f8103126d72304a65cf272cf06f059f6cc3e8cb4a64ee1"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/017.mp3",
+            "sha256": "baabec82cef9381bc8a69c2fcaf2b2e3f844f89d2ea4b46a0a65c6091d785be7"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/018.mp3",
+            "sha256": "34a5f239282935d493c43a5a6981e36f297549a59cbd5156ffa9b0c72d0373fb"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/019.mp3",
+            "sha256": "84823e92afeab8549e39d18b665eeff16ed8091160984664ed51524cda97f766"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/020.mp3",
+            "sha256": "b03f5be21f3e94ba6677978662175528d482f0310990512fe1af4ad4d3165808"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/021.mp3",
+            "sha256": "b636d6b5c8caf9cb691540f67bbd7b280d7b31ae955f7e68b621898e29aa47cc"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/022.mp3",
+            "sha256": "eaac7d106b76e8a3d2c861babff88883319fa89cca40a05b660d6eef1109b347"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/023.mp3",
+            "sha256": "054010a8666de1c3811f42f7ef4e18fe827a96bbdabcee21ffa7cc781c7b22a1"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/024.mp3",
+            "sha256": "e592603adf1cc6f667a01e74fdeb71586da427c2e3043c9d733657f4f3e8d7ac"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/025.mp3",
+            "sha256": "54891867aac6f324c3268d7a23d40bc1bcc0ea0fb41f85efc233ad06e35fe82e"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/026.mp3",
+            "sha256": "3dcc13f2b62460ab17e0c11745cc359e07d217158f262b258081499ae1b0de22"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/027.mp3",
+            "sha256": "f59e1f348821eee9be5a346243aee151fb3a7bae60b8b78e6f9196df7ec9e0f8"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/028.mp3",
+            "sha256": "926533df49b7899a00066d28f78b98a38ba897927ac7bd9090596497d5f67855"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/029.mp3",
+            "sha256": "c4d119dd46037ccd7f20dcdbb9a54d24a340afde8698bcbfc5a5c362feb739ca"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/030.mp3",
+            "sha256": "fed8faea7f0fd5a67c224826508703ec96666976f13ca0db569a1d9c5acdd2dd"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/031.mp3",
+            "sha256": "5bb55565bbee98aa87a530c8f0a4f53ca4a50c6ec89a2dddd9577de9236bbb34"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/032.mp3",
+            "sha256": "e4727083b27e15d9729fb9c9351f941f0acb3e827e4c3d5c8dea864ca4717a79"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/033.mp3",
+            "sha256": "7c5f7f8ea9bb9b2c5bad2f7f024cf56dff6a22c3211b9d18be61a4b7f835726b"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/034.mp3",
+            "sha256": "e89a6aa36b6ca86d9fb5991552576eb82c13553b7315d55e09535f4319525776"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/035.mp3",
+            "sha256": "0a494f82b192ee4d5003583e7a6c732c96994f45f146683baef5418992438a79"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/036.mp3",
+            "sha256": "759301a9a118414b4ca80a78290542c7da6d64baa40a16dac13580df1c4422f3"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/037.mp3",
+            "sha256": "387c28cf11e0dfcb8dd23b836929cb1508425ec312380731c83ab18c2427405b"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/038.mp3",
+            "sha256": "737e44caf8bd7460106615a458e02289bb6c95c87054873af4b7b25000753249"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/039.mp3",
+            "sha256": "383b7e9964ce64850789f593855b6dd47f852ba23f06ff492d658e246fc0a6dd"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/040.mp3",
+            "sha256": "47b5add85dda2f8effd41f498ebe6ed87a539463509e91042c0e2278b91d8f38"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/041.mp3",
+            "sha256": "4154181dd88c9e9da691302004070ab075fb61c7e86ca3e35a481297affea12e"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/042.mp3",
+            "sha256": "8e0514a0c2b8e687890bfd9716460f5bb4176bedf532ff6bd61c50c96a332524"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/043.mp3",
+            "sha256": "99ddae299338092c1ef68619bda146003b5388a281e3bfdff9d1602721a20468"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/044.mp3",
+            "sha256": "bc35717ecd92099f7fdeeddd160adb4eb1d9fa4d088c545af873d9e4a64eca95"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/045.mp3",
+            "sha256": "55b6e945bf0446aad6aa0e5cd9c63c2982d2282a4eb5682d5e3de85da16f5d75"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/046.mp3",
+            "sha256": "3ef116d88c96dcdab7bc7fc16f0884fbff210bd247253c86c640135336225456"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/047.mp3",
+            "sha256": "f1ec3572515d49babf99509b105b8878ffc22fe28b8d6d7559ba8a37fb19b9e3"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/048.mp3",
+            "sha256": "9dc4d45975a0f1067e44c2987d0e2cc93fad1e44a2063f3c20e83980bf96cf8a"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/049.mp3",
+            "sha256": "52844d7cf87bc1b652aa1106a8c3a20d1c5642bc9584e5d5f109c064bb9b757b"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/050.mp3",
+            "sha256": "5d3d9171b71bb2c2630f52c6dcf5cac488fbec5746eb280124373e01b377705e"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/051.mp3",
+            "sha256": "7f55fe12be8c816c2fb9e0fa0710e60e3841158cb9ddc0949aa2c14e5d229589"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/052.mp3",
+            "sha256": "d1a82043f7f0962f8ab8adbdf1d0866f183b459bb741fdc9c52d7adf92aef0df"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/053.mp3",
+            "sha256": "0e2f5d819a7549d05a336bf833000f87628c74499e4fbb48077c979431fcb959"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/054.mp3",
+            "sha256": "ea9d6e43be014e5a6793d7d732497f0a59b20e7b316944afd10e5b55b983c93d"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/055.mp3",
+            "sha256": "f85f36ebf933dcf4f9bfa6a3078909a81394ad5bba67d80dd561256822ca1322"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/056.mp3",
+            "sha256": "1392e7bc2d8bed0f75409ab759d1afcdd7898f32c6bf5b0e2fa7cb606cf05eb6"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/057.mp3",
+            "sha256": "8f10ed5c77a8ac1f6e7713c4459700842e886882d70e4a7c99c2b7b9830a09b0"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/058.mp3",
+            "sha256": "cd3d0679e28ebe2b1d2f6cccc1e161fc6f8e4906b8579ab665abe13e3d61dc65"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/059.mp3",
+            "sha256": "111aae892766854caa4f98d541acdacd0000feb7a825eb5debff2517d20146b9"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/060.mp3",
+            "sha256": "7fb653a6f63f0a92d716f6213ea0e50b03c445573ae019149f4d7c19c00f8919"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/061.mp3",
+            "sha256": "f1f160eb8b28460083d9556b4c6215b6f7effd9a548e7872c61b1d88b4fec904"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/062.mp3",
+            "sha256": "000aaaf0159fe1e7ef30baba8400eea5798d8756c3b64bc5cc1d818067827b43"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/063.mp3",
+            "sha256": "cf300a204f5f6bd0a06ccd307d315febe53ef5ae12b7b9f7ade1bad8bd963c87"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/064.mp3",
+            "sha256": "a96b0be54d51564660d3ce8d87d0cf199291937d057f4f7715a151ec1a61e7d1"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/065.mp3",
+            "sha256": "e2e49c1b641a7e82ae35d8d993a34965b9157af5f998c830409baaa0041c4344"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/066.mp3",
+            "sha256": "a7beb73d26d7a71a531b01d732d7d60e5f052cfd155a31f85e8804784651c297"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/067.mp3",
+            "sha256": "af5c42c8a06b00b36807af4244754e29059e959a5dee80bb574b387fda8930f8"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/068.mp3",
+            "sha256": "15d4a72b82b48043d314f7e75603600e8c6b4eadeb412a2182bd91aecd2aef7f"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/069.mp3",
+            "sha256": "3a7175d27b3ac0b5d0f70ebbe3d89404d91c4a328204775188932b66a7eb2b93"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/070.mp3",
+            "sha256": "51935855a52f3ca52d8958c012212c450c43c6d0421c78c7b1f1fa31a29fba76"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/071.mp3",
+            "sha256": "59f48d1063d9ead2e91f3875512e847dba6b9c253a415d2a4946ba5954b0f9ee"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/072.mp3",
+            "sha256": "940d7c3ba947f03e6666d2518132446cf675aee8ebefbd8c43dd58a7dff07668"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/073.mp3",
+            "sha256": "e7e9c57ffd0498dd70f6c18724c1c68e039b0d62e80415eea8ba81bbe541a638"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/074.mp3",
+            "sha256": "124d0cfa570dd644eabddb0e92b037f2e4b60632d9883fcd5aba7312b32475b6"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/075.mp3",
+            "sha256": "6b45a23bf4dccf6755db2ff015e8f1f1f82c1c7a803245cf89b674ec7de65295"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/076.mp3",
+            "sha256": "b6a07d88d81485440338a9670ceed3f7cb634465c38a20d69ce72edb8aa9b3f1"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/077.mp3",
+            "sha256": "469c00e6eddba8f8f67b18958a545b7aa47bf66fc4be2f50510f78c33995cbee"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/078.mp3",
+            "sha256": "55c44ee66c1f2c9882fd1e883119e7e76f48ce756bceeb9ecfcc1322dec7ed36"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/079.mp3",
+            "sha256": "0563cf11c042edbceb87366f6e239fc97db2cd9a75176c85990f591ef6034f8d"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/080.mp3",
+            "sha256": "f35d9119fdaa80498dd6f1701ee6598d2400f21af86ad4cca91696c044d25cf0"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/081.mp3",
+            "sha256": "25813f6f60a6ef1aec1af6fd133e897740e18c7c5734bae1a0fb4fe75b34e5d4"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/082.mp3",
+            "sha256": "fa0424df4ed0ba54d17ee0cdb1346b48fc49736f33ddae70a74e49043273cf72"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/083.mp3",
+            "sha256": "bfb80cf6b229d99acb8ca487e9eff81025e10a7fbef6aeecaee9fada2554e017"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/084.mp3",
+            "sha256": "8b98880222b25d9f3ffea2dc24d47d066228298591435e458135bda6690ae6bc"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/085.mp3",
+            "sha256": "e6bc1f308108a0d78fd569a317f873cce522b579b0b33353adf29c72be04a562"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/086.mp3",
+            "sha256": "52051277f59cc0d6885531ae37fafdf7e3a4849c1f8a727604711aef9d355eed"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/087.mp3",
+            "sha256": "079171a64956f730d1451a56de5259ddf7a3d3c9be0d517f562b8400aac66e7c"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/088.mp3",
+            "sha256": "99c499fcffbc186b2811d990571ad6f9cc01a6c18028b2aac2dcbe326b11b518"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/089.mp3",
+            "sha256": "a4753e56e176864a469794fd797643c6c53c990b6cb75727db2fd64e58641921"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/090.mp3",
+            "sha256": "f50a4693fea5021c37050991c5c7c1e5c4d1fcdda1b507e760ee0f1840d677a9"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/091.mp3",
+            "sha256": "f52420cef5fe2f0b6892ffb784c0f8fe0f0948d7b9e2f9bbde7239712302af51"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/092.mp3",
+            "sha256": "b903dd5713a031746cf770b7ba09d5576089c4b24fe7bd5903ffe5368294585d"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/093.mp3",
+            "sha256": "a708a5f40afe15b8cdff809d1f8330c34e3d8ac3fd5ce8043fce347aa5cd9d9b"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/094.mp3",
+            "sha256": "a9764631ae6edb6704b1054a699410e28b03cb0df03ef9f4ac08d8aa08da7ef4"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/095.mp3",
+            "sha256": "ce230583ecd723bc96a2f253db9b2dd07bc55d2535829e0de567e7d09afc4153"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/096.mp3",
+            "sha256": "6b809b91e431cbbdc0c9a0b377a24a8fa58e94d7433696237590a75d43386b52"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/097.mp3",
+            "sha256": "67a73f9d8e7842075edfb1f0e778de957a2e370920d24aab171d5940602dde2f"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/098.mp3",
+            "sha256": "d6162255614497358ea040d747e1f239bd3f6e20fe9bc719b41d9fc5fd0c93b4"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/099.mp3",
+            "sha256": "b73b0ba77767cdb0e3c1cb472f62dcb753ac4b10a1eec286e6b315a2fe94765c"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/100.mp3",
+            "sha256": "2079b629c7e6dd88fbead66b1aaa1e3adbb0779983cbcfdd65c7b50fdc68aa43"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/101.mp3",
+            "sha256": "3506b9987e0abae7cefc15ad4f96f4163d5af29675efbda65303322312e25adf"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/102.mp3",
+            "sha256": "89cedf55900e5865ec36eea67c8dea7e2a318d4e49680f2f46765df5ddbb0221"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/103.mp3",
+            "sha256": "99121e133f5077e3d8b384a7c2a9ba9ddab12e3f7179d6711859676b67246c2b"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/104.mp3",
+            "sha256": "f6af62dbefed2b42ff4110946273ba84ca2b1c224c5239c1da4e992915fd4a22"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/105.mp3",
+            "sha256": "049f81842d13d51e95ffb25a7b320741c111ee499ae06e53badbc6c5df60dffe"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/106.mp3",
+            "sha256": "e628abf72ebf3ac09bc4ef03207f336e55fc8e00031c610e425bcd9f76b18538"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/107.mp3",
+            "sha256": "f4c297851094c720d4b69a600feb630a27be64b6a54705ae5b4dcb70c6fd1bff"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/108.mp3",
+            "sha256": "4916cc251fe1f7f3378be31fcd45e9a874b21f4869779002362723efe2dd6774"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/109.mp3",
+            "sha256": "1149c0f4babda2eb3c7c6e2bce76edeb4e72393a55b7d1af7fb028f0bb689540"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/110.mp3",
+            "sha256": "90c59660ecb239b31b7fe5878a5c04f26a5ebea236fa69d3d2b16216b2c4368b"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/111.mp3",
+            "sha256": "45915997b90ccb22b6f5ff3217adc583524669f6cc00536544227f9b40bb5e63"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/112.mp3",
+            "sha256": "2107caf01439bdfd68f1c61e34b30f58b300d853b12694fe8e88b33ddedc96b0"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/113.mp3",
+            "sha256": "f91eeece7b5bd8ea6c2af4fc54babd5f4844e927cea72bd817c33429d1574bdb"
+          },
+          {
+            "url": "https://cdn.mp3quran.net/audio/tawfeeq-sayegh/r1/114.mp3",
+            "sha256": "4c3d0c0e6877d2328a2386f4b4bb11b8520250f7263ad9276319867334ba49dd"
+          }
+        ]
+      }
     }
   ]
 }

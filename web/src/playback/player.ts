@@ -37,6 +37,7 @@ import { PlaybackStallWatchdog } from './playbackStallWatchdog'
 import { peekPlaylistNextIndex } from './playlistNext'
 import { MediaSessionBridge, browserMediaSession } from './mediaSessionBridge'
 import { wantsGapless5Transport } from './gaplessPolicy'
+import { isVerseClipUrl } from './verseClips'
 import { buildPlaylist, type PlaylistItem } from './playlistPlan'
 import { PLAYBACK_MESSAGES, describePlaybackError } from './playbackErrors'
 import { verseGapFollows } from './verseGap'
@@ -336,7 +337,8 @@ export class PlayerController {
 
   private async applyGapless5TransportLocked(): Promise<void> {
     // Re-evaluate after waiting in the queue — a later setSpeed may have run.
-    const enabled = wantsGapless5Transport(
+    // Gapless-5 loads remote HTTPS URLs itself; a range-sourced verse only exists as a fetched blob.
+    const enabled = !this.reciter?.rangeSourced && wantsGapless5Transport(
       this.gapless5Preferred,
       this.state.speed,
       this.verseGapMs,
@@ -966,7 +968,8 @@ export class PlayerController {
       this.setBuffering(true)
     }
     // Quiet open: prefer the resolved source immediately; warm in background.
-    const warmedSrc = quiet
+    // A range-sourced verse has no playable remote URL: it must be fetched (and cut) first.
+    const warmedSrc = quiet && !isVerseClipUrl(item.url)
       ? this.prefetcher.resolveSrc(item.url)
       : (await this.prefetcher.ensure(item.url)) ?? this.prefetcher.resolveSrc(item.url)
     if (token !== this.playToken) return
@@ -980,7 +983,7 @@ export class PlayerController {
     // iOS gets one persistent media element and an ordinary HTTPS source.
     // The read-ahead fetch above warms the browser HTTP cache, while avoiding
     // WebKit's fragile blob-media and multi-element playback paths.
-    const src = this.transport.singleElement ? item.url : warmedSrc
+    const src = this.transport.singleElement && !isVerseClipUrl(item.url) ? item.url : warmedSrc
 
     // Only suppress the pause→isPlaying:false sync when we intend to keep
     // playing after the src swap. Quiet loads (openSurah) must still clear it.

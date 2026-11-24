@@ -31,17 +31,29 @@ data class Ayah(
     val words: List<Word>,
 )
 
+/**
+ * Host of the per-verse URLs of a reciter who is not on EveryAyah and is cut
+ * from a surah recording instead ([Reciter.rangeSourced]). `.invalid` never
+ * resolves: nothing is ever fetched from it. `VerseClipDataSource` turns each
+ * such URL into a byte range of the real surah file, so every cache, download
+ * and prefetch key in the app stays one per-verse URL, exactly as for EveryAyah.
+ */
+const val VERSE_CLIP_HOST = "verse-clips.invalid"
+
 data class Reciter(
     val id: Int,
     val slug: String,
     val name: String,
     val style: String,
     val hasTimings: Boolean,
+    /** True when each verse is a byte range of a whole-surah recording (`audio_clips`). */
+    val rangeSourced: Boolean = false,
 ) {
     fun audioUrl(surah: Int, ayah: Int): String {
         val s = surah.toString().padStart(3, '0')
         val a = ayah.toString().padStart(3, '0')
-        return "https://everyayah.com/data/$slug/$s$a.mp3"
+        val host = if (rangeSourced) VERSE_CLIP_HOST else "everyayah.com"
+        return "https://$host/data/$slug/$s$a.mp3"
     }
 
     /**

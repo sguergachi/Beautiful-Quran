@@ -494,7 +494,10 @@ internal object TarjiVersePulse {
         val bytes = java.io.ByteArrayOutputStream(512 * 1024)
         val data = RecitationCache.playbackDataSourceFactory(
             context,
-            DefaultHttpDataSource.Factory().setUserAgent("BeautifulQuran/1.0"),
+            com.beautifulquran.playback.VerseClipDataSource.Factory(
+                DefaultHttpDataSource.Factory().setUserAgent("BeautifulQuran/1.0"),
+                (context.applicationContext as com.beautifulquran.QuranApp).repository.verseClips,
+            ),
         ).createDataSource()
         try {
             data.open(DataSpec(Uri.parse(url)))

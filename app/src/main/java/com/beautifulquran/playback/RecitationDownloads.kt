@@ -455,7 +455,7 @@ internal fun chapterActionIsFetch(action: String): Boolean =
     action == "Download" || action == "Pause" || action == "Resume"
 
 private val EVERYAYAH_URI =
-    Regex("""everyayah\.com/data/([^/]+)/(\d{3})(\d{3})\.mp3""")
+    Regex("""(?:everyayah\.com|verse-clips\.invalid)/data/([^/]+)/(\d{3})(\d{3})\.mp3""")
 
 internal fun parseEveryayahUri(uri: String): EveryayahRef? {
     val match = EVERYAYAH_URI.find(uri) ?: return null
@@ -817,7 +817,7 @@ internal object RecitationDownloads {
     private suspend fun runQueue(app: android.content.Context) {
         val worker = coroutineContext[Job]
         val keep = RecitationCache.keep(app)
-        val writer = RecitationCache.downloadDataSourceFactory(app, httpFactory())
+        val writer = RecitationCache.downloadDataSourceFactory(app, httpFactory(app))
         try {
             while (true) {
                 val req = synchronized(lock) {
@@ -922,9 +922,12 @@ internal object RecitationDownloads {
         return activeWriterFinished
     }
 
-    private fun httpFactory() = DefaultHttpDataSource.Factory()
-        .setUserAgent("BeautifulQuran/1.0")
-        .setConnectTimeoutMs(15_000)
-        .setReadTimeoutMs(15_000)
-        .setAllowCrossProtocolRedirects(true)
+    private fun httpFactory(app: android.content.Context) = VerseClipDataSource.Factory(
+        DefaultHttpDataSource.Factory()
+            .setUserAgent("BeautifulQuran/1.0")
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(15_000)
+            .setAllowCrossProtocolRedirects(true),
+        (app.applicationContext as com.beautifulquran.QuranApp).repository.verseClips,
+    )
 }
