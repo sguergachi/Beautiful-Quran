@@ -17,21 +17,21 @@ describe('brushCheckPath + lab params', () => {
 
   it('locks the settled lab design bit-for-bit', () => {
     expect(SHIPPED_CHECK_PARAMS).toEqual({
-      p0x: 0.1,
+      p0x: 0.14,
       p0y: 0.49,
       p1x: 0.39,
-      p1y: 0.8,
+      p1y: 0.77,
       p2x: 0.73,
-      p2y: 0.11,
-      size: 24,
-      peakHalf: 1.68,
-      nibBias: 0.56,
-      attack: 0.184,
+      p2y: 0.12,
+      size: 24.7,
+      peakHalf: 1.81,
+      nibBias: 0.63,
+      attack: 0.087,
       releaseStart: 0.74,
-      bodyAmp: 0.1,
-      bodyFreq: 2.2,
-      paintMs: 833,
-      alpha: 0.75,
+      bodyAmp: 0,
+      bodyFreq: 0.5,
+      paintMs: 301,
+      alpha: 0.86,
     })
   })
 

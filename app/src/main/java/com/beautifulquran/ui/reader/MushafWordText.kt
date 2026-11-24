@@ -214,3 +214,147 @@ private class MushafWordTextNode(
         drawContent()
     }
 }
+
+/**
+ * A whole QCF line of a leaf with no live ink, set and drawn by one node.
+ *
+ * Such a line is only ever its words' ink: no wash, no recess, no layer —
+ * [MushafQcfPageLine] gives each word a node of its own only so the verse
+ * under the voice can carry those. A leaf coming in mid-flip has none of
+ * them, and composing, measuring and placing ~150 word nodes was most of
+ * what bringing it in cost the UI thread. Here the line lays its cells out
+ * through the same cache, places them at the same rounded origins and draws
+ * them in the same order — word, then its mark — so the pixels are the ones
+ * the word nodes drew.
+ */
+internal fun Modifier.mushafStaticQcfLine(
+    texts: List<MushafLineText>,
+    wordStyle: TextStyle,
+    markStyle: TextStyle,
+    geometry: MushafLineGeometry,
+    emPx: Float,
+    /** Hears the placed origins, for the line's tap handler. */
+    onPlaced: (FloatArray) -> Unit,
+): Modifier = this then MushafStaticQcfLineElement(texts, wordStyle, markStyle, geometry, emPx, onPlaced)
+
+private class MushafStaticQcfLineElement(
+    val texts: List<MushafLineText>,
+    val wordStyle: TextStyle,
+    val markStyle: TextStyle,
+    val geometry: MushafLineGeometry,
+    val emPx: Float,
+    val onPlaced: (FloatArray) -> Unit,
+) : ModifierNodeElement<MushafStaticQcfLineNode>() {
+    override fun create() = MushafStaticQcfLineNode(texts, wordStyle, markStyle, geometry, emPx, onPlaced)
+
+    override fun update(node: MushafStaticQcfLineNode) =
+        node.update(texts, wordStyle, markStyle, geometry, emPx, onPlaced)
+
+    override fun equals(other: Any?): Boolean = other is MushafStaticQcfLineElement &&
+        other.texts === texts && other.wordStyle == wordStyle && other.markStyle == markStyle &&
+        other.geometry === geometry && other.emPx == emPx && other.onPlaced === onPlaced
+
+    override fun hashCode(): Int {
+        var h = System.identityHashCode(texts)
+        h = h * 31 + wordStyle.hashCode()
+        h = h * 31 + markStyle.hashCode()
+        h = h * 31 + System.identityHashCode(geometry)
+        h = h * 31 + emPx.hashCode()
+        return h * 31 + System.identityHashCode(onPlaced)
+    }
+
+    override fun InspectorInfo.inspectableProperties() {
+        name = "mushafStaticQcfLine"
+        properties["cells"] = texts.size
+    }
+}
+
+private class MushafStaticQcfLineNode(
+    private var texts: List<MushafLineText>,
+    private var wordStyle: TextStyle,
+    private var markStyle: TextStyle,
+    private var geometry: MushafLineGeometry,
+    private var emPx: Float,
+    private var onPlaced: (FloatArray) -> Unit,
+) : Modifier.Node(), LayoutModifierNode, DrawModifierNode, CompositionLocalConsumerModifierNode {
+    private var laid: Array<TextLayoutResult>? = null
+    private var x = IntArray(0)
+    private var y = IntArray(0)
+
+    override val shouldAutoInvalidate: Boolean get() = false
+
+    fun update(
+        texts: List<MushafLineText>,
+        wordStyle: TextStyle,
+        markStyle: TextStyle,
+        geometry: MushafLineGeometry,
+        emPx: Float,
+        onPlaced: (FloatArray) -> Unit,
+    ) {
+        val changed = texts !== this.texts || wordStyle != this.wordStyle || markStyle != this.markStyle ||
+            geometry !== this.geometry || emPx != this.emPx
+        this.texts = texts
+        this.wordStyle = wordStyle
+        this.markStyle = markStyle
+        this.geometry = geometry
+        this.emPx = emPx
+        this.onPlaced = onPlaced
+        if (changed) {
+            laid = null
+            invalidateMeasurement()
+            invalidateDraw()
+        }
+    }
+
+    override fun MeasureScope.measure(measurable: Measurable, constraints: Constraints): MeasureResult {
+        val resolver = currentValueOf(LocalFontFamilyResolver)
+        val locales = currentValueOf(LocalLocaleList)
+        // Each cell exactly as a word node lays it out: unconstrained, which
+        // is also the key its layout is cached under.
+        val cells = Array(texts.size) { i ->
+            val cell = texts[i]
+            MushafWordLayouts.layout(
+                text = cell.text,
+                style = if (cell.mark) markStyle else wordStyle,
+                density = this,
+                direction = layoutDirection,
+                resolver = resolver,
+                locales = locales,
+            )
+        }
+        var height = 0
+        cells.forEach { height = maxOf(height, it.size.height) }
+        val width = constraints.maxWidth
+        val origins = mushafCellOrigins(
+            cells = geometry.drawnCells,
+            count = cells.size,
+            width = width.toFloat(),
+            fit = geometry.fit,
+            joins = geometry.joinsEm,
+            emPx = emPx,
+        )
+        if (x.size != cells.size) {
+            x = IntArray(cells.size)
+            y = IntArray(cells.size)
+        }
+        for (i in cells.indices) {
+            x[i] = origins[i].roundToInt()
+            y[i] = (height - cells[i].size.height) / 2
+        }
+        laid = cells
+        onPlaced(origins)
+        val placeable = measurable.measure(Constraints.fixed(width, height))
+        return layout(width, height) { placeable.place(0, 0) }
+    }
+
+    override fun ContentDrawScope.draw() {
+        laid?.forEachIndexed { i, cell ->
+            val dx = x[i].toFloat()
+            val dy = y[i].toFloat()
+            drawContext.transform.translate(dx, dy)
+            drawText(cell)
+            drawContext.transform.translate(-dx, -dy)
+        }
+        drawContent()
+    }
+}

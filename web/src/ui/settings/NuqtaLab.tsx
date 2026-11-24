@@ -5,6 +5,7 @@ import {
   formatNuqtaCopy,
   formatNuqtaKnob,
   NUQTA_KNOB_GROUPS,
+  NuqtaParamsContext,
   parseNuqtaFromText,
   SHIPPED_NUQTA,
   type NuqtaParams,
@@ -24,6 +25,7 @@ type Props = {
  */
 export function NuqtaLab({ params, onChange, showTitle = true }: Props) {
   const [demo, setDemo] = useState<'first' | 'second'>('first')
+  const [defaultDemo, setDefaultDemo] = useState<'first' | 'second'>('first')
   /** Bumps on paste/reset so Base UI sliders remount with exact values. */
   const [epoch, setEpoch] = useState(0)
   const [note, setNote] = useState<string | null>(null)
@@ -89,15 +91,34 @@ export function NuqtaLab({ params, onChange, showTitle = true }: Props) {
           </p>
         </>
       ) : null}
-      <PaperChoiceList
-        aria-label="Nuqta preview"
-        value={demo}
-        options={[
-          { value: 'first', label: 'First choice' },
-          { value: 'second', label: 'Second choice' },
-        ]}
-        onChange={setDemo}
-      />
+      <div className="component-kit-compare">
+        <div className="component-kit-version">
+          <p className="component-kit-version-label">Current default</p>
+          <NuqtaParamsContext.Provider value={SHIPPED_NUQTA}>
+            <PaperChoiceList
+              aria-label="Nuqta default preview"
+              value={defaultDemo}
+              options={[
+                { value: 'first', label: 'First choice' },
+                { value: 'second', label: 'Second choice' },
+              ]}
+              onChange={setDefaultDemo}
+            />
+          </NuqtaParamsContext.Provider>
+        </div>
+        <div className="component-kit-version">
+          <p className="component-kit-version-label">Customized</p>
+          <PaperChoiceList
+            aria-label="Nuqta preview"
+            value={demo}
+            options={[
+              { value: 'first', label: 'First choice' },
+              { value: 'second', label: 'Second choice' },
+            ]}
+            onChange={setDemo}
+          />
+        </div>
+      </div>
       {NUQTA_KNOB_GROUPS.map((group) => (
         <div key={group.title} className="brush-lab-sliders">
           <p className="settings-caption">{group.title}</p>

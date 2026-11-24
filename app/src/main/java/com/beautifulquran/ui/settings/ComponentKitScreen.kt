@@ -70,6 +70,11 @@ private enum class KitComponent(val title: String, val blurb: String) {
  * held in a preview that stays put while its dials scroll beneath it. Swipe
  * sideways for the next or previous component.
  *
+ * The stage shows two copies of the mark: the current default (what Reset
+ * restores — the shipped params, or the chosen brush preset) and the version
+ * being customized, so a tuning can be judged against the default without
+ * losing it to a Reset.
+ *
  * Edits live in [SettingsInkPreviewState] for the session, so every real
  * control on the Settings and Customize sheets follows them too. Ship a tuning
  * by copying it into the component's defaults (docs/DESIGN.md).
@@ -132,11 +137,29 @@ internal fun ComponentKitScreen(
                         index = index,
                         count = pages.size,
                         note = note.takeIf { pager.currentPage == index },
+                        defaultPreview = {
+                            when (component) {
+                                KitComponent.NUQTA -> CompositionLocalProvider(
+                                    LocalNuqtaParams provides ShippedNuqtaParams,
+                                ) { NuqtaPreview() }
+                                KitComponent.CHECK -> CheckPreview(
+                                    checkParams = shippedCheckParams(),
+                                    checkPaintToken = inkPreview.checkPaintToken,
+                                )
+                                KitComponent.BRUSH -> BrushDefaultPreview(viewModel, inkPreview)
+                            }
+                        },
                         preview = {
                             when (component) {
                                 KitComponent.NUQTA -> NuqtaPreview()
-                                KitComponent.CHECK -> CheckPreview(inkPreview)
-                                KitComponent.BRUSH -> BrushPreview(inkPreview)
+                                KitComponent.CHECK -> CheckPreview(
+                                    checkParams = inkPreview.checkParams,
+                                    checkPaintToken = inkPreview.checkPaintToken,
+                                )
+                                KitComponent.BRUSH -> BrushPreview(
+                                    brushParams = inkPreview.brushParams,
+                                    paintToken = inkPreview.paintToken,
+                                )
                             }
                         },
                         dials = {
@@ -153,13 +176,14 @@ internal fun ComponentKitScreen(
     }
 }
 
-/** One component: its name, a preview that holds still, and dials that scroll. */
+/** One component: its name, previews that hold still, and dials that scroll. */
 @Composable
 private fun KitPage(
     component: KitComponent,
     index: Int,
     count: Int,
     note: String?,
+    defaultPreview: @Composable () -> Unit,
     preview: @Composable () -> Unit,
     dials: @Composable ColumnScope.() -> Unit,
 ) {
@@ -177,14 +201,15 @@ private fun KitPage(
         )
         Spacer(Modifier.height(16.dp))
         // The stage: stays put while the dials below scroll, so every change
-        // is seen on the mark itself.
-        Box(
-            contentAlignment = Alignment.Center,
+        // is seen on the mark itself — default first, customized beside it.
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 132.dp),
         ) {
-            preview()
+            KitVersion(label = "Current default") { defaultPreview() }
+            Spacer(Modifier.height(12.dp))
+            KitVersion(label = "Customized") { preview() }
         }
         if (note != null) Caption(note)
         Spacer(Modifier.height(4.dp))
@@ -204,6 +229,18 @@ private fun KitPage(
             Spacer(Modifier.height(48.dp))
         }
     }
+}
+
+/** One labelled copy of the mark on the stage (default or customized). */
+@Composable
+private fun KitVersion(label: String, preview: @Composable () -> Unit) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = QuranTheme.ink.muted,
+    )
+    Spacer(Modifier.height(4.dp))
+    preview()
 }
 
 /** Which component of how many — also a way to jump straight to one. */
@@ -281,14 +318,14 @@ private fun NuqtaDials(inkPreview: SettingsInkPreviewState, onNote: (String) -> 
 // ------------------------------------------------------------------ check
 
 @Composable
-private fun CheckPreview(inkPreview: SettingsInkPreviewState) {
+private fun CheckPreview(checkParams: BrushCheckParams, checkPaintToken: Int) {
     var checked by remember { mutableStateOf(true) }
     ToggleRow(
         label = "Preview",
         checked = checked,
         onChange = { checked = it },
-        checkParams = inkPreview.checkParams,
-        checkPaintToken = inkPreview.checkPaintToken,
+        checkParams = checkParams,
+        checkPaintToken = checkPaintToken,
     )
 }
 
@@ -323,16 +360,29 @@ private fun CheckDials(inkPreview: SettingsInkPreviewState, onNote: (String) -> 
 
 // ------------------------------------------------------------------ brush
 
+/** The current default brush: the chosen preset's params, before any tuning. */
 @Composable
-private fun BrushPreview(inkPreview: SettingsInkPreviewState) {
+private fun BrushDefaultPreview(
+    viewModel: SettingsViewModel,
+    inkPreview: SettingsInkPreviewState,
+) {
+    val settings by viewModel.settings.settings.collectAsStateWithLifecycle()
+    BrushPreview(
+        brushParams = brushCircleParams(settings.brushCircleStyle),
+        paintToken = inkPreview.paintToken,
+    )
+}
+
+@Composable
+private fun BrushPreview(brushParams: BrushCircleParams, paintToken: Int) {
     var choice by remember { mutableStateOf("Scroll") }
     InkCircledChoiceRow(
         entries = listOf("Scroll", "Mushaf", "Both"),
         selected = choice,
         label = { it },
         onSelect = { choice = it },
-        params = inkPreview.brushParams,
-        paintToken = inkPreview.paintToken,
+        params = brushParams,
+        paintToken = paintToken,
     )
 }
 

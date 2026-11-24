@@ -113,7 +113,7 @@ class MushafCatalogTest {
             ),
         ).page(5)!!
 
-        val reflowed = reflowMushafPage(page) { if (it.surahId == 1) 10f else 1f }
+        val reflowed = reflowMushafPage(page, rowCapacity = 10f, endsChapter = { false }) { if (it.surahId == 1) 10f else 6f }
 
         assertEquals(5, reflowed.lines.size)
         assertEquals(
@@ -129,7 +129,7 @@ class MushafCatalogTest {
         val page = buildMushafCatalog(
             (1..150).map { source(2, 17, it, "word$it", page = 4, line = (it - 1) / 10 + 1) },
         ).page(4)!!
-        val reflowed = reflowMushafPage(page) { 1f }
+        val reflowed = reflowMushafPage(page, rowCapacity = 8.8f, endsChapter = { false }) { 1f }
 
         assertEquals(17, reflowed.lines.size)
         assertEquals(page.lines.flatMap { it.tokens }, reflowed.lines.flatMap { it.tokens })
@@ -151,7 +151,7 @@ class MushafCatalogTest {
                 (1..12).map { source(51, 1, it, "dh$it", page = 520, line = 14 + (it - 1) / 6) },
         ).page(520)!!
         // Its print rows are a little fuller than Qaf's, as on the real page.
-        val reflowed = reflowMushafPage(page) { if (it.surahId == 51) 3f else 1.7f }
+        val reflowed = reflowMushafPage(page, rowCapacity = 14.6f, endsChapter = { false }) { if (it.surahId == 51) 3f else 1.7f }
 
         assertEquals(13, reflowed.surahStarts.single().beforeLineIndex)
         assertEquals(15, reflowed.lines.size)
@@ -168,12 +168,56 @@ class MushafCatalogTest {
                 source(113, 1, 3, "three", page = 600, line = 2),
             ),
         ).page(600)!!
-        val reflowed = reflowMushafPage(page) { if (it.surahId == 112) 100f else 1f }
+        val reflowed = reflowMushafPage(page, rowCapacity = 1f, endsChapter = { false }) { if (it.surahId == 112) 100f else 1f }
 
         assertEquals(4, reflowed.lines.size)
         assertEquals(1, reflowed.surahStarts.single().beforeLineIndex)
         assertEquals(page.lines.flatMap { it.tokens }, reflowed.lines.flatMap { it.tokens })
         assertTrue(reflowed.lines.all { it.tokens.isNotEmpty() })
+    }
+
+    @Test
+    fun `short chapters take only the rows their words need`() {
+        // Page 604's shape: al-Falaq's words fill three display rows, an-Nas's
+        // a little over three. Handed the grid's spare rows anyway they were
+        // spread over four and five, and justified into gaps an em wide.
+        val page = buildMushafCatalog(
+            (1..12).map { source(113, 1, it, "falaq$it", page = 604, line = 7 + (it - 1) / 4) } +
+                (1..13).map { source(114, 1, it, "nas$it", page = 604, line = 12 + (it - 1) / 4) },
+        ).page(604)!!
+        val reflowed = reflowMushafPage(page, rowCapacity = 4f, endsChapter = { it.surahId == 114 }) { 1f }
+
+        assertEquals(listOf(4, 4, 4), reflowed.lines.take(3).map { it.tokens.size })
+        assertEquals(listOf(0, 3), reflowed.surahStarts.map { it.beforeLineIndex })
+        // Three rows, not four: the chapter's last word is folded in rather
+        // than given a row of its own.
+        assertEquals(listOf(4, 4, 5), reflowed.lines.drop(3).map { it.tokens.size })
+        assertEquals(page.lines.flatMap { it.tokens }, reflowed.lines.flatMap { it.tokens })
+    }
+
+    @Test
+    fun `a chapter's ending is set in full rows and stands short at its end`() {
+        // Ten words a row wide over two print lines that the display needs
+        // nearly three rows for: filled, not spread to three loose rows.
+        val page = buildMushafCatalog(
+            (1..10).map { source(100, 1, it, "w$it", page = 600, line = 1 + (it - 1) / 5) } +
+                (1..4).map { source(101, 1, it, "next$it", page = 600, line = 4) },
+        ).page(600)!!
+        val reflowed = reflowMushafPage(page, rowCapacity = 4f, endsChapter = { false }) { 1f }
+
+        assertEquals(listOf(4, 4, 2), reflowed.lines.take(3).map { it.tokens.size })
+        assertEquals(listOf(0, 3), reflowed.surahStarts.map { it.beforeLineIndex })
+    }
+
+    @Test
+    fun `a section running on takes a spare row only while its rows stay full`() {
+        assertEquals(3, mushafSectionRows(rows = 2.3f, printRows = 3, tokenCount = 20, endsChapter = false))
+        assertEquals(3, mushafSectionRows(rows = 2.8f, printRows = 2, tokenCount = 20, endsChapter = false))
+        assertEquals(17, mushafSectionRows(rows = 15.4f, printRows = 15, tokenCount = 150, endsChapter = false))
+        assertEquals(16, mushafSectionRows(rows = 14.9f, printRows = 15, tokenCount = 150, endsChapter = false))
+        assertEquals(3, mushafSectionRows(rows = 2.31f, printRows = 4, tokenCount = 20, endsChapter = true))
+        assertEquals(3, mushafSectionRows(rows = 3.29f, printRows = 4, tokenCount = 20, endsChapter = true))
+        assertEquals(4, mushafSectionRows(rows = 3.31f, printRows = 4, tokenCount = 20, endsChapter = true))
     }
 
     @Test
@@ -186,7 +230,7 @@ class MushafCatalogTest {
                 source(1, 2, 2, "lillahi", page = 1, line = 3),
             ),
         ).page(1)!!
-        val reflowed = reflowMushafPage(page) { 10f }
+        val reflowed = reflowMushafPage(page, rowCapacity = 10f, endsChapter = { false }) { 10f }
         assertEquals(page.lines.map { it.tokens.map { t -> t.word.arabic } },
             reflowed.lines.map { it.tokens.map { t -> t.word.arabic } })
         assertEquals(2, reflowed.lines.size)

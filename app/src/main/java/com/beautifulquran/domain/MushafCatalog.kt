@@ -46,50 +46,135 @@ data class MushafPage(
 }
 
 /**
- * Keeps a leaf's words and page boundary, but balances them over the larger
+ * Keeps a leaf's words and page boundary, but sets them over the larger
  * display grid. Chapter openings remain hard boundaries so their title and
  * basmalah never drift into the preceding chapter's tail.
+ *
+ * Each section — the run of a page's words between chapter openings — is
+ * given the print's rows and the grid's two spare ones, but only as many as
+ * its words fill. A full page needs both spare rows and gets them (the page
+ * faces' advances carry the print's justification, so a print line holds
+ * about 1.2 display rows of words). A page of short chapters does not: handed
+ * the spare rows anyway, page 604's al-Falaq and an-Nās spread three rows of
+ * words over four and five, and full justification could only open each row
+ * into gaps an em and more wide. A row no section can fill is left off, and
+ * the leaf's foot stays paper.
+ *
+ * A section that ends its chapter is set as the print sets one: full rows,
+ * the last standing short ([mushafLineMayStandShort]). Spread evenly, every row
+ * of it came out short and every one was justified loose. A section that runs
+ * on to the next page has no row that may stand short, so its rows are
+ * balanced; it keeps the print's count and takes a spare row only while its
+ * rows stay at least [MUSHAF_ROW_MIN_FILL] full.
+ *
+ * [rowCapacity] is what a naturally set display row holds, in [tokenWeight]'s
+ * units. [endsChapter] says whether a token closes its chapter — needed for a
+ * page's last section only; every other section is followed by an opening.
  */
 fun reflowMushafPage(
     page: MushafPage,
+    rowCapacity: Float,
+    endsChapter: (MushafToken) -> Boolean,
     tokenWeight: (MushafToken) -> Float,
 ): MushafPage {
-    if (mushafIsOpeningLeaf(page.page) || page.lines.isEmpty()) return page
+    if (mushafIsOpeningLeaf(page.page) || page.lines.isEmpty() || rowCapacity <= 0f) return page
     val boundaries = (listOf(0) + page.surahStarts.map { it.beforeLineIndex } + page.lines.size)
         .distinct().sorted()
     val sections = boundaries.zipWithNext().filter { (start, end) -> start < end }
     val tokens = sections.map { (start, end) -> page.lines.subList(start, end).flatMap { it.tokens } }
-    val counts = IntArray(sections.size) { sections[it].second - sections[it].first }
-    val weights = tokens.map { row -> row.sumOf { tokenWeight(it).coerceAtLeast(0.001f).toDouble() } }
-    val extraRows = MUSHAF_DISPLAY_LINES_PER_PAGE - MUSHAF_LINES_PER_PAGE
+    val printRows = IntArray(sections.size) { sections[it].second - sections[it].first }
+    val weights = tokens.map { row -> row.sumOf { tokenWeight(it).coerceAtLeast(0.001f).toDouble() }.toFloat() }
+    val ends = BooleanArray(sections.size) { i ->
+        i < sections.lastIndex || tokens[i].lastOrNull()?.let(endsChapter) == true
+    }
+    val wanted = IntArray(sections.size) { i ->
+        mushafSectionRows(weights[i] / rowCapacity, printRows[i], tokens[i].size, ends[i])
+    }
+    // Never more rows than the print plus the grid's spare ones; fewer when
+    // the words need fewer.
+    val counts = IntArray(sections.size) { minOf(printRows[it], wanted[it]) }
+    val spare = printRows.sum() + (MUSHAF_DISPLAY_LINES_PER_PAGE - MUSHAF_LINES_PER_PAGE) - counts.sum()
     // A spare row goes where the rows are still fullest *with* it. Judged by
     // the rows a section has now, a chapter's two-line opening outbid its
     // neighbour's eleven, and page 520's six short verses of al-Dhāriyāt were
     // split over three rows that a full justification could only open into
     // gaps half a word wide.
-    repeat(extraRows) {
-        val expanded = sections.indices.filter { counts[it] < tokens[it].size }
+    repeat(spare) {
+        val expanded = sections.indices.filter { counts[it] < wanted[it] }
             .maxByOrNull { weights[it] / (counts[it] + 1) } ?: return@repeat
         counts[expanded]++
     }
-    val rows = ArrayList<MushafLine>(page.lines.size + extraRows)
+    val rows = ArrayList<MushafLine>(page.lines.size + spare)
     val starts = ArrayList<MushafSurahStart>(page.surahStarts.size)
     sections.forEachIndexed { index, (start, _) ->
         page.surahStarts.filter { it.beforeLineIndex == start }.forEach {
             starts += it.copy(beforeLineIndex = rows.size)
         }
-        val count = counts[index].coerceAtMost(tokens[index].size)
-        balancedMushafRows(tokens[index], count, tokenWeight).forEach { row ->
+        val count = counts[index].coerceIn(1, tokens[index].size)
+        balancedMushafRows(
+            tokens = tokens[index],
+            count = count,
+            tokenWeight = tokenWeight,
+            // A chapter's rows are filled; only its last may stand short.
+            fullRow = if (ends[index]) rowCapacity * MUSHAF_ROW_END_FILL else 0f,
+            lastRowMin = rowCapacity * MUSHAF_ROW_SPILL,
+        ).forEach { row ->
             rows += MushafLine(number = rows.size + 1, tokens = row)
         }
     }
     return page.copy(lines = rows, surahStarts = starts)
 }
 
+/**
+ * How many display rows a section's words want: [rows] is their width in
+ * naturally set rows. A chapter's ending is filled row by row, so it takes one
+ * more only when more than [MUSHAF_ROW_SPILL] of a row would otherwise be
+ * squeezed into the others — less than that and the rows give it up by
+ * narrowing a few percent, where a row of its own would be one stranded word.
+ * A section running on to the next page is justified throughout: it keeps
+ * its [printRows] and takes more only while each stays [MUSHAF_ROW_MIN_FILL]
+ * full.
+ */
+internal fun mushafSectionRows(rows: Float, printRows: Int, tokenCount: Int, endsChapter: Boolean): Int {
+    val wanted = if (endsChapter) {
+        kotlin.math.ceil(rows - MUSHAF_ROW_SPILL).toInt()
+    } else {
+        maxOf(printRows, kotlin.math.floor(rows / MUSHAF_ROW_MIN_FILL).toInt())
+    }
+    return wanted.coerceIn(1, tokenCount.coerceAtLeast(1))
+}
+
+/**
+ * How much of a display row a page face's advances fill when its words are set
+ * at their own width: the advances carry the print's justification, which the
+ * display's own fit replaces. Measured over the book, rows that the reader's
+ * full pages set at their natural spacing come to about this much.
+ */
+const val MUSHAF_ROW_SET_FILL = 0.85f
+
+/**
+ * How full a chapter's ending sets each row before its last, in naturally set
+ * rows: about as full as an ordinary page's rows come out, so its white is
+ * theirs. Filled only to the natural measure, al-Kawthar's first row on page
+ * 602 opened to gaps a word wide.
+ */
+const val MUSHAF_ROW_END_FILL = 1.05f
+
+/** How much of a row a chapter's ending may fold into its other rows, and
+ * the least it leaves its last row. */
+const val MUSHAF_ROW_SPILL = 0.3f
+
+/** How full a justified row must stay for a section to take another. */
+const val MUSHAF_ROW_MIN_FILL = 0.9f
+
 private fun balancedMushafRows(
     tokens: List<MushafToken>,
     count: Int,
     tokenWeight: (MushafToken) -> Float,
+    /** At least this much per row before the last, when the words allow. */
+    fullRow: Float = 0f,
+    /** What filling the rows must leave the last one. */
+    lastRowMin: Float = 0f,
 ): List<List<MushafToken>> {
     val weights = tokens.map { tokenWeight(it).coerceAtLeast(0.001f) }
     val rows = ArrayList<List<MushafToken>>(count)
@@ -99,7 +184,13 @@ private fun balancedMushafRows(
             rows += tokens.subList(start, tokens.size)
         } else {
             val remaining = count - row
-            val target = weights.subList(start, weights.size).sum() / remaining
+            val rest = weights.subList(start, weights.size).sum()
+            val even = rest / remaining
+            val target = if (fullRow > 0f) {
+                maxOf(even, minOf(fullRow, (rest - lastRowMin) / (remaining - 1)))
+            } else {
+                even
+            }
             val maxEnd = tokens.size - remaining + 1
             var end = start + 1
             var width = weights[start]
