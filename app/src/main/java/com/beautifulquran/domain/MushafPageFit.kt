@@ -100,6 +100,8 @@ fun mushafIsOpeningLeaf(page: Int): Boolean = page in 1..2
  * with its corners knocked off.
  *
  * The rows tile the circle's height, so row k's chord is taken at its centre.
+ * Al-Baqarah's basmalah is the crown row of its circle; the title bands
+ * stand above both.
  */
 fun mushafMedallionChords(rows: Int): FloatArray {
     if (rows <= 0) return FloatArray(0)
@@ -108,6 +110,53 @@ fun mushafMedallionChords(rows: Int): FloatArray {
         kotlin.math.sqrt((1f - y * y).coerceAtLeast(0f))
     }
 }
+
+/**
+ * The opening medallions' diameter, em: the widest row either opening leaf
+ * sets in the book's hand (`mushafLineSetWidthPx`) — al-Baqarah 2:2–3's line,
+ * 15.45 em. Both leaves share it, so the facing pair stand on one pitch;
+ * sized each by its own widest row, al-Fātiḥah's rows sat 8% closer than
+ * al-Baqarah's.
+ */
+const val MUSHAF_MEDALLION_DIAMETER_EM = 15.5f
+
+/**
+ * The pitch of an opening medallion's rows, px: the circle's diameter shared
+ * between its [rows], every one of them — the opening leaves' title band too
+ * ([slotsOutside]) — on this one pitch.
+ *
+ * The diameter is [MUSHAF_MEDALLION_DIAMETER_EM] of the type size, or the
+ * widest row's own circle if one ever runs wider, set a little tighter than
+ * round ([MUSHAF_MEDALLION_LEADING]), so the shape is the same on every
+ * screen. It used to be the measure over the row count
+ * — the circle the rows were stretched to — while the band and basmalah above
+ * stayed on the book's leading, so the crown was crowded and the rows below
+ * spread apart, by a different amount on every screen. Never taller than the
+ * well can hold.
+ */
+fun mushafMedallionPitchPx(
+    fontPx: Float,
+    widestRowPx: Float,
+    rows: Int,
+    wellHeightPx: Float,
+    slotsOutside: Int,
+): Float {
+    if (rows <= 0 || fontPx <= 0f) return 0f
+    val widestChord = mushafMedallionChords(rows).max()
+    val diameter = maxOf(MUSHAF_MEDALLION_DIAMETER_EM * fontPx, widestRowPx / widestChord)
+    // The band's slot stands above the circle and its twin below it, so the
+    // circle is what sits in the middle of the well.
+    val room = wellHeightPx / (rows + 2 * slotsOutside).coerceAtLeast(1)
+    return minOf(diameter / rows * MUSHAF_MEDALLION_LEADING, room)
+}
+
+/**
+ * How much tighter than round the medallion's rows are set. Set exactly
+ * round, its ~2.2 em pitch read loose beside the book's ~1.7 em leading; at
+ * nine tenths the block is a touch wider than tall and still reads as a
+ * circle.
+ */
+const val MUSHAF_MEDALLION_LEADING = 0.9f
 
 /**
  * A short row must actually end its chapter. Never on the two opening

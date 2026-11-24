@@ -14,9 +14,12 @@ import com.beautifulquran.domain.mushafFontPreloadPages
  * and a [Typeface] holds a native font object that no amount of Java heap
  * pressure will reclaim. Cached for the life of the process, reading the book
  * end to end would retain every one of them, so the cache is a window: the
- * pager composes at most three leaves and warms two either side
- * ([mushafFontPreloadPages]), and [MAX_RESIDENT] keeps a comfortable margin
- * over that while the rest are dropped in least-recently-used order.
+ * pager holds five leaves composed at rest, and a run of flips sets up to a
+ * dozen ahead of it — the turn's target and three past it either way, and the
+ * resting leaf's two either side ([mushafWarmOrder]) — so [MAX_RESIDENT]
+ * covers both while the rest are dropped in least-recently-used order. A face
+ * evicted mid-run took its warmed cell layouts with it, and its leaf composed
+ * cold.
  */
 /** Both representations of one resident page face, kept and evicted together. */
 internal class MushafQcfFace(
@@ -25,8 +28,8 @@ internal class MushafQcfFace(
 )
 
 internal object MushafQcfFonts {
-    /** Comfortably more than the pager's composed-plus-warmed window of five. */
-    private const val MAX_RESIDENT = 12
+    /** The composed leaves plus everything a run of flips warms, with margin. */
+    private const val MAX_RESIDENT = 20
 
     /**
      * Both forms of one face. A line is drawn as [FontFamily] text, but it is
@@ -42,14 +45,25 @@ internal object MushafQcfFonts {
             eldest: MutableMap.MutableEntry<Int, MushafQcfFace>,
         ): Boolean {
             if (size <= MAX_RESIDENT) return false
-            // Its laid-out cells hold the same native font; let them go with it.
-            MushafWordLayouts.forget(eldest.value.family)
+            forgetDerived(eldest.value)
             return true
         }
     }
 
     @Synchronized
     fun cached(page: Int): MushafQcfFace? = families[page]
+
+    /**
+     * Everything measured from a face goes with it: its laid-out cells hold
+     * the same native font, and a rebuilt face is a new typeface that the
+     * measures and reflows keyed on this one would never match again — they
+     * only sat in their caches until the caches' own limits pushed them out.
+     */
+    private fun forgetDerived(face: MushafQcfFace) {
+        MushafWordLayouts.forget(face.family)
+        forgetMushafLineMeasures(face.typeface)
+        forgetMushafDisplayPages(face.typeface)
+    }
 
     fun face(context: Context, page: Int): MushafQcfFace? {
         cached(page)?.let { return it }

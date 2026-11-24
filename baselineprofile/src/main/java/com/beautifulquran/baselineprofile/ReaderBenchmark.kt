@@ -56,6 +56,7 @@ class ReaderBenchmark {
             device.chooseReaderSettings("Mushaf")
             device.openChapter("Al-Fatihah")
             device.waitForMushafReader()
+            device.waitForMushafLeafAtRest(device.mushafPageNumber())
         },
     ) {
         repeat(4) {
@@ -63,8 +64,32 @@ class ReaderBenchmark {
             device.turnMushafTowardLaterPages()
             val to = device.waitUntilMushafPageChanges(from)
             check(to == from + 1) { "Expected the next leaf after $from, got $to" }
+            device.waitForMushafLeafAtRest(to)
             logBenchmark("mushafPageTurn $from -> $to")
         }
+    }
+
+    /** A run of swipes, each starting while the last turn is still sliding. */
+    @Test
+    fun mushafRapidFlip() = rule.measureRepeated(
+        packageName = PackageName,
+        metrics = listOf(FrameTimingMetric()),
+        compilationMode = CompilationMode.Partial(),
+        iterations = iterations(5),
+        setupBlock = {
+            launchPastCover()
+            device.chooseReaderSettings("Mushaf")
+            device.openChapter("Al-Fatihah")
+            device.waitForMushafReader()
+            device.waitForMushafLeafAtRest(device.mushafPageNumber())
+        },
+    ) {
+        val from = device.mushafPageNumber()
+        repeat(RapidFlips) { device.flickMushafTowardLaterPages() }
+        device.idleBriefly(1_500)
+        val to = device.mushafPageNumber()
+        check(to - from >= RapidFlips / 2) { "Rapid flips only moved $from -> $to" }
+        logBenchmark("mushafRapidFlip $from -> $to")
     }
 
     @Test
@@ -115,3 +140,5 @@ class ReaderBenchmark {
         )
     }
 }
+
+private const val RapidFlips = 8

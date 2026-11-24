@@ -593,6 +593,91 @@ tick must not remasure three pages or recreate 150 `Text` nodes.
   completed ayahs use a static full-ink pack and later ayahs share a motionless
   recess pack. One page-level accessibility node exposes the canonical
   Arabic instead of hundreds of private-use glyphs.
+- A turn slides pictures, not type (`MushafTurnSnapshot.kt`). Every Madinah
+  page has its own face and each word is one large glyph, so a leaf's glyphs
+  fill about half of HWUI's GPU glyph atlas (its size follows the screen's).
+  Two leaves on screen at once did not fit: every frame of a turn evicted one
+  leaf's glyphs to draw the other's and uploaded them again — ~130 ms of
+  `glTexSubImage2D` per swipe on the emulator, spread over every frame of it.
+  So every Arabic leaf not carrying live ink is pictured — a run of quick
+  flips never rests, and each leaf it reaches must be a picture by the time
+  it slides in. The picture never touches the render thread, which is drawing
+  the turn: the leaf's next draw records itself a second time into an
+  `android.graphics.Picture` (a software canvas, so Compose draws the leaf's
+  own layers' content into it), which is rasterised on a background thread
+  into a bitmap in the window's colour space (Display P3 on a wide window,
+  whose accents are P3) and copied to a hardware bitmap there, off the render
+  thread's upload path. A leaf composed static is pictured as soon as its
+  entrance fade is done; one that carried live ink first waits out any fade it
+  may have begun (`InkEngine` ink fade / recess, the leaf's face fade, plus
+  120 ms). A pictured leaf draws its picture whenever it holds a valid one —
+  off screen at rest as well as mid-turn, so a turn starting or ending never
+  redraws it (a redraw there could not be told from a change: it threw away
+  pictures still rasterising, and had to assume the turn's end changed
+  nothing) — and the settled leaf keeps setting live type. Any redraw of a
+  leaf showing its picture means the leaf changed: it goes live and its
+  picture is retired, so a changed leaf is never shown stale.
+  Software rasterises a QCF word exactly as the GPU does — screenshot diffs of
+  forced pictures against the live leaf, light and Nightfall, sRGB and P3,
+  differ by at most 1/255 (2/255 through P3) — but not everything else. The
+  title band's hairline weave anti-aliases differently (up to 119/255 apart),
+  and Skia's GPU path draws a glyph past 256 px (the basmalah, a wide word like
+  سَتُغۡلَبُونَ on page 51) as an outline where software keeps a mask, visibly
+  different strokes. Those (`drawnLiveOverPicture`: the band, the basmalah,
+  any word whose ink reaches 232 px, `mushafCellDrawnAsPath`) are left out of
+  the picture and drawn over it from layers of their own; none of them uses the
+  glyph atlas. `MushafPictureFidelityTest` (baselineprofile module, against the
+  benchmark build, whose `MushafPictureProbe` makes the resting leaf draw its
+  picture) screenshots pages 2 and 3 live and pictured, sRGB and P3, and fails
+  past 3/255; it caught the band and basmalah at 119/255 when they were drawn
+  into the picture. Each picture holds a leaf-sized bitmap (~11 MB) for as long as
+  its leaf stays composed. Forcing `Offscreen`
+  compositing on the leaf is still wrong: its layers are re-rendered inside
+  the turn, a whole page's uploads in one 90 ms frame.
+- Leaves hold two neighbours either side at rest (`MushafHeldNeighbours`),
+  returned a pair at a time after an open or a dial landing. Whatever a turn
+  can show is therefore composed and measured before it starts. The pager
+  still composes leaves of its own accord — the one joining its window halfway
+  through a turn (28–48 ms of composition and measure on that frame) and the
+  one it prefetches past the window at rest, whose lines `BoxWithConstraints`
+  then measured on the next swipe's first frame (40–70 ms). Both stay blank
+  paper (`mushafDefersLeaf`) until the pager rests within reach, unless in or
+  beside the view or a jump's destination.
+- Leaves are set before they are composed (`MushafLeafWarmup.kt`). Composing a
+  leaf nobody had opened measured everything on the UI thread — its reflow,
+  each word's ink profile and bounds, the line fit, then a paragraph per word:
+  ~75 ms on the emulator, paid at the start of nearly every swipe of a quick
+  run, which never settles and so never warmed the leaves it reached. The
+  warm-up follows the page in view and the turn's target, not only the settled
+  page, and sets the target and the three leaves beyond it in the direction of
+  travel, then the ones behind (`mushafWarmOrder`), on `Dispatchers.Default`.
+  It fills the caches the composition reads — the display reflow
+  (`mushafDisplayPage`), line geometry (`mushafLineGeometry`) and the cell
+  layouts (`MushafWordLayouts`) — under the keys the composition uses, from
+  the setting the last composed leaf published (`MushafLeafSetting`). A miss
+  only means the composition measures as it always did.
+- A line with no ink to animate is one node (`mushafStaticQcfLine`), not a
+  node per word and mark. A word only needs a node of its own for the
+  layers live ink puts on it; a static leaf has none, and neither has a line
+  whose verses are at rest (`mushafLineInkAtRest`: no wash, no recess, its
+  mark at full strength — every line of a resting leaf with no voice on
+  it). The one node lays its cells out through the same cache, places them
+  at the same rounded origins and draws them in the same order, so its pixels
+  are the word nodes' (identical on pages 1–6 at two sizes; sabotaging it
+  shows at once). A line goes back to its word nodes the frame a verse on it
+  takes ink, and only that line; a cell drawn as a path keeps the word nodes
+  so it can be drawn live over the picture.
+- "Resting" is its own state (`restPage`), two still frames after the scroll
+  ends. `settledPage` moves on the frame a finger lifts, between the drag's
+  scroll and the fling's, while the leaf has half the screen to go: every leaf
+  keyed on it (live ink, flash, search focus) recomposed mid-fling.
+- The pager's page content is built outside `TurningFrameRate`. Written inline
+  in its content, each frame-rate vote change handed `HorizontalPager` a new
+  block, recomposing every leaf at a turn's start, its end and at finger lift.
+  Taps read `pagerState.currentPage` when they land rather than holding it in
+  composition, which recomposed the whole pager halfway through each turn.
+  `clipLeafSides` is one modifier instance, so a recomposed leaf is not
+  re-recorded.
 - Chrome (`MushafReadingSheet`) keys the gilt seed on `settledPage`, not
   `currentPage`, so a fling does not regenerate ornaments mid-turn.
 - QCF word and verse-mark cells are `MushafWordText` nodes. They are laid out
@@ -631,6 +716,45 @@ Page 5's text and controls were pixel-identical below the changed running
 head. Forced `Offscreen` page caching was rejected: its 95th percentile rose
 to 113 ms. These are a same-host 60 Hz comparison, not a physical-device
 120 Hz result; cold page measure still exceeds the 8.3 ms frame budget.
+
+2026-11-22, same emulator (60 Hz panel, so frame work is held to 120 Hz's
+8.3 ms budget), release benchmark APKs, `mushafPageTurn` letting each leaf
+rest before the next swipe, display-queue waits (`dequeueBuffer`,
+`postAndWait`) excluded. Before, over ~400 turn frames per run: UI thread one
+frame over 8.3 ms (47 ms, the swipe-start measure); render thread 39 over,
+95th percentile 10.3 ms, max 22 ms, almost all glyph uploads. After, three
+runs, ~1,220 turn frames: UI thread max 2.0 ms; render thread 99th percentile
+≤ 6.8 ms, max 8.1 ms; none over 8.3 ms. The work moved to rest: the outer
+leaf's composition (~50 ms UI) and two pictures (~100 ms of render-thread
+time, asynchronous) once a turn settles. A turn begun within about a second
+of opening a chapter, or one of a rapid series begun before the last settled,
+has no pictures yet and draws live as before.
+
+2026-11-23, quick flips (`mushafRapidFlip`: eight short swipes, each starting
+while the last turn still slides), same emulator and method. Before, five
+runs: UI thread 40 of ~1,500 frames over 8.3 ms (max 83 ms — a leaf composed
+and measured cold at each swipe's start, 33 ms of it word ink profiles and
+bounds); render thread 140 over, 95th percentile 13.1 ms, max 121 ms (two
+live leaves thrashing the atlas, and each newly composed leaf's first draw).
+After warm-ups and every still leaf pictured: UI thread 10 over (max 13 ms,
+the leaf joining the window, now composed from warm caches in 6–10 ms);
+render thread 17 over, 95th percentile 5.9 ms — of those, one per run is the
+landing leaf going live at rest (50–65 ms of glyph uploads, nothing moving)
+and one per run a first-draw shader compile. At reading pace the turn frames
+stay as before (UI max 4.6 ms; render thread 4 of ~1,240 over, max 11.4 ms).
+
+2026-11-23, one node per still line, same emulator and method, three runs
+each. Quick flips: UI thread 2 of 926 frames over 8.3 ms (95th/99th
+percentile 3.3/7.4 ms) → 0 of 1,309 (1.9/5.3 ms, max 8.2). Reading pace:
+UI thread 7 over in 963 frames (max 10.3 ms) → 2 in 1,819 (max 9.9). Only
+static leaves on one node had made it worse (10 in 1,693, max 12.0): a
+landing leaf rebuilding every word node raised the landing frame's
+composition from 2 to 5 ms, so resting lines keep the one node too.
+Recitation start (Al-Baqarah, 12 s from Play), when a leaf's lines go back
+to word nodes as its verses dim, against live leaves kept on word nodes: UI
+frames over 8.3 ms 4–5 → 3–5 per run (one noisy run of the before: 59),
+worst frame 34 → 26 ms. Render-thread frames are unchanged, and heavy during
+recitation either way on this emulator.
 
 ### 6. R8 release builds are what ships
 
@@ -817,7 +941,9 @@ Until a physical trace shows a stall, leave the wash and startup order alone.
   mushaf mode).
 - Gapless surah-file playback (single MediaItem + absolute-offset segments)
   to remove inter-ayah stream startup entirely.
-- Mushaf glyph-atlas uploads (2026-11-21, not fixed). Every Madinah page has
+- Mushaf glyph-atlas uploads (2026-11-21; turns fixed 2026-11-22 by turn
+  pictures, see 5b — the uploads now happen at rest, and still on a dial
+  landing's first frames). Every Madinah page has
   its own face, so a leaf's first visible frames rasterise and upload its
   glyphs. One page-turn run spent 1.4 s in `glTexSubImage2D`; a dial landing
   frame took 80 ms, ~25 ms of it uploads. One attempt warmed each held
@@ -829,13 +955,16 @@ Until a physical trace shows a stall, leave the wash and startup order alone.
   not found. A future attempt needs on-device proof that HWUI renders an
   off-screen layer, and must not draw a leaf's content layer into a second
   parent.
-- Neighbour leaf composition. Bringing a leaf into the pager's window still
-  composes ~150 word nodes in one frame (16–44 ms of composition on the
+- Neighbour leaf composition (turns fixed 2026-11-22: leaves joining the
+  window mid-turn stay blank until rest, see 5b). Bringing a leaf into the
+  pager's window composed ~150 word nodes in one frame (16–44 ms of composition on the
   emulator, on top of first-visit measure). Splitting it with pausable
   composition needs a pager prefetch hook that `HorizontalPager` does not
-  expose. Drawing a line's static words from one node would cut the node
-  count. However, it would rebuild every word node when ink packs arrive at
-  playback start, which is an animated moment.
+  expose. Lines without moving ink are one node now (see 5b), which cut it;
+  the line's cells are still one cached `TextLayoutResult` each, and drawing
+  their glyphs straight from a `Paint` would save the warm-up's paragraph
+  layouts (~17 ms a leaf, off the UI thread) but would have to be proved
+  pixel-identical first.
 - The surah band's ground is two `generatedFieldWeave` layers, the second a
   mirror of the first. A new chapter opening tessellates both
   (`AAHairlineOp`, 1–7 ms each, ~19 ms of an 80 ms dial-landing frame).

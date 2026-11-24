@@ -79,6 +79,10 @@ android {
         buildConfigField("String", "QF_CONTENT_BASE_URL", "\"$qfContentBaseUrl\"")
         buildConfigField("String", "CAPTURE_SOURCE_REVISION", "\"${captureSourceRevision.get()}\"")
         buildConfigField("boolean", "CAPTURE_SOURCE_DIRTY", captureSourceDirty.get().toString())
+        // Lets the benchmark build force a Madinah leaf to draw from its turn
+        // picture, so MushafPictureFidelityTest can compare it with the live
+        // leaf. False in every shipped build, where R8 drops the probe.
+        buildConfigField("boolean", "MUSHAF_PICTURE_PROBE", "false")
     }
 
     signingConfigs {
@@ -319,6 +323,15 @@ tasks.withType<Test>().configureEach {
                 .withPropertyName("dbFingerprint-$asset")
                 .withPathSensitivity(PathSensitivity.NONE)
         }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("benchmarkRelease")) { variant ->
+        variant.buildConfigFields?.put(
+            "MUSHAF_PICTURE_PROBE",
+            com.android.build.api.variant.BuildConfigField("boolean", "true", "MushafPictureFidelityTest"),
+        )
+    }
 }
 
 dependencies {
