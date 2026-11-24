@@ -54,7 +54,19 @@ the left with the chapter at the right. The running head keeps its gutter.
 English shares the same full-height frame and running-head folio; its hand
 grows into the reclaimed well while its verses keep their own pagination.
 Extra Arabic rows go to the densest chapter section that still has words to
-spare; a short section cannot acquire empty rows.
+spare; a short section cannot acquire empty rows. A section gets only the rows
+its words fill (`mushafSectionRows`): the page faces' advances carry the
+print's justification, so a print line holds about 1.2 display rows of words,
+and a full page spends both extra rows. A page of short chapters does not.
+Handed them anyway, page 604 spread al-Falaq and an-Nās over four and five
+rows that justification opened into gaps an em wide. A row no section fills
+is left off and the foot stays paper; the leading does not change. A section
+that ends its chapter fills its rows to an ordinary page's density
+(`MUSHAF_ROW_END_FILL`) and lets its last stand short, as the print does. A
+section running on to the next page keeps the print's rows and takes a spare
+one only while its rows stay 90% full. On a height-bound screen (a row longer
+than about 17 em), an ordinary page can need fewer than seventeen rows, and
+gets them rather than rows stretched apart.
 
 ## 3. Every full line is flush
 
@@ -115,9 +127,12 @@ its letterforms exactly as drawn.
 
 The QCF renderer additionally measures each join's visible white (§6). Loose
 display rows now widen their letterforms at a white level of 0.65 em, down
-from 0.85. The 1.25 em short-line threshold remains for known chapter endings;
-full rows spend the remaining width on space after reaching the letterform
-stretch limit. These levels
+from 0.85. A known chapter ending is justified only while its white stays
+under 0.9 em (`MUSHAF_SHORT_JUSTIFY_WHITE_EM`, down from 1.25); past that it
+stands short and centred, set as the rows around it are — letters at 1.15,
+white levelled to 0.65 em — not at its own width with a 0.18 em box gap, which
+read a size smaller and let nested pairs touch. Full rows spend the remaining
+width on space after reaching the letterform stretch limit. These levels
 include the paper inside the two glyph profiles, not just a box gap.
 The collision floors stay at 0.24 em along a shared channel and 0.20 em at the
 closest stroke, so tightening the page does not weld neighboring words.

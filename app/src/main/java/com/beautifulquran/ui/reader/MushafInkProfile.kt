@@ -307,8 +307,6 @@ private const val MUSHAF_FIT_WHITE_K = 1.20f
 /** Past this level of paper a line is set with wider letters, not wider spaces. */
 internal const val MUSHAF_MAX_WHITE_LEVEL_EM = 0.65f
 
-/** The last setting before a line is left standing short and centred. */
-internal const val MUSHAF_STRETCH_WHITE_LEVEL_EM = 1.25f
 
 /** The share of a join's rows that decides whether it runs alongside. */
 private const val MUSHAF_JOIN_TIGHT_FRACTION = 0.25f
