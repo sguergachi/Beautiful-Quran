@@ -67,6 +67,9 @@ internal data class MushafLeafFrame(
         )
 
     /** One slot of [displayPage]'s grid: one unit of it, whatever it holds. */
+    /** How many ems of [page]'s type a row holds — what its reflow fills. */
+    fun rowEm(page: MushafPage): Float = lineMeasurePx / fontPx(page)
+
     fun lineSlotPx(displayPage: MushafPage): Float =
         wellHeightPx / mushafDisplayGridSlots(mushafLeafSlotCount(displayPage))
 }

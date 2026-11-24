@@ -259,7 +259,6 @@ internal fun MushafPageSheet(
     }
     val pageFont = pageFace?.family
     val pageTypeface = pageFace?.typeface
-    val displayPage = remember(page, pageTypeface) { mushafDisplayPage(page, pageTypeface) }
     val leafReady = pageFace != null || faceOverdue
     // A face already resident cannot reflow, so there is nothing for this fade
     // to hide and the leaf starts fully inked. The chapter's own entrance is
@@ -307,6 +306,10 @@ internal fun MushafPageSheet(
                 unitPx = with(density) { unit.toPx() },
             )
             val fontPx = remember(frame, page) { frame.fontPx(page) }
+            val rowEm = remember(frame, page) { frame.rowEm(page) }
+            val displayPage = remember(page, pageTypeface, rowEm, surahsById) {
+                mushafDisplayPage(page, pageTypeface, rowEm) { surahsById[it]?.ayahCount }
+            }
             val fontSp = with(density) { fontPx.toSp() }
             val lineMeasurePx = frame.lineMeasurePx
             // Handed to the leaves still to come, which are set from it in the

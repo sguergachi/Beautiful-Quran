@@ -605,9 +605,27 @@ internal fun mushafInkLineFit(
     // Width cannot tell a full row from a chapter's last. Only a known ending
     // may stand short; every other row keeps its margins after the letters
     // have reached their stretch limit.
+    if (!allowShort) return MushafLineFit(scale = MUSHAF_MAX_LINE_SCALE, gapPx = 0f, flush = true)
+    // A chapter's last row is justified only while its white stays near a
+    // full row's; past that it stands short and centred, as the print sets a
+    // line that will not fill. Opened up to 1.25 em instead, page 604's
+    // endings read as words strewn across the measure.
     val stretched = mushafWhiteLevel(joins, measure / MUSHAF_MAX_LINE_SCALE - ink)
-    if (!allowShort || stretched <= MUSHAF_STRETCH_WHITE_LEVEL_EM) {
+    if (stretched <= MUSHAF_SHORT_JUSTIFY_WHITE_EM) {
         return MushafLineFit(scale = MUSHAF_MAX_LINE_SCALE, gapPx = 0f, flush = true)
     }
-    return MushafLineFit(scale = 1f, gapPx = MUSHAF_WORD_GAP_EM * fontPx, flush = false)
+    // Standing short, it is set as the rows around it are: letters at the
+    // stretch an ordinary row reaches, white levelled to
+    // MUSHAF_MAX_WHITE_LEVEL_EM. Set at its own width with a fixed gap between
+    // ink boxes instead, it read a size smaller than the row above it and let
+    // a nested pair (al-Ikhlas's lahu kufuwan) all but touch. It still fits:
+    // the letters reached that stretch above without filling the measure.
+    return MushafLineFit(
+        scale = MUSHAF_MAX_LINE_SCALE,
+        gapPx = opened * fontPx * MUSHAF_MAX_LINE_SCALE / joins.size,
+        flush = false,
+    )
 }
+
+/** The most white a chapter's last row may open to before it stands short instead. */
+internal const val MUSHAF_SHORT_JUSTIFY_WHITE_EM = 0.9f

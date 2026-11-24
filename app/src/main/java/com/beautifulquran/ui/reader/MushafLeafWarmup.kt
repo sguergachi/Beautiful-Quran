@@ -7,6 +7,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import com.beautifulquran.domain.MUSHAF_ROW_SET_FILL
 import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
 import com.beautifulquran.domain.MushafPage
 import com.beautifulquran.domain.mushafIsOpeningLeaf
@@ -65,8 +66,8 @@ internal object MushafLeafWarmup {
             warmMushafInkProfiles(page, face.typeface)
             return
         }
-        val display = mushafDisplayPage(page, face.typeface)
         val fontPx = setting.frame.fontPx(page)
+        val display = mushafDisplayPage(page, face.typeface, setting.frame.rowEm(page), surahAyahCount)
         val fontSp = with(setting.density) { fontPx.toSp() }
         val linePx = with(setting.density) { fontSp.toPx() }
         display.lines.forEach { line ->
@@ -101,11 +102,16 @@ internal object MushafLeafWarmup {
 
 /**
  * The page as the leaf sets it — rows rebalanced by [reflowMushafPage] with
- * the page's own face — from a small process-wide cache, so the leaf and
- * [MushafLeafWarmup] reflow each page once.
+ * the page's own face, for a row [rowEm] ems long — from a small
+ * process-wide cache, so the leaf and [MushafLeafWarmup] reflow each page once.
  */
-internal fun mushafDisplayPage(page: MushafPage, typeface: android.graphics.Typeface?): MushafPage {
-    val key = DisplayPageKey(page.page, System.identityHashCode(typeface))
+internal fun mushafDisplayPage(
+    page: MushafPage,
+    typeface: android.graphics.Typeface?,
+    rowEm: Float,
+    surahAyahCount: (Int) -> Int?,
+): MushafPage {
+    val key = DisplayPageKey(page.page, System.identityHashCode(typeface), rowEm.toRawBits())
     synchronized(displayPages) {
         displayPages[key]?.takeIf { it.source === page && it.typeface === typeface }?.let { return it.display }
     }
@@ -113,7 +119,11 @@ internal fun mushafDisplayPage(page: MushafPage, typeface: android.graphics.Type
         this.typeface = typeface
         textSize = 100f
     }
-    val display = reflowMushafPage(page) { token ->
+    val display = reflowMushafPage(
+        page = page,
+        rowCapacity = rowEm * paint.textSize * MUSHAF_ROW_SET_FILL,
+        endsChapter = { token -> token.endsAyah && token.ayah == surahAyahCount(token.surahId) },
+    ) { token ->
         val qcf = token.word.qcfV2
         val word = if (qcf.isEmpty()) {
             token.word.arabic
@@ -132,7 +142,7 @@ internal fun forgetMushafDisplayPages(typeface: android.graphics.Typeface) {
     synchronized(displayPages) { displayPages.values.removeAll { it.typeface === typeface } }
 }
 
-private data class DisplayPageKey(val page: Int, val typefaceId: Int)
+private data class DisplayPageKey(val page: Int, val typefaceId: Int, val rowEmBits: Int)
 
 private class DisplayPage(
     val source: MushafPage,
