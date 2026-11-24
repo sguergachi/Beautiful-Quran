@@ -12,6 +12,7 @@ import androidx.media3.datasource.cache.ContentMetadata
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.NoOpCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
+import com.beautifulquran.data.verseClipKeys
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -195,11 +196,41 @@ internal object RecitationCache {
         if (!trimStarted.compareAndSet(false, true)) return
         val app = context.applicationContext
         Thread({
+            dropStaleVerseClips(app)
             dropListenCopiesLocked(app)
             trim(listen(app))
         }, "recitation-cache").apply {
             isDaemon = true
             start()
+        }
+    }
+
+    /**
+     * Verses of a range-sourced reciter are cached under their URL, which says
+     * nothing about which bytes were cut. When the ranges change (a better seam,
+     * a re-measured recording) or were never recorded, the copies cached by an
+     * earlier build would keep playing the old cut, so they go, with the marks
+     * that claimed them downloaded. Fresh copies stream from the recording.
+     */
+    private fun dropStaleVerseClips(app: Context) {
+        try {
+            val repository = (app as com.beautifulquran.QuranApp).repository
+            val dir = File(app.noBackupFilesDir, "verse-clip-stamps").also { it.mkdirs() }
+            for (stamp in repository.verseClipStamps()) {
+                val file = File(dir, stamp.slug)
+                if (file.takeIf { it.isFile }?.readText() == stamp.fingerprint) continue
+                synchronized(lock) {
+                    val listen = listen(app)
+                    val keep = keep(app)
+                    for (key in verseClipKeys(listen.keys, stamp.slug)) listen.removeResource(key)
+                    val kept = verseClipKeys(keep.keys, stamp.slug)
+                    for (key in kept) keep.removeResource(key)
+                    if (kept.isNotEmpty()) unmarkKeptReciter(app, stamp.reciterId)
+                }
+                file.writeText(stamp.fingerprint)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("RecitationCache", "Could not check cached verse clips", e)
         }
     }
 

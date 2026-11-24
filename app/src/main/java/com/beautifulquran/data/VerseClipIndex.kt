@@ -68,3 +68,49 @@ internal fun readVerseClips(db: SQLiteDatabase): Map<String, VerseClip> {
     }
     return out
 }
+
+/** One range-sourced reciter's slicing, reduced to what decides whether a cached verse is still the right audio. */
+data class VerseClipStamp(val slug: String, val reciterId: Int, val fingerprint: String)
+
+/**
+ * A fingerprint per range-sourced reciter over every verse's byte range, lead
+ * and source size. The playback cache keys a verse by its URL alone, so audio
+ * cut by an earlier build (other seams, other ranges) would keep playing after
+ * the ranges changed. It must be dropped whenever this changes.
+ */
+internal fun readVerseClipStamps(db: SQLiteDatabase): List<VerseClipStamp> {
+    val out = ArrayList<VerseClipStamp>()
+    db.rawQuery(
+        """
+        SELECT r.slug, r.id, c.surah_id, c.ayah_number, c.source_bytes, c.start_byte, c.end_byte, c.lead_bytes
+        FROM audio_clips c JOIN reciters r ON r.id = c.reciter_id
+        ORDER BY r.id, c.surah_id, c.ayah_number
+        """.trimIndent(),
+        null,
+    ).use { cursor ->
+        var slug: String? = null
+        var id = 0
+        var digest = java.security.MessageDigest.getInstance("SHA-256")
+        fun finish() {
+            slug?.let { out += VerseClipStamp(it, id, digest.digest().joinToString("") { b -> "%02x".format(b) }) }
+        }
+        while (cursor.moveToNext()) {
+            if (cursor.getString(0) != slug) {
+                finish()
+                slug = cursor.getString(0)
+                id = cursor.getInt(1)
+                digest = java.security.MessageDigest.getInstance("SHA-256")
+            }
+            val row = (2..7).joinToString(":") { cursor.getLong(it).toString() }
+            digest.update("$row\n".toByteArray())
+        }
+        finish()
+    }
+    return out
+}
+
+/** The cache keys of [slug]'s verses: every per-verse URL under its folder. */
+internal fun verseClipKeys(keys: Collection<String>, slug: String): List<String> {
+    val prefix = "https://$VERSE_CLIP_HOST/data/$slug/"
+    return keys.filter { it.startsWith(prefix) }
+}

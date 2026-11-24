@@ -142,6 +142,9 @@ class QuranRepository(
     /** Where each range-sourced reciter's verses live in their surah recordings. */
     val verseClips: VerseClipIndex = VerseClipIndex { readVerseClips(database.db) }
 
+    /** Fingerprints of those ranges; blocking, call from a background thread. */
+    fun verseClipStamps(): List<VerseClipStamp> = readVerseClipStamps(database.db)
+
     /** Drop derived views after a runtime refresh so they rebuild from it. */
     fun invalidateRuntimeMushafViews() = runtimeViews.invalidate {
         wordSearchIndex = null

@@ -221,4 +221,17 @@ class VerseClipTest {
         assertTrue(parseEveryayahUri(range.audioUrl(114, 6))?.let { it.slug == range.slug && it.surah == 114 && it.ayah == 6 } == true)
         assertEquals(range.audioUrl(1, 1), range.basmalahAudioUrl())
     }
+
+    @Test
+    fun `stale cache clean-up only touches the reciter's own verse urls`() {
+        val keys = listOf(
+            "https://verse-clips.invalid/data/Tawfeek_As-Sawaigh_128kbps/109003.mp3",
+            "https://verse-clips.invalid/data/Other_128kbps/109003.mp3",
+            "https://everyayah.com/data/Tawfeek_As-Sawaigh_128kbps/109003.mp3",
+        )
+        assertEquals(
+            listOf(keys[0]),
+            com.beautifulquran.data.verseClipKeys(keys, "Tawfeek_As-Sawaigh_128kbps"),
+        )
+    }
 }
