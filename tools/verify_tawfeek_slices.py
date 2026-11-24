@@ -105,8 +105,15 @@ def verify_surah(surah, source_dir, index, record):
                 continue
             # Where a neighbour's sound begins, the sound beyond that point is the neighbour's: the
             # detected edge of a verse that touches the next is only bounded by it.
-            onset = max(r["onsetMs"], all_runs[i - 1]["offsetMs"]) if i else r["onsetMs"]
-            offset = min(r["offsetMs"], all_runs[i + 1]["onsetMs"]) if i + 1 < len(all_runs) else r["offsetMs"]
+            # A verse's own words say how far its sound can reach: the detected edge of one that runs
+            # into the next is only a bound, never later than a quarter second past its last word.
+            words = record["words"]
+            onset = max(r["onsetMs"], words[r["first"]][2] - 250)
+            offset = min(r["offsetMs"], words[r["last"]][3] + 250)
+            if i:
+                onset = max(onset, all_runs[i - 1]["offsetMs"])
+            if i + 1 < len(all_runs):
+                offset = min(offset, all_runs[i + 1]["onsetMs"])
             if onset < begin_ms - SEAM_TOLERANCE_MS or offset > finish_ms + SEAM_TOLERANCE_MS:
                 problems.append((key, f"sound {onset}-{offset} ms outside slice "
                                       f"{begin_ms:.0f}-{finish_ms:.0f} ms"))

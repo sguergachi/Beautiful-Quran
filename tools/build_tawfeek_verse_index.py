@@ -138,9 +138,15 @@ def units_of(surah, record):
     Edges are the measured start and end of the sound (reciter_align.acoustics),
     not the aligner's token frames, so a cut never lands inside a word's tail.
     """
-    units = [(run["onsetMs"], run["offsetMs"], "verse", f"{surah}:{run['ayah']}") for run in record["runs"]]
+    words = record["words"]
+    units = [
+        (run["onsetMs"], run["offsetMs"], "verse", f"{surah}:{run['ayah']}",
+         words[run["first"]][2], words[run["last"]][3])  # first word's start, last word's end (aligned)
+        for run in record["runs"]
+    ]
     for opening in record["openings"]:
-        units.append((opening["onsetMs"], opening["offsetMs"], opening["kind"], opening["kind"]))
+        units.append((opening["onsetMs"], opening["offsetMs"], opening["kind"], opening["kind"],
+                      opening["startMs"], opening["endMs"]))
     units.sort()
     return units
 
@@ -226,12 +232,13 @@ def plan_cuts(surah, pcm, units, frames):
     """
     F = SAMPLES_PER_FRAME
     spans = {}
-    for lo, hi, kind, key in units:
+    for lo, hi, kind, key, first_ms, last_ms in units:
         if kind == "verse":
             old = spans.get(key)
-            spans[key] = (lo, hi) if old is None else (min(old[0], lo), max(old[1], hi))
+            spans[key] = (lo, hi, first_ms, last_ms) if old is None else (
+                min(old[0], lo), max(old[1], hi), min(old[2], first_ms), max(old[3], last_ms))
     seq = sorted(
-        [(lo, hi, "verse", key) for key, (lo, hi) in spans.items()]
+        [(lo, hi, "verse", key, first_ms, last_ms) for key, (lo, hi, first_ms, last_ms) in spans.items()]
         + [u for u in units if u[2] != "verse"]
     )
 
@@ -257,13 +264,21 @@ def plan_cuts(surah, pcm, units, frames):
             if lo_f <= hi_f:
                 best = min(range(lo_f, hi_f + 1),
                            key=lambda f: (_seam_score(pcm, f), abs(f - (lo_f + hi_f) / 2)))
-            else:   # their sounds touch or overlap: the quietest frame near where they meet
-                best = quiet_seam_frame(pcm, (e0 + s1) // 2)
+            else:
+                # Their sounds run together, so neither verse's detected edge says where one ends and the
+                # other begins. The aligned words do: the cut belongs after the last word's final sound and
+                # before the next word's attack, at the quietest frame between them.
+                after_last = -(-ms_to_samples(seq[i][5] + 30) // F)
+                before_next = ms_to_samples(seq[i + 1][4] - 30) // F
+                if before_next < after_last:
+                    after_last = before_next = (after_last + before_next) // 2
+                best = min(range(after_last, before_next + 1),
+                           key=lambda f: (_seam_score(pcm, f), abs(f - (after_last + before_next) / 2)))
             seam_cache[i] = (best, lo_f <= hi_f)
         return seam_cache[i]
 
     cuts = {}
-    for i, (lo, hi, kind, key) in enumerate(seq):
+    for i, (lo, hi, kind, key, _first_ms, _last_ms) in enumerate(seq):
         if kind != "verse":
             continue
         (s0, s1), (e0, e1) = windows(i)

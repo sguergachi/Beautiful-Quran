@@ -149,7 +149,8 @@ def _hypotheses(route, after, cfg: RouteConfig, any_back: bool):
                 for keep in (1, 2, 3):
                     if keep < len(letters(following.text)):
                         options[f"repeat:{back}+{keep}"] = again + [
-                            replace(following, text=letters(following.text)[:keep], kind="fragment", inserted=True)]
+                            replace(following, text=letters(following.text)[:keep], kind="fragment", inserted=True,
+                                    ayah=again[-1].ayah)]  # it belongs to the pass it ends, not the verse it starts
     return options
 
 
