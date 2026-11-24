@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Beautiful Quran · PeerJS trial</title>
+<style>
+  :root { color-scheme: light; font: 17px/1.6 system-ui,sans-serif; color:#292b28; background:#faf8f1 }
+  body { max-width:820px; margin:0 auto; padding:42px 24px }
+  h1 { font:normal 32px/1.2 Georgia,serif; margin:6px 0 24px }
+  h2 { font-size:17px; font-weight:500; margin:30px 0 8px }
+  p { margin:8px 0 } small,.muted { color:#777970 }
+  button,input { font:inherit; color:inherit; background:none; border:0; padding:8px 0; margin-right:18px }
+  button,a { color:#52624d; cursor:pointer; text-decoration:underline; text-underline-offset:5px }
+  input { width:100%; box-sizing:border-box; outline-offset:3px }
+  button:disabled { color:#999; cursor:default; text-decoration:none }
+  pre { font:13px/1.6 ui-monospace,monospace; white-space:pre-wrap; overflow-wrap:anywhere; margin:8px 0 }
+  #peer-id { user-select:all; overflow-wrap:anywhere }
+</style>
+<body>
+  <small>Beautiful Quran · Connection experiment</small>
+  <h1>Two devices, one place in the book</h1>
+  <p>Send sample personal data and a playback checkpoint over a WebRTC data channel.</p>
+  <p class="muted">This trial keeps samples in memory. A checkpoint receipt does not start audio.</p>
+  <h2>This device</h2>
+  <p id="peer-id">Registering…</p>
+  <p id="status" role="status">Connecting to signaling…</p>
+  <p id="broker" class="muted"></p>
+  <h2>Other device</h2>
+  <label for="remote-id" class="muted">Paste its peer ID</label>
+  <input id="remote-id" placeholder="bq-android-… or bq-web-…" autocomplete="off" spellcheck="false">
+  <button id="connect">Connect</button>
+  <a id="second" target="_blank" rel="noopener">Open another browser peer</a>
+  <h2>Try a transfer</h2>
+  <button id="personal" disabled>Send personal data</button>
+  <button id="handoff" disabled>Send playback checkpoint</button>
+  <button id="drop" disabled>Close data channel</button>
+  <button id="signaling">Disconnect signaling</button>
+  <h2>Received samples</h2>
+  <pre id="received">No samples received yet.</pre>
+  <h2>Connection log</h2>
+  <pre id="log" aria-live="polite"></pre>
+  <p class="muted">Local peers must use the same signaling server. Public signaling can introduce devices over the Internet, but difficult networks need a TURN relay. Both devices must be open.</p>
+  <script src="/vendor/peerjs.min.js"></script>
+  <script type="module" src="/lab.js"></script>
+</body>
+</html>
