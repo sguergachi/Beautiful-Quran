@@ -145,54 +145,6 @@ def units_of(surah, record):
     return units
 
 
-def quietest(pcm, center, radius):
-    """Sample index of the quietest 2 ms frame within +-radius of center."""
-    hop = ms_to_samples(HOP_MS)
-    lo = max(0, center - radius)
-    hi = min(len(pcm), center + radius)
-    best, best_score = center, None
-    for start in range(lo, max(lo + 1, hi - hop), max(1, hop // 2)):
-        frame = pcm[start:start + hop].astype(np.float64)
-        energy = float(np.sqrt(np.mean(frame * frame))) if len(frame) else 0.0
-        score = (round(energy, 1), abs(start + hop // 2 - center))  # ties: nearest boundary
-        if best_score is None or score < best_score:
-            best_score, best = score, start + hop // 2
-    return best
-
-
-def plan_surah(surah, pcm, units):
-    """Return {verseKey: (cut_in, cut_out)} in source samples, one span per verse."""
-    n = len(pcm)
-    spans = {}
-    for i, (start, end, kind, key) in enumerate(units):
-        if kind != "verse":
-            continue
-        lo, hi, first, last = spans.get(key, (start, end, i, i))
-        spans[key] = (min(lo, start), max(hi, end), min(first, i), max(last, i))
-    plans = {}
-    for key, (lo_ms, hi_ms, first, last) in spans.items():
-        before = [u[1] for j, u in enumerate(units) if j < first and u[1] <= lo_ms + 1]
-        after = [u[0] for j, u in enumerate(units) if j > last and u[0] >= hi_ms - 1]
-        prev_end = max(before) if before else 0
-        next_start = min(after) if after else n * 1000 // RATE
-        gap_before, gap_after = lo_ms - prev_end, next_start - hi_ms
-        touching_in = gap_before <= TOUCH_MS
-        touching_out = gap_after <= TOUCH_MS and bool(after)
-        cut_in = (quietest(pcm, ms_to_samples(lo_ms), ms_to_samples(SNAP_MS)) if touching_in
-                  else ms_to_samples(lo_ms - min(gap_before * 0.5, LEAD_CAP_MS)))
-        cut_out = (quietest(pcm, ms_to_samples(hi_ms), ms_to_samples(SNAP_MS)) if touching_out
-                   else ms_to_samples(hi_ms + min(gap_after * 0.5, TAIL_CAP_MS)))
-        plans[key] = [max(0, cut_in), min(n, cut_out), touching_in, touching_out,
-                      ms_to_samples(lo_ms), ms_to_samples(hi_ms)]
-    # Touching neighbours share one cut sample so a seam neither repeats nor drops audio.
-    ordered = sorted(plans, key=lambda k: plans[k][0])
-    for a, b in zip(ordered, ordered[1:]):
-        pa, pb = plans[a], plans[b]
-        if pa[3] and pb[2] and abs(pa[1] - pb[0]) <= ms_to_samples(2 * SNAP_MS):
-            pa[1] = pb[0]
-    return {k: tuple(v) for k, v in plans.items()}
-
-
 def lead_frames(begin, payload, wanted):
     """Frames before `wanted` whose bytes feed its bit reservoir (main_data_begin)."""
     need, count = begin[wanted], 0
@@ -254,32 +206,84 @@ def _frame_rms(pcm, first, count):
     return float(np.sqrt(np.mean(window * window))) if len(window) else 1e9
 
 
-def quiet_start_frame(pcm, nominal, sound_start):
-    """Where a verse that follows silence begins: the quietest of a few frames before its sound.
+def _frames_ms(ms):
+    return -(-ms_to_samples(ms) // SAMPLES_PER_FRAME)
 
-    The first frame of a slice decodes without its predecessor's overlap, so its opening
-    milliseconds are shaped. That is inaudible only if little is playing there; the nominal
-    cut is a fixed lead before the detected sound, and room tone or a decaying tail can still
-    be audible at that point. Pick the quietest start that still leaves 40 ms before the sound.
+
+def _seam_score(pcm, frame):
+    """How loud the two frames that open a slice at `frame` are (they decode without overlap)."""
+    return round(_frame_rms(pcm, frame, 2), 1)
+
+
+def plan_cuts(surah, pcm, units, frames):
+    """{verseKey: (wanted_frame, end_frame)}: where each verse's slice begins and ends.
+
+    The invariant that matters: a verse ends no later than the next one begins, so playing
+    verses back to back never replays source audio (slices that overlapped repeated the end of
+    one verse at the start of the next). Where the pause between two verses is short they share
+    one seam, cut where the recording is quietest; where it is long each keeps only a little
+    room, never past its own sound.
     """
-    latest = max(2, sound_start // SAMPLES_PER_FRAME - 2 - (ms_to_samples(40) // SAMPLES_PER_FRAME))
-    best, best_score = None, None
-    for w in range(max(2, nominal - 6), min(latest, nominal + 3) + 1):
-        score = (round(_frame_rms(pcm, w, 2), 1), abs(w - nominal))
-        if best_score is None or score < best_score:
-            best_score, best = score, w
-    return best if best is not None else min(nominal, latest)
+    F = SAMPLES_PER_FRAME
+    spans = {}
+    for lo, hi, kind, key in units:
+        if kind == "verse":
+            old = spans.get(key)
+            spans[key] = (lo, hi) if old is None else (min(old[0], lo), max(old[1], hi))
+    seq = sorted(
+        [(lo, hi, "verse", key) for key, (lo, hi) in spans.items()]
+        + [u for u in units if u[2] != "verse"]
+    )
 
+    def windows(i):
+        """(start window, end window) in frames for the verse at seq[i]."""
+        lo, hi = seq[i][0], seq[i][1]
+        prev = seq[i - 1] if i else None
+        nxt = seq[i + 1] if i + 1 < len(seq) else None
+        s1 = max(2, ms_to_samples(lo - 40) // F - 2)               # shaped opening frames end before the sound
+        s0 = max(s1 - _frames_ms(LEAD_CAP_MS), -(-ms_to_samples(prev[1]) // F) if prev else 2, 2)
+        e0 = -(-ms_to_samples(hi) // F) + 1                         # one frame of decay past the detected end
+        e1 = min(e0 + _frames_ms(TAIL_CAP_MS), ms_to_samples(nxt[0]) // F if nxt else frames, frames)
+        return (min(s0, s1), s1), (e0, max(e0, e1))
 
-def quiet_end_frame(pcm, nominal, sound_end):
-    """Where a verse followed by silence ends: the quietest frame boundary after its sound."""
-    earliest = -(-sound_end // SAMPLES_PER_FRAME) + 1
-    best, best_score = None, None
-    for w in range(max(nominal, earliest), max(nominal, earliest) + 7):
-        score = (round(_frame_rms(pcm, w - 1, 1), 1), w)
-        if best_score is None or score < best_score:
-            best_score, best = score, w
-    return best
+    seam_cache = {}
+
+    def shared_seam(i):
+        """Seam between seq[i] and seq[i+1] (both verses)."""
+        if i not in seam_cache:
+            _, (e0, e1) = windows(i)
+            (s0, s1), _ = windows(i + 1)
+            lo_f, hi_f = max(e0, s0), min(e1, s1)
+            if lo_f <= hi_f:
+                best = min(range(lo_f, hi_f + 1),
+                           key=lambda f: (_seam_score(pcm, f), abs(f - (lo_f + hi_f) / 2)))
+            else:   # their sounds touch or overlap: the quietest frame near where they meet
+                best = quiet_seam_frame(pcm, (e0 + s1) // 2)
+            seam_cache[i] = (best, lo_f <= hi_f)
+        return seam_cache[i]
+
+    cuts = {}
+    for i, (lo, hi, kind, key) in enumerate(seq):
+        if kind != "verse":
+            continue
+        (s0, s1), (e0, e1) = windows(i)
+        prev = seq[i - 1] if i else None
+        nxt = seq[i + 1] if i + 1 < len(seq) else None
+        if prev and prev[2] == "verse" and shared_seam(i - 1)[1]:
+            wanted = shared_seam(i - 1)[0]
+        elif prev and prev[2] == "verse":
+            wanted = shared_seam(i - 1)[0] if windows(i - 1)[1][0] > s1 else min(
+                range(s0, s1 + 1), key=lambda f: (_seam_score(pcm, f), abs(f - s1)))
+        else:
+            wanted = min(range(s0, s1 + 1), key=lambda f: (_seam_score(pcm, f), abs(f - s1)))
+        if nxt and nxt[2] == "verse" and shared_seam(i)[1]:
+            end = shared_seam(i)[0]
+        elif nxt and nxt[2] == "verse" and windows(i + 1)[0][1] < e0:
+            end = shared_seam(i)[0]
+        else:
+            end = min(range(e0, e1 + 1), key=lambda f: (round(_frame_rms(pcm, f - 1, 1), 1), f))
+        cuts[key] = (wanted, min(frames, end))
+    return cuts
 
 
 def index_surah(surah, source_dir, record):
@@ -290,22 +294,9 @@ def index_surah(surah, source_dir, record):
     if abs(len(pcm) - frames * SAMPLES_PER_FRAME) > 2 * SAMPLES_PER_FRAME:
         raise SystemExit(f"{path}: decoded {len(pcm)} samples vs {frames} frames")
     out = {}
-    seams = {}
-
-    def seam(sample):
-        if sample not in seams:
-            seams[sample] = quiet_seam_frame(pcm, sample // SAMPLES_PER_FRAME)
-        return seams[sample]
-
-    for key, (cut_in, cut_out, touching_in, touching_out, sound_in, sound_out) in plan_surah(
-            surah, pcm, units_of(surah, record)).items():
-        wanted = seam(cut_in) if touching_in else quiet_start_frame(
-            pcm, min(frames - 1, cut_in // SAMPLES_PER_FRAME), sound_in)
+    for key, (wanted, last) in plan_cuts(surah, pcm, units_of(surah, record), frames).items():
+        wanted = min(wanted, frames - 1)
         first = max(0, wanted - lead_frames(begin, payload, wanted))
-        if touching_out:
-            last = min(frames, seam(cut_out))  # the next verse's wanted frame: no overlap, no gap
-        else:
-            last = min(frames, quiet_end_frame(pcm, -(-cut_out // SAMPLES_PER_FRAME) + 1, sound_out))
         out[key] = {
             "startByte": offsets[first],
             "endByte": offsets[last],

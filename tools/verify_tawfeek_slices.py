@@ -68,6 +68,16 @@ def verify_surah(surah, source_dir, index, record):
         return surah, [("source", "does not match the pinned hash")], {}
     full = decode(None, str(path))
     stats = {}
+    # Playing verses back to back must never replay source audio: a verse ends no later than
+    # the next one's first audible frame (the silenced lead before it is not audible).
+    ordered = sorted((c["ayah"] if "ayah" in c else int(k.split(":")[1]), k, c)
+                     for k, c in index["clips"].items() if c["surah"] == surah)
+    for (_, ka, a), (_, kb, b) in zip(ordered, ordered[1:]):
+        end = a["originSamples"] + a["durationSamples"]
+        audible = b["originSamples"] + lead_samples(raw, b)
+        if end > audible:
+            problems.append((kb, f"opens {round((end - audible) * 1000 / index_tool.RATE)} ms before {ka} ends: "
+                                 "the previous verse's last sound would play twice"))
     for key, clip in index["clips"].items():
         if clip["surah"] != surah:
             continue
@@ -87,14 +97,18 @@ def verify_surah(surah, source_dir, index, record):
             bad = int(np.abs(out[warm:n].astype(int) - ref[warm:n].astype(int)).max())
             problems.append((key, f"not bit-exact after warm-up (max error {bad})"))
         # Every sound of the verse, as the alignment measured it, must lie inside the slice.
-        runs = [r for r in record["runs"] if f"{surah}:{r['ayah']}" == key]
+        all_runs = record["runs"]
         begin_ms = (origin + lead) * 1000 / index_tool.RATE
         finish_ms = (origin + len(out)) * 1000 / index_tool.RATE
-        for r in runs:
-            # Verses that touch share one seam cut where it is quietest, up to ~130 ms from where the
-            # neighbour's first sound is detected; anything further out is a real clipped word.
-            if r["onsetMs"] < begin_ms - SEAM_TOLERANCE_MS or r["offsetMs"] > finish_ms + SEAM_TOLERANCE_MS:
-                problems.append((key, f"sound {r['onsetMs']}-{r['offsetMs']} ms outside slice "
+        for i, r in enumerate(all_runs):
+            if f"{surah}:{r['ayah']}" != key:
+                continue
+            # Where a neighbour's sound begins, the sound beyond that point is the neighbour's: the
+            # detected edge of a verse that touches the next is only bounded by it.
+            onset = max(r["onsetMs"], all_runs[i - 1]["offsetMs"]) if i else r["onsetMs"]
+            offset = min(r["offsetMs"], all_runs[i + 1]["onsetMs"]) if i + 1 < len(all_runs) else r["offsetMs"]
+            if onset < begin_ms - SEAM_TOLERANCE_MS or offset > finish_ms + SEAM_TOLERANCE_MS:
+                problems.append((key, f"sound {onset}-{offset} ms outside slice "
                                       f"{begin_ms:.0f}-{finish_ms:.0f} ms"))
         silent = out[:lead]
         if lead and int(np.abs(silent).max()):
