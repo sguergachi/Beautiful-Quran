@@ -109,6 +109,7 @@ sets **layout + Arabic view + Mishary Rashid Alafasy**. Scroll is ready on `Back
 | `longAyahRecitation` | Scroll | `2:282` playing (`Pause` = `isPlaying`), network off | ~2 s karaoke frames |
 | `mushafPageTurn` | Mushaf | page description present | four rightward swipes, through full text leaves; assert each advances exactly one page, and let the leaf come to rest (plus a 1 s reading pause) before the next |
 | `mushafRapidFlip` | Mushaf | page description present | eight short rightward flicks 180 ms apart, each landing while the last turn still slides; assert at least four pages advanced after a 1.5 s rest |
+| `MushafPictureFidelityTest` | Mushaf | page description present | not a timing journey: pages 2 and 3 screenshotted live, then forced onto their turn pictures (sRGB, then P3) through the benchmark build's `MushafPictureProbe`; fails if a picture differs from the live leaf by more than 3/255 or was never drawn |
 | `distantDialJump` | Mushaf | page description present | dial swipe; assert the visible page moves at least 10 pages |
 | `coldSearch` | Scroll | cover already open, process-cold index | focused field, type `peace` → `In the Quran`; auxiliary latency log |
 

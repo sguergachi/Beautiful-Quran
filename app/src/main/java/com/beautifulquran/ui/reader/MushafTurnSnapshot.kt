@@ -182,7 +182,7 @@ internal fun Modifier.mushafTurnSnapshot(
             picture.takingGeneration = at
             scope.launch {
                 try {
-                    val bitmap = snapshots.rasterize(recording, recording.width, recording.height, wideGamut)
+                    val bitmap = snapshots.rasterize(recording, recording.width, recording.height, wideGamut || MushafPictureProbe.forcesP3)
                     if (bitmap != null && at == picture.generation) {
                         picture.bitmap = bitmap
                         picture.bitmapGeneration = at
@@ -212,6 +212,7 @@ internal fun Modifier.mushafTurnSnapshot(
                 ) {
                     drawImage(bitmap, topLeft = Offset(-bleedX.toFloat(), -bleedY.toFloat()))
                     overlay.drawOver(this)
+                    MushafPictureProbe.drewPicture()
                     picture.lastDrawWasPicture = true
                     return@drawWithContent
                 }

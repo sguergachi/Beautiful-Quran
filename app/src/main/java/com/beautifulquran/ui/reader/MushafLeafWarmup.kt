@@ -7,19 +7,15 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import com.beautifulquran.domain.MUSHAF_ROW_SET_FILL
 import com.beautifulquran.domain.MUSHAF_WORD_GAP_EM
-import com.beautifulquran.domain.MushafGrid
 import com.beautifulquran.domain.MushafPage
-import com.beautifulquran.domain.mushafDisplayFontPx
-import com.beautifulquran.domain.mushafGridSlots
 import com.beautifulquran.domain.mushafIsOpeningLeaf
 import com.beautifulquran.domain.mushafLineJustifies
 import com.beautifulquran.domain.mushafLineMayStandShort
-import com.beautifulquran.domain.mushafUniformFontPx
 import com.beautifulquran.domain.qcfTrailingMark
 import com.beautifulquran.domain.qcfWordGlyphs
 import com.beautifulquran.domain.reflowMushafPage
-import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
@@ -29,11 +25,7 @@ import kotlinx.coroutines.ensureActive
  * set from it before they are composed.
  */
 internal class MushafLeafSetting(
-    /** The measure the type size is fitted to: the leaf inside its fit inset. */
-    val fitWidthPx: Float,
-    val unitPx: Float,
-    /** The measure every ordinary line is set to. */
-    val lineMeasurePx: Float,
+    val frame: MushafLeafFrame,
     val density: Density,
     val resolver: FontFamily.Resolver,
     val locales: LocaleList,
@@ -63,12 +55,19 @@ internal object MushafLeafWarmup {
         surahAyahCount: (Int) -> Int?,
     ) {
         val face = MushafQcfFonts.face(context, page.page) ?: return
-        warmMushafInkProfiles(page, face.typeface)
-        val setting = setting ?: return
-        // The opening leaves are set in a circle, each row to its own chord.
-        if (mushafIsOpeningLeaf(page.page)) return
-        val display = mushafDisplayPage(page, face.typeface)
-        val fontPx = mushafLeafFontPx(page, setting.fitWidthPx, setting.unitPx)
+        val setting = setting
+        // The opening leaves size each row from its own set width in
+        // MushafPageSheet (mushafLineSetWidthPx), a measure this does not
+        // predict. Without a setting, or on those leaves, only the words' ink
+        // profiles are warmed; otherwise the line geometry below measures
+        // them itself, and a separate pass over them first was the same
+        // raster work done twice.
+        if (setting == null || mushafIsOpeningLeaf(page.page)) {
+            warmMushafInkProfiles(page, face.typeface)
+            return
+        }
+        val fontPx = setting.frame.fontPx(page)
+        val display = mushafDisplayPage(page, face.typeface, setting.frame.rowEm(page), surahAyahCount)
         val fontSp = with(setting.density) { fontPx.toSp() }
         val linePx = with(setting.density) { fontSp.toPx() }
         display.lines.forEach { line ->
@@ -80,7 +79,7 @@ internal object MushafLeafWarmup {
                 line = line,
                 pageTypeface = face.typeface,
                 linePx = linePx,
-                measureWidthPx = setting.lineMeasurePx,
+                measureWidthPx = setting.frame.lineMeasurePx,
                 justify = mushafLineJustifies(line.tokens.size),
                 allowShort = mushafLineMayStandShort(page.page, last, last?.surahId?.let(surahAyahCount)),
             )
@@ -103,11 +102,16 @@ internal object MushafLeafWarmup {
 
 /**
  * The page as the leaf sets it — rows rebalanced by [reflowMushafPage] with
- * the page's own face — from a small process-wide cache, so the leaf and
- * [MushafLeafWarmup] reflow each page once.
+ * the page's own face, for a row [rowEm] ems long — from a small
+ * process-wide cache, so the leaf and [MushafLeafWarmup] reflow each page once.
  */
-internal fun mushafDisplayPage(page: MushafPage, typeface: android.graphics.Typeface?): MushafPage {
-    val key = DisplayPageKey(page.page, System.identityHashCode(typeface))
+internal fun mushafDisplayPage(
+    page: MushafPage,
+    typeface: android.graphics.Typeface?,
+    rowEm: Float,
+    surahAyahCount: (Int) -> Int?,
+): MushafPage {
+    val key = DisplayPageKey(page.page, System.identityHashCode(typeface), rowEm.toRawBits())
     synchronized(displayPages) {
         displayPages[key]?.takeIf { it.source === page && it.typeface === typeface }?.let { return it.display }
     }
@@ -115,7 +119,11 @@ internal fun mushafDisplayPage(page: MushafPage, typeface: android.graphics.Type
         this.typeface = typeface
         textSize = 100f
     }
-    val display = reflowMushafPage(page) { token ->
+    val display = reflowMushafPage(
+        page = page,
+        rowCapacity = rowEm * paint.textSize * MUSHAF_ROW_SET_FILL,
+        endsChapter = { token -> token.endsAyah && token.ayah == surahAyahCount(token.surahId) },
+    ) { token ->
         val qcf = token.word.qcfV2
         val word = if (qcf.isEmpty()) {
             token.word.arabic
@@ -129,7 +137,12 @@ internal fun mushafDisplayPage(page: MushafPage, typeface: android.graphics.Type
     return display
 }
 
-private data class DisplayPageKey(val page: Int, val typefaceId: Int)
+/** Drops the pages reflowed with [typeface]; see [forgetMushafLineMeasures]. */
+internal fun forgetMushafDisplayPages(typeface: android.graphics.Typeface) {
+    synchronized(displayPages) { displayPages.values.removeAll { it.typeface === typeface } }
+}
+
+private data class DisplayPageKey(val page: Int, val typefaceId: Int, val rowEmBits: Int)
 
 private class DisplayPage(
     val source: MushafPage,
@@ -141,32 +154,6 @@ private val displayPages = object : LinkedHashMap<DisplayPageKey, DisplayPage>(3
     override fun removeEldestEntry(eldest: MutableMap.MutableEntry<DisplayPageKey, DisplayPage>) =
         size > 32
 }
-
-/**
- * The fit's slot count: the page's lines, plus a title band for every chapter
- * opening on it and a basmalah row under each that takes one.
- */
-internal fun mushafLeafFitSlotCount(page: MushafPage): Int =
-    (page.lines.size + page.surahStarts.size +
-        page.surahStarts.count { surahOpensWithBasmalahPreface(it.surahId) })
-        .coerceAtLeast(1)
-
-/**
- * The one type size a leaf is set at (see [MushafPageSheet]). The well is the
- * grid's fifteen units, whatever the page holds: a leaf carrying a chapter's
- * opening asks for more slots than that and packs them into the same paper.
- * Both arguments used to be scaled by the slot count, which cancelled and left
- * the guard unable to bite — a chapter opening kept type cut for a full slot
- * while its slot had shrunk to about 0.88 of one.
- */
-internal fun mushafLeafFontPx(page: MushafPage, fitWidthPx: Float, unitPx: Float): Float =
-    mushafDisplayFontPx(
-        mushafUniformFontPx(
-            measureWidthPx = fitWidthPx,
-            wellHeightPx = unitPx * MushafGrid.TEXT_LINES,
-            slots = mushafGridSlots(mushafLeafFitSlotCount(page)),
-        ),
-    )
 
 /** How many leaves past a turn's target are set ahead of it. */
 internal const val MushafWarmReach = 3

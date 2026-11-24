@@ -1,6 +1,7 @@
 package com.beautifulquran.ui.reader
 
 import com.beautifulquran.data.model.Word
+import com.beautifulquran.domain.MUSHAF_MAX_LINE_SCALE
 import com.beautifulquran.domain.MushafLine
 import com.beautifulquran.domain.MushafLineFit
 import com.beautifulquran.domain.MushafToken
@@ -23,6 +24,37 @@ class MushafCellOriginsTest {
         assertTrue(!ending.flush)
         assertEquals(900f, origins.first() + cell.inkRight, 0.01f)
         assertEquals(0f, origins.last(), 0.01f)
+    }
+
+    @Test
+    fun `a chapter ending that stands short is spaced like a full row`() {
+        val joins = List(3) { MushafInkJoin(closest = 0.10f, tight = 0.15f, paper = 0.25f) }
+        val ending = mushafInkLineFit(300f, joins, 900f, 100f, allowShort = true)
+        val cell = MushafCell(advance = 75f, inkLeft = 0f, inkRight = 75f).scaled(ending.scale)
+        val origins = mushafCellOrigins(List(4) { cell }, 4, 900f, ending, joins, 100f * ending.scale)
+
+        assertTrue(!ending.flush)
+        // In the same hand as an ordinary row: its letters at the row stretch,
+        // each join opened to the full-row white, centred on the measure.
+        assertEquals(MUSHAF_MAX_LINE_SCALE, ending.scale, 0.0001f)
+        val white = joins.first().whiteAt(MUSHAF_MAX_WHITE_LEVEL_EM) - joins.first().paper
+        for (i in 0 until 3) {
+            assertEquals(white * 100f * ending.scale, origins[i] - origins[i + 1] - cell.inkWidth, 0.5f)
+        }
+        val left = origins.last()
+        val right = 900f - (origins.first() + cell.inkRight)
+        assertEquals(left, right, 0.5f)
+    }
+
+    @Test
+    fun `a chapter ending close to full is justified, not left standing short`() {
+        val joins = List(8) { MushafInkJoin(closest = 0.10f, tight = 0.15f, paper = 0.25f) }
+        // Its white opens a little past a full row's (about 0.73 em): justified.
+        assertTrue(mushafInkLineFit(400f, joins, 900f, 100f, allowShort = true).flush)
+        // About 0.98 em, which used to be justified too (up to 1.25): now short.
+        assertTrue(!mushafInkLineFit(200f, joins, 900f, 100f, allowShort = true).flush)
+        // A row that is not a chapter's last never stands short.
+        assertTrue(mushafInkLineFit(200f, joins, 900f, 100f).flush)
     }
 
     @Test
