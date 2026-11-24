@@ -68,8 +68,16 @@ class VerseSeamAudioProcessorTest {
         assertTrue(out.all { it.toInt() == 0 })
     }
 
-    private fun playThenSilence(gapless: Boolean): ByteArray {
-        val processor = VerseSeamAudioProcessor()
+    @Test
+    fun `verses cut from a surah recording are never bridged`() {
+        // Their opening silence is the cut's lead, not a hole in the recording:
+        // filling it replays the previous verse's last word, reversed.
+        val out = playThenSilence(gapless = true, bridgeSeams = false)
+        assertTrue(out.all { it.toInt() == 0 })
+    }
+
+    private fun playThenSilence(gapless: Boolean, bridgeSeams: Boolean = true): ByteArray {
+        val processor = VerseSeamAudioProcessor().also { it.bridgeSeams = bridgeSeams }
         val format = AudioProcessor.AudioFormat(1_000, 1, C.ENCODING_PCM_16BIT)
         processor.configure(format)
         processor.flush(AudioProcessor.StreamMetadata.DEFAULT)

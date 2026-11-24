@@ -31,6 +31,7 @@ import com.beautifulquran.LogExport
 import com.beautifulquran.QuranApp
 import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.AssistantIntents
+import com.beautifulquran.data.model.VERSE_CLIP_HOST
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.hizbOpeningStartMs
@@ -55,6 +56,7 @@ class PlaybackService : MediaLibraryService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var mediaSession: MediaLibrarySession? = null
     private var prefetcher: AudioPrefetcher? = null
+    private var seamProcessor: VerseSeamAudioProcessor? = null
     private var assistantAudioResume: AssistantAudioResume? = null
     private val hizbStarts = mutableMapOf<String, Long>()
 
@@ -111,6 +113,7 @@ class PlaybackService : MediaLibraryService() {
             }
 
         player.addListener(PrefetchListener(player, prefetcher))
+        player.addListener(SeamBridgeListener(player) { seamProcessor?.bridgeSeams = it })
         // Observe the actual service player only during an explicit log capture.
         // The reader's MediaController samples and these samples share nanoTime.
         serviceScope.launch {
@@ -201,11 +204,12 @@ class PlaybackService : MediaLibraryService() {
                 enableAudioTrackPlaybackParams: Boolean,
             ): AudioSink {
                 val tap = VoiceTapAudioProcessor()
+                val seams = VerseSeamAudioProcessor().also { seamProcessor = it }
                 val routes = (application as QuranApp).outputRoutes
                 val sink = DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                    .setAudioProcessors(arrayOf(VerseSeamAudioProcessor(), tap))
+                    .setAudioProcessors(arrayOf(seams, tap))
                     .setAudioTrackProvider(object : DefaultAudioSink.AudioTrackProvider {
                         override fun getAudioTrack(config: AudioSink.AudioTrackConfig, attributes: AudioAttributes,
                             audioSessionId: Int, context: Context?): AudioTrack =
@@ -216,6 +220,25 @@ class PlaybackService : MediaLibraryService() {
                 return tap.attach(sink)
             }
         }
+
+    /**
+     * Tells the seam processor whether this playlist's files are verses cut
+     * from a surah recording, whose seams must not be bridged. A playlist is
+     * one reciter, so the first item decides for all.
+     */
+    private class SeamBridgeListener(
+        private val player: Player,
+        private val setBridging: (Boolean) -> Unit,
+    ) : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = update(mediaItem)
+
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) = update(player.currentMediaItem)
+
+        private fun update(item: MediaItem?) {
+            val host = item?.localConfiguration?.uri?.host ?: return
+            setBridging(host != VERSE_CLIP_HOST)
+        }
+    }
 
     /**
      * Turns playback events into cache-warming hints. Reads the player (main

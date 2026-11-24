@@ -25,6 +25,17 @@ import java.nio.ByteBuffer
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class VerseSeamAudioProcessor : BaseAudioProcessor() {
 
+    /**
+     * Whether a gapless seam may be bridged. Off for verses cut from a surah
+     * recording ([com.beautifulquran.data.model.VERSE_CLIP_HOST]): their opening
+     * silence is the cut's own reservoir lead, not encoder priming, and the
+     * recording carries no hole there to fill. Bridging it replays the end of
+     * the verse before, reversed, in front of the next one: heard as a word
+     * said twice at a seam.
+     */
+    @Volatile
+    var bridgeSeams: Boolean = true
+
     private var seam: VerseSeamFade? = null
 
     /** A next file was configured since the last flush: an end of stream now is a gapless seam. */
@@ -55,7 +66,7 @@ class VerseSeamAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun onQueueEndOfStream() {
-        bridge = if (nextFileConfigured) seam?.bridgeSource() else null
+        bridge = if (nextFileConfigured && bridgeSeams) seam?.bridgeSource() else null
         val tail = seam?.endOfStream() ?: return
         if (tail.isEmpty()) return
         replaceOutputBuffer(tail.size).put(tail).flip()
