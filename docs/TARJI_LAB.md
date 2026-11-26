@@ -108,11 +108,23 @@ Applying a profile enables the same full-depth pulse shown in the lab, while
 preserving the wash settings. Live acoustic eligibility remains independent
 of the visual tajweed-pacing toggle, including in English reading modes.
 
-The supplied `tarji_7_1_7_w9.json` tuning is installed once for **Hani Ar-Rifai**
-(app reciter id 7): 200% brightness, 1.6–8 Hz, 656.6863 ms minimum hold,
-0.13819668 minimum depth, 0.38481894 periodicity, 0.3 pitch drift, 50 ms
-attack, and 1095.3691 ms release. This replaces any older Hani profile once;
-later lab edits persist normally. Other stored reciter profiles are preserved.
+Shipped tunings (`SHIPPED_TARJI_TUNINGS` in `ReciterTarjiProfiles.kt`) are
+the exact knobs of a sample the user shared from the lab. Each is installed
+once per device, under its own flag, over any older profile for that reciter;
+later lab edits persist normally and other reciters' profiles are untouched.
+
+- **Hani Ar-Rifai** (id 7), from `tarji_7_2_14_w16.json`: 200% brightness,
+  2.7–8.3 Hz, 1,200 ms minimum hold, 0.123 minimum depth, 0.15 periodicity,
+  0.3 pitch drift, 50 ms attack, 100 ms release.
+- **Tawfeek As-Sawaigh** (id 20), from `tarji_20_114_2_w2.json` (ٱلنَّاسِ,
+  tuned under Recording): 200% brightness, 2.7–8.2 Hz, 1,155 ms minimum hold,
+  0.046 minimum depth, 0.15 periodicity, 1% quietest voice, 36% drama, 0.3
+  pitch drift, 50 ms attack, 100 ms release.
+
+Each sample is kept in `app/src/test/resources/tarji/`, and `TarjiTest` holds
+the shipped knobs equal to it and checks that its capture still pulses.
+To ship a new one: the user taps **Share** in the lab, the JSON joins those
+fixtures, and its knobs join `SHIPPED_TARJI_TUNINGS` with a new flag.
 
 - **Glint brightness** scales the tint and halo together from 0–200%.
   0% removes the sheen, 100% preserves the shipped look, and 200% brightens it

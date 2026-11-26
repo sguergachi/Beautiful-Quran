@@ -47,12 +47,13 @@ class ReciterTarjiProfiles(context: Context) {
 
     private fun load(): ReciterTarjiProfileBook {
         val book = ReciterTarjiProfileBook.decode(prefs.getString(KEY, null) ?: "{}")
-        if (prefs.getBoolean(HANI_TUNING_APPLIED, false)) return book
-        // Install the supplied capture's tuning once; later lab edits remain yours.
-        val seeded = book.copy(profiles = book.profiles + ("7" to HANI_TUNING))
+        val due = SHIPPED_TARJI_TUNINGS.filterNot { prefs.getBoolean(it.appliedKey, false) }
+        if (due.isEmpty()) return book
+        // Install each supplied capture's tuning once; later lab edits remain yours.
+        val seeded = book.copy(profiles = book.profiles + due.map { it.reciterId.toString() to it.knobs })
         prefs.edit {
             putString(KEY, ReciterTarjiProfileBook.encode(seeded))
-            putBoolean(HANI_TUNING_APPLIED, true)
+            due.forEach { putBoolean(it.appliedKey, true) }
         }
         return seeded
     }
@@ -60,7 +61,6 @@ class ReciterTarjiProfiles(context: Context) {
     private companion object {
         const val PREFS = "tarji_profiles"
         const val KEY = "book"
-        const val HANI_TUNING_APPLIED = "hani_2_14_w16_tuning_applied"
     }
 }
 
@@ -78,6 +78,33 @@ internal val HANI_TUNING = TarjiLabKnobs(
     attackMs = 50f,
     releaseMs = 100f,
     glintBrightness = 2f,
+)
+
+/**
+ * Exact settings exported in tarji_20_114_2_w2.json (Tawfeek As-Sawaigh,
+ * ٱلنَّاسِ in 114:2), tuned under the Recording detector.
+ */
+internal val TAWFEEK_TUNING = TarjiLabKnobs(
+    maxTremoloHz = 8.2f,
+    minTremoloHz = 2.6999998f,
+    holdMinMs = 1154.7185f,
+    minTremoloDepth = 0.045600593f,
+    minPeriodicity = 0.15000004f,
+    minVolume = 0.01f,
+    minDrama = 0.36118606f,
+    maxPitchDrift = 0.3f,
+    attackMs = 50f,
+    releaseMs = 100f,
+    glintBrightness = 2f,
+)
+
+/** A tuning a reciter ships with, installed once under [appliedKey]. A new
+ * key re-installs it over that reciter's saved profile, once. */
+internal class ShippedTarjiTuning(val reciterId: Int, val knobs: TarjiLabKnobs, val appliedKey: String)
+
+internal val SHIPPED_TARJI_TUNINGS = listOf(
+    ShippedTarjiTuning(7, HANI_TUNING, "hani_2_14_w16_tuning_applied"),
+    ShippedTarjiTuning(20, TAWFEEK_TUNING, "tawfeek_114_2_w2_tuning_applied"),
 )
 
 @Serializable
