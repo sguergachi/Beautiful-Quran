@@ -1,6 +1,8 @@
 package com.beautifulquran.tarjilab
 
+import android.content.ClipData
 import android.content.Context
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
@@ -22,6 +24,7 @@ import com.beautifulquran.playback.TarjiLabCapture
 import com.beautifulquran.playback.TarjiLabTrim
 import com.beautifulquran.playback.TarjiDetectorMode
 import com.beautifulquran.playback.VoiceEnergy
+import com.beautifulquran.share.ShareFiles
 import com.beautifulquran.ui.reader.InkEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -69,8 +72,6 @@ class TarjiLabViewModel(
         /** Session-only developer choice; excluded from samples and reciter profiles. */
         val mode: TarjiDetectorMode = InkEngine.tarjiDetectorMode,
         val knobs: TarjiLabKnobs = TarjiLabKnobs(),
-        val reference: TarjiLabReference? = null,
-        val showingReference: Boolean = false,
         val canUndo: Boolean = false,
         val canRedo: Boolean = false,
         /** Loop selection; the legacy exchange format also carries old labels. */
@@ -98,9 +99,6 @@ class TarjiLabViewModel(
         val sampleReciterName: String? = null,
         val note: String? = null,
     ) {
-        val displayTrace: TarjiLabTrace? get() = if (showingReference) reference?.trace else trace
-        val displayKnobs: TarjiLabKnobs get() = if (showingReference) reference?.knobs ?: knobs else knobs
-
         /** A result belongs to one capture, method and detector tuning. Brightness is paint-only. */
         internal fun acceptsAnalysis(capture: TarjiLabCapture, knobs: TarjiLabKnobs, mode: TarjiDetectorMode): Boolean =
             this.capture === capture && this.mode == mode &&
@@ -108,11 +106,11 @@ class TarjiLabViewModel(
 
         /** Change admission without stopping the audio or reusing another method's decisions. */
         internal fun forMode(mode: TarjiDetectorMode): TarjiLabUiState = copy(
-            mode = mode, trace = null, reference = null, showingReference = false,
+            mode = mode, trace = null,
             analyzing = capture != null, note = null,
         )
 
-        /** Freeze this capture and displayed tuning before opening the system save picker. */
+        /** Freeze this capture and tuning before opening the save picker or share sheet. */
         fun sampleForExport(): TarjiLabSample? {
             val audio = capture ?: return null
             val id = sampleReciterId ?: reciter?.id ?: return null
@@ -123,7 +121,7 @@ class TarjiLabViewModel(
                 label = TarjiLabCodec.label(name, surahId, ayah, wordPosition),
                 reciterId = id, reciterName = name,
                 surahId = surahId, ayah = ayah, wordPosition = wordPosition,
-                wordArabic = wordArabic, knobs = displayKnobs,
+                wordArabic = wordArabic, knobs = knobs,
                 expectation = expectation, notes = sampleNotes,
             )
         }
@@ -421,8 +419,6 @@ class TarjiLabViewModel(
             captureProgress = 1f,
             capture = trimmed,
             trace = null,
-            reference = null,
-            showingReference = false,
             firstHopMediaMs = capture.hopMediaMs(range.first, firstHopMediaMs),
             expectation = TarjiLabExpectation().withWindow(
                 TarjiHoldWindow(0f, captureMs),
@@ -497,11 +493,7 @@ class TarjiLabViewModel(
                 if (live.capture !== capture) return@launch
                 // Coalesce edits, but never paint a completed result under newer knobs or a new method.
                 if (!live.acceptsAnalysis(capture, st.knobs, st.mode)) continue
-                _ui.value = live.copy(
-                    trace = trace,
-                    reference = live.reference ?: TarjiLabReference(st.knobs, trace),
-                    analyzing = false,
-                )
+                _ui.value = live.copy(trace = trace, analyzing = false)
                 return@launch
             }
         }
@@ -511,7 +503,7 @@ class TarjiLabViewModel(
     fun matchPulse() {
         val st = _ui.value
         val capture = st.capture ?: return
-        if (st.matchingPulse || st.showingReference || st.holdEditing || st.capturing) return
+        if (st.matchingPulse || st.holdEditing || st.capturing) return
         val scope = if (st.tool == TarjiLabTool.HOLD) TarjiPreviewScope.HOLD else TarjiPreviewScope.WORD
         val window = previewLoopWindow(scope, st.expectation.window, capture.totalContentMs)
         _ui.value = st.copy(matchingPulse = true, note = null)
@@ -549,7 +541,7 @@ class TarjiLabViewModel(
         val detectorChanged = knobs.copy(glintBrightness = _ui.value.knobs.glintBrightness) != _ui.value.knobs
         cancelPulseMatch()
         persistKnobs(knobs)
-        _ui.value = _ui.value.copy(knobs = knobs, showingReference = false, note = null,
+        _ui.value = _ui.value.copy(knobs = knobs, note = null,
             trace = if (detectorChanged) null else _ui.value.trace,
             canUndo = knobHistory.canUndo, canRedo = knobHistory.canRedo,
             analyzing = _ui.value.analyzing || (detectorChanged && _ui.value.capture != null))
@@ -563,23 +555,6 @@ class TarjiLabViewModel(
 
     fun undoKnobs() { knobHistory.undo(_ui.value.knobs)?.let(::applyKnobs) }
     fun redoKnobs() { knobHistory.redo(_ui.value.knobs)?.let(::applyKnobs) }
-
-    /** Compare graph and glow at the same audio position without changing the profile. */
-    fun toggleReference() {
-        cancelPulseMatch()
-        finishKnobEdit()
-        if (_ui.value.reference != null) {
-            _ui.value = _ui.value.copy(showingReference = !_ui.value.showingReference, note = null)
-        }
-    }
-
-    fun setReference() {
-        finishKnobEdit()
-        val st = _ui.value
-        if (st.analyzing || st.trace == null) return
-        _ui.value = st.copy(reference = TarjiLabReference(st.knobs, st.trace), showingReference = false,
-            note = "Reference saved · tap Compare")
-    }
 
     /** Restore only this reciter's defaults; the reset itself is undoable. */
     fun resetKnobs() {
@@ -972,6 +947,34 @@ class TarjiLabViewModel(
         }
     }
 
+    /** Hand the sample to another app (KDE Connect, chat, mail) as a JSON file. */
+    fun shareSample(context: Context) {
+        val sample = _ui.value.sampleForExport() ?: run {
+            _ui.value = _ui.value.copy(note = "Capture a word with reciter details first.")
+            return
+        }
+        val app = context.applicationContext
+        viewModelScope.launch {
+            try {
+                val uri = withContext(Dispatchers.IO) {
+                    ShareFiles.writeText(app, TarjiLabCodec.fileName(sample), TarjiLabCodec.encode(sample))
+                }
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/json"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_SUBJECT, TarjiLabCodec.fileName(sample))
+                    clipData = ClipData.newRawUri(TarjiLabCodec.fileName(sample), uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(send, "Share Tarjīʿ tuning"))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _ui.value = _ui.value.copy(note = "Share failed: ${error.message}")
+            }
+        }
+    }
+
     /** Document reads never block the transport; failures remain visible in the lab. */
     fun importSample(context: Context, uri: Uri) {
         importJob?.cancel()
@@ -1032,8 +1035,6 @@ class TarjiLabViewModel(
             wordEndMs = 0L,
             capture = capture,
             trace = null,
-            reference = null,
-            showingReference = false,
             canUndo = false,
             canRedo = false,
             capturing = false,
@@ -1077,8 +1078,6 @@ class TarjiLabViewModel(
         abortCapture()
         _ui.value = _ui.value.copy(
             trace = null,
-            reference = null,
-            showingReference = false,
             analyzing = false,
             isLoading = false,
             captureError = if (interruptedCapture) "Capture interrupted. Retry this word." else _ui.value.captureError,

@@ -8,8 +8,8 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * Cache-dir handoff for share exports. Text shares never touch this — only
- * image (and later video) files live under [shareDir].
+ * Cache-dir handoff for share exports: images, and Tarjīʿ Lab samples.
+ * Plain-text shares (verse text) never touch this.
  */
 object ShareFiles {
 
@@ -33,6 +33,14 @@ object ShareFiles {
                 throw IllegalStateException("PNG compress failed")
             }
         }
+        return FileProvider.getUriForFile(context, authority(context), file)
+    }
+
+    /** Writes [text] under its own [fileName] so the receiver keeps the name. */
+    fun writeText(context: Context, fileName: String, text: String): Uri {
+        cleanup(context, keepNewest = 4)
+        val file = File(shareDir(context), fileName)
+        file.writeText(text)
         return FileProvider.getUriForFile(context, authority(context), file)
     }
 
