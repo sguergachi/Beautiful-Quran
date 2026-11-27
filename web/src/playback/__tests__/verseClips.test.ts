@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { audioUrl, type Reciter } from '../../data/models'
 import { parseEveryayahUrl } from '../recitationDownloads'
 import {
+  dropStaleVerseClips,
   fetchVerseClip,
   installVerseClipFetch,
   isVerseClipUrl,
@@ -10,8 +11,11 @@ import {
   parseVerseClipUrl,
   resetVerseClipFetchForTests,
   silenceLead,
+  verseClipFingerprint,
+  verseClipHeadMs,
   type VerseClip,
 } from '../verseClips'
+import { AUDIO_CACHE, AUDIO_KEEP_CACHE } from '../audioPrefetch'
 
 /** One synthetic MPEG-1 Layer III stereo frame, no CRC, 128 kbps (same as the Android test). */
 function frame(pad: number, seed: number): Uint8Array {
@@ -152,5 +156,67 @@ describe('fetchVerseClip', () => {
       await target.fetch('https://everyayah.com/data/Alafasy_128kbps/001001.mp3', { headers: { Range: 'bytes=0-9' } }).catch(() => {})
       expect(seen[1]).toBe('https://everyayah.com/data/Alafasy_128kbps/001001.mp3')
     })
+  })
+})
+
+describe('stale verse clips', () => {
+  const clip: VerseClip = {
+    sourceUrl: 'https://server.example/023/112.mp3',
+    sourceBytes: 1000,
+    startByte: 100,
+    endByte: 500,
+    leadBytes: 835,
+    trimSamples: 3 * 1152,
+  }
+
+  it('the browser hears a verse after its whole silenced head', () => {
+    expect(verseClipHeadMs(clip)).toBeCloseTo((3 * 1152 * 1000) / 44_100, 6)
+  })
+
+  it('any change to a range or its source changes the fingerprint', () => {
+    const base = verseClipFingerprint([['T/112:1', clip]])
+    expect(verseClipFingerprint([['T/112:1', { ...clip }]])).toBe(base)
+    for (const changed of [
+      { ...clip, endByte: 501 },
+      { ...clip, trimSamples: 2 * 1152 },
+      { ...clip, sourceUrl: 'https://mirror.example/023/112.mp3' },
+    ]) {
+      expect(verseClipFingerprint([['T/112:1', changed]])).not.toBe(base)
+    }
+  })
+
+  function fakeCaches(urls: Record<string, string[]>) {
+    const stores = new Map(Object.entries(urls).map(([name, list]) => [name, new Set(list)]))
+    return {
+      stores,
+      caches: {
+        open: async (name: string) => {
+          const set = stores.get(name) ?? new Set<string>()
+          stores.set(name, set)
+          return {
+            keys: async () => [...set].map((url) => ({ url }) as Request),
+            delete: async (request: Request) => set.delete(request.url),
+          }
+        },
+      } as unknown as CacheStorage,
+    }
+  }
+
+  it('drops only that reciter\'s cached verses, once per change', async () => {
+    const own = 'https://verse-clips.invalid/data/T/112001.mp3'
+    const other = 'https://verse-clips.invalid/data/U/112001.mp3'
+    const everyayah = 'https://everyayah.com/data/A/112001.mp3'
+    const { stores, caches } = fakeCaches({ [AUDIO_CACHE]: [own, other, everyayah], [AUDIO_KEEP_CACHE]: [own] })
+    const stamps = new Map<string, string>()
+    const store = { getItem: (k: string) => stamps.get(k) ?? null, setItem: (k: string, v: string) => void stamps.set(k, v) }
+    await dropStaleVerseClips(new Map([['T', 'one']]), store, caches)
+    expect([...stores.get(AUDIO_CACHE)!]).toEqual([other, everyayah])
+    expect([...stores.get(AUDIO_KEEP_CACHE)!]).toEqual([])
+
+    stores.get(AUDIO_KEEP_CACHE)!.add(own)
+    await dropStaleVerseClips(new Map([['T', 'one']]), store, caches)
+    expect([...stores.get(AUDIO_KEEP_CACHE)!]).toEqual([own])
+    await dropStaleVerseClips(new Map([['T', 'two']]), store, caches)
+    expect([...stores.get(AUDIO_KEEP_CACHE)!]).toEqual([])
   })
 })

@@ -15,6 +15,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -35,6 +36,11 @@ import org.junit.runner.RunWith
  * file's PCM began. `tools/check_verse_seams.py` lines it up against the surah
  * recording: every seam must continue the recording, with no hole and nothing
  * heard twice.
+ *
+ * [captureSeekInsideAyatAlKursi] seeks back inside one verse instead and marks
+ * the timestamp the sink was handed after each flush (`pts <us> <byte>`), so
+ * `tools/check_verse_seek.py` can tell whether the player's clock still names
+ * the recording's sample after the seek.
  *
  * Needs the network (the recordings stream from their public host).
  */
@@ -64,18 +70,27 @@ class VerseClipSeamCaptureTest {
         }
     }
 
+    /** 1,280 ms is 49 MP3 frames exactly, so the seek lands on a frame boundary. */
+    @Test
+    fun captureSeekInsideAyatAlKursi() = capture("2-255-seek", surah = 2, ayahs = 255..255, seek = SeekPlan(3_000L, 1_280L, 6_000L))
+
+    private class SeekPlan(val atMs: Long, val toMs: Long, val stopAtMs: Long)
+
     @Test
     fun captureAlKafirun() = capture("109", surah = 109, ayahs = 1..6)
 
     @Test
     fun captureAlIkhlas() = capture("112", surah = 112, ayahs = 1..4)
 
-    private fun capture(label: String, surah: Int, ayahs: IntRange) {
+    private fun capture(label: String, surah: Int, ayahs: IntRange, seek: SeekPlan? = null) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val app = context.applicationContext as QuranApp
         val reciter = kotlinx.coroutines.runBlocking { app.repository.reciters() }.first { it.rangeSourced }
         val capture = Capture()
-        val seams = VerseSeamAudioProcessor().also { it.sampleExactSeams = true }
+        val clips = app.repository.verseClips
+        val seams = VerseSeamAudioProcessor(seekTrimFrames = { uri ->
+            com.beautifulquran.data.parseVerseClipUrl(uri)?.let(clips::lookup)?.let(::verseClipEncoderDelay) ?: 0
+        }).also { it.sampleExactSeams = true }
         val done = CountDownLatch(1)
         var player: ExoPlayer? = null
         val main = Handler(Looper.getMainLooper())
@@ -85,9 +100,27 @@ class VerseClipSeamCaptureTest {
                     context: Context,
                     enableFloatOutput: Boolean,
                     enableAudioTrackPlaybackParams: Boolean,
-                ): AudioSink = DefaultAudioSink.Builder(context)
-                    .setAudioProcessors(arrayOf(seams, capture))
-                    .build()
+                ): AudioSink = object : ForwardingAudioSink(
+                    DefaultAudioSink.Builder(context).setAudioProcessors(arrayOf(seams, capture)).build(),
+                ) {
+                    private var flushed = true
+
+                    override fun flush() {
+                        flushed = true
+                        super.flush()
+                    }
+
+                    override fun handleBuffer(buffer: ByteBuffer, presentationTimeUs: Long, encodedAccessUnitCount: Int): Boolean {
+                        if (flushed) {
+                            flushed = false
+                            synchronized(capture) {
+                                capture.marks.append("pts ").append(presentationTimeUs).append(' ')
+                                    .append(capture.pcm.size()).append('\n')
+                            }
+                        }
+                        return super.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount)
+                    }
+                }
             }
             val upstream = VerseClipDataSource.Factory(DefaultHttpDataSource.Factory(), app.repository.verseClips)
             player = ExoPlayer.Builder(context, renderers)
@@ -115,6 +148,25 @@ class VerseClipSeamCaptureTest {
                     prepare()
                     play()
                 }
+            if (seek != null) {
+                var seeked = false
+                main.post(object : Runnable {
+                    override fun run() {
+                        val p = player ?: return
+                        val at = p.currentPosition
+                        if (!seeked && at >= seek.atMs) {
+                            seeked = true
+                            synchronized(capture) { capture.marks.append("seek ").append(seek.toMs).append('\n') }
+                            p.seekTo(seek.toMs)
+                        } else if (seeked && at >= seek.stopAtMs) {
+                            p.stop()
+                            done.countDown()
+                            return
+                        }
+                        main.postDelayed(this, 20)
+                    }
+                })
+            }
         }
         val finished = done.await(240, TimeUnit.SECONDS)
         main.post { player?.release() }

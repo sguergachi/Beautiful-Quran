@@ -31,7 +31,6 @@ import com.beautifulquran.LogExport
 import com.beautifulquran.QuranApp
 import com.beautifulquran.assistant.AssistantAction
 import com.beautifulquran.assistant.AssistantIntents
-import com.beautifulquran.data.model.VERSE_CLIP_HOST
 import com.beautifulquran.data.model.Surah
 import com.beautifulquran.domain.BASMALAH_PLAYLIST_AYAH
 import com.beautifulquran.domain.hizbOpeningStartMs
@@ -113,7 +112,8 @@ class PlaybackService : MediaLibraryService() {
             }
 
         player.addListener(PrefetchListener(player, prefetcher))
-        player.addListener(SeamBridgeListener(player) { seamProcessor?.sampleExactSeams = it })
+        val seamListener = SeamBridgeListener(player) { seamProcessor?.sampleExactSeams = it }
+        player.addListener(seamListener)
         // Observe the actual service player only during an explicit log capture.
         // The reader's MediaController samples and these samples share nanoTime.
         serviceScope.launch {
@@ -167,6 +167,7 @@ class PlaybackService : MediaLibraryService() {
         serviceScope.launch {
             app.settings.settings.map { it.verseGapSeconds }.distinctUntilChanged().collect { seconds ->
                 player.pauseAtEndOfMediaItems = seconds > 0
+                seamListener.update()
             }
         }
         val sessionPlayer = VerseGapPlayer(
@@ -204,7 +205,10 @@ class PlaybackService : MediaLibraryService() {
                 enableAudioTrackPlaybackParams: Boolean,
             ): AudioSink {
                 val tap = VoiceTapAudioProcessor()
-                val seams = VerseSeamAudioProcessor().also { seamProcessor = it }
+                val clips = (application as QuranApp).repository.verseClips
+                val seams = VerseSeamAudioProcessor(seekTrimFrames = { uri ->
+                    com.beautifulquran.data.parseVerseClipUrl(uri)?.let(clips::lookup)?.let(::verseClipEncoderDelay) ?: 0
+                }).also { seamProcessor = it }
                 val routes = (application as QuranApp).outputRoutes
                 val sink = DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
@@ -222,21 +226,32 @@ class PlaybackService : MediaLibraryService() {
         }
 
     /**
-     * Tells the seam processor whether this playlist's files are verses cut
-     * from a surah recording, whose seams continue the recording sample-exact.
-     * A playlist is one reciter, so the current item decides for all.
+     * Tells the seam processor whether the seam at the end of the verse now
+     * playing continues the recording sample-exact ([sampleExactSeam]). The
+     * processor reads it at that verse's end of stream, which comes after this
+     * transition into it unless the verse is shorter than the sink's buffer.
      */
     private class SeamBridgeListener(
-        private val player: Player,
+        private val player: ExoPlayer,
         private val setSampleExact: (Boolean) -> Unit,
     ) : Player.Listener {
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = update(mediaItem)
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = update()
 
-        override fun onTimelineChanged(timeline: Timeline, reason: Int) = update(player.currentMediaItem)
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) = update()
 
-        private fun update(item: MediaItem?) {
-            val host = item?.localConfiguration?.uri?.host ?: return
-            setSampleExact(host == VERSE_CLIP_HOST)
+        override fun onRepeatModeChanged(repeatMode: Int) = update()
+
+        fun update() {
+            val next = player.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }
+                ?.let { player.getMediaItemAt(it) }
+            setSampleExact(
+                sampleExactSeam(
+                    current = player.currentMediaItem?.localConfiguration?.uri?.toString(),
+                    next = next?.localConfiguration?.uri?.toString(),
+                    repeatOne = player.repeatMode == Player.REPEAT_MODE_ONE,
+                    pausesAtEnd = player.pauseAtEndOfMediaItems,
+                ),
+            )
         }
     }
 

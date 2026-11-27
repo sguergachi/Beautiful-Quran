@@ -216,15 +216,24 @@ one warm-up frame decoded for real, so the verse's first frame decodes exactly
 as in the surah file. On Android the stream is prefixed with an ID3 `iTunSMPB`
 tag (`gaplessHeaderFor`): Media3 trims the decoded lead and the platform
 decoder's 529-sample padding, and verses played back to back are the recording,
-sample for sample, so a seam inside connected recitation cannot be heard. Their
-seams also skip `VerseSeamAudioProcessor`'s fade and bridge, which exist for
-separately recorded EveryAyah files. The web has no such trim and silences the
-whole head instead (its word clock runs that ~50 ms early). The URL pinned for
-each surah carries its byte size, and playback refuses a source that has changed.
-`tools/verify_tawfeek_slices.py` proves the exactness for all 6,236 slices, and
-`VerseClipSeamCaptureTest` + `tools/check_verse_seams.py` prove it for the real
-player and decoder on a device. Cached verses are keyed by URL, so a change to the
-ranges (or to `VERSE_CLIP_FORMAT`) drops the cached copies on next launch.
+sample for sample, so a seam inside connected recitation cannot be heard. A seam
+from one verse into the next of the same surah (`sampleExactSeam`) skips
+`VerseSeamAudioProcessor`'s fade and bridge, which exist for separately recorded
+EveryAyah files; every other seam keeps them (the basmalah into a chapter, a
+repeated verse, a wrap, the pause between verses), since those end on a cut.
+Media3 applies the trim only when a file starts, so after a seek inside a verse
+the processor trims the same encoder delay itself (`seekTrimFrames`), or the
+recording would run 40–80 ms behind the words. The web has no such trim and
+silences the whole head instead, so it delays that reciter's word times by the
+head (`verseClipHeadMs`). The URL pinned for each surah carries its byte size,
+and playback refuses a source that has changed. `tools/verify_tawfeek_slices.py`
+proves the exactness for all 6,236 slices, and `VerseClipSeamCaptureTest` with
+`tools/check_verse_seams.py` (back to back) and `tools/check_verse_seek.py`
+(a seek inside Āyat al-Kursī) prove it for the real player and decoder on a
+device. Cached verses are keyed by URL, so a change to the ranges or their source
+(or to `VERSE_CLIP_FORMAT`) drops the cached and downloaded copies on next
+launch, before a download may resume (Android `dropStaleVerseClips`; web
+`dropStaleVerseClips` in `verseClips.ts`).
 
 His word times are our own: `tools/reciter_align` (see its README) aligns the same
 recordings to the canonical text with MMS-300m CTC, finds the istiadha and basmala

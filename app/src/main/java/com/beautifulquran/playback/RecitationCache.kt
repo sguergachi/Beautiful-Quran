@@ -36,6 +36,9 @@ internal object RecitationCache {
     const val MAX_BYTES = 1024L * 1024 * 1024
 
     private val trimStarted = AtomicBoolean(false)
+
+    /** Opens once [prepare]'s stale verse-clip check has run (see [awaitVerseClipCheck]). */
+    private val verseClipsChecked = java.util.concurrent.CountDownLatch(1)
     private val relocated = AtomicBoolean(false)
     private val lock = Any()
     private var db: StandaloneDatabaseProvider? = null
@@ -196,13 +199,27 @@ internal object RecitationCache {
         if (!trimStarted.compareAndSet(false, true)) return
         val app = context.applicationContext
         Thread({
-            dropStaleVerseClips(app)
+            try {
+                dropStaleVerseClips(app)
+            } finally {
+                verseClipsChecked.countDown()
+            }
             dropListenCopiesLocked(app)
             trim(listen(app))
         }, "recitation-cache").apply {
             isDaemon = true
             start()
         }
+    }
+
+    /**
+     * Blocks a download until stale verse clips are gone. Otherwise a chapter
+     * resumed at start-up could write verses, lose the early ones to the drop,
+     * and still be marked downloaded. A no-op before [prepare]; never waits
+     * more than a few seconds.
+     */
+    fun awaitVerseClipCheck() {
+        if (trimStarted.get()) verseClipsChecked.await(5, java.util.concurrent.TimeUnit.SECONDS)
     }
 
     /**

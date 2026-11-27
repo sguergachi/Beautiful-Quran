@@ -58,10 +58,14 @@ private fun bigEndian(value: Int) = byteArrayOf(
  * after it, so verses join sample-exact instead of across ~26 ms of silence.
  */
 internal fun gaplessHeaderFor(clip: VerseClip): ByteArray =
-    gaplessId3Tag(
-        delay = (clip.trimSamples - PLATFORM_MP3_DECODER_DELAY).coerceAtLeast(0),
-        padding = PLATFORM_MP3_DECODER_DELAY,
-    )
+    gaplessId3Tag(delay = verseClipEncoderDelay(clip), padding = PLATFORM_MP3_DECODER_DELAY)
+
+/**
+ * Decoded samples the player trims from the front of [clip] at its start: its
+ * frames before the verse, less what the platform decoder already drops.
+ */
+internal fun verseClipEncoderDelay(clip: VerseClip): Int =
+    (clip.trimSamples - PLATFORM_MP3_DECODER_DELAY).coerceAtLeast(0)
 
 /**
  * One verse as a standalone byte stream: the logic of `VerseClipDataSource`,

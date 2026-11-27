@@ -792,9 +792,16 @@ export class PlayerController {
     startAyah = 1,
     opts: { warm?: boolean; quiet?: boolean } = {},
   ) {
+    const sourcingChanged = Boolean(this.reciter?.rangeSourced) !== Boolean(reciter.rangeSourced)
     this.content = content
     this.reciter = reciter
     this.surahId = content.surah.id
+    // Gapless-5 fetches its URLs itself; a range-sourced verse exists only through the fetch shim.
+    if (reciter.rangeSourced && this.gapless5Enabled) {
+      this.gapless5?.dispose()
+      this.gapless5 = null
+      this.gapless5Enabled = false
+    }
     this.playlist = buildPlaylist(content, reciter, startAyah)
     this.index = 0
     this.basmalahHeard = false
@@ -807,6 +814,8 @@ export class PlayerController {
     this.prefetcher.readAhead(urls, -1) // include index 0 as "next" from -1
     void this.playIndex(0, /*autoplay*/ false, { quiet: opts.quiet === true })
     if (!opts.quiet) this.updateMediaSession()
+    // Back on a reciter Gapless-5 can load: let the preference take effect again.
+    if (sourcingChanged && !reciter.rangeSourced) void this.applyGapless5Transport()
   }
 
   /** Start (or resume) from a specific ayah; optionally skip basmalah. */

@@ -82,8 +82,8 @@ internal const val VERSE_CLIP_FORMAT = 2
 data class VerseClipStamp(val slug: String, val reciterId: Int, val fingerprint: String)
 
 /**
- * A fingerprint per range-sourced reciter over every verse's byte range, lead
- * and source size. The playback cache keys a verse by its URL alone, so audio
+ * A fingerprint per range-sourced reciter over every verse's byte range, lead,
+ * trim and source (URL and size). The playback cache keys a verse by its URL alone, so audio
  * cut by an earlier build (other seams, other ranges) would keep playing after
  * the ranges changed. It must be dropped whenever this changes.
  */
@@ -92,7 +92,7 @@ internal fun readVerseClipStamps(db: SQLiteDatabase): List<VerseClipStamp> {
     db.rawQuery(
         """
         SELECT r.slug, r.id, c.surah_id, c.ayah_number, c.source_bytes, c.start_byte, c.end_byte, c.lead_bytes,
-               c.trim_samples
+               c.trim_samples, c.source_url
         FROM audio_clips c JOIN reciters r ON r.id = c.reciter_id
         ORDER BY r.id, c.surah_id, c.ayah_number
         """.trimIndent(),
@@ -112,7 +112,8 @@ internal fun readVerseClipStamps(db: SQLiteDatabase): List<VerseClipStamp> {
                 digest = java.security.MessageDigest.getInstance("SHA-256")
             }
             // Prefixed with how the stream is served (gapless header), so a change there drops old copies too.
-            val row = "$VERSE_CLIP_FORMAT:" + (2..8).joinToString(":") { cursor.getLong(it).toString() }
+            val row = "$VERSE_CLIP_FORMAT:" + (2..8).joinToString(":") { cursor.getLong(it).toString() } +
+                ":" + cursor.getString(9)
             digest.update("$row\n".toByteArray())
         }
         finish()

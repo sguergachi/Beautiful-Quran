@@ -966,7 +966,9 @@ class TarjiLabViewModel(
                     clipData = ClipData.newRawUri(TarjiLabCodec.fileName(sample), uri)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                context.startActivity(Intent.createChooser(send, "Share Tarjīʿ tuning"))
+                // The application context: the Activity that asked may be gone by now.
+                app.startActivity(Intent.createChooser(send, "Share Tarjīʿ tuning")
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {

@@ -816,6 +816,7 @@ internal object RecitationDownloads {
 
     private suspend fun runQueue(app: android.content.Context) {
         val worker = coroutineContext[Job]
+        RecitationCache.awaitVerseClipCheck()
         val keep = RecitationCache.keep(app)
         val writer = RecitationCache.downloadDataSourceFactory(app, httpFactory(app))
         try {

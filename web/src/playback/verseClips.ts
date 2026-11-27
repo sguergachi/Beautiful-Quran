@@ -13,13 +13,15 @@
  *    sample-exact, then trims both; see `trimSamples`). The browser has no such
  *    trim, so every frame before the verse is silenced ([silenceLead]) and
  *    kept at the front: the verse never opens on a replay of the one before.
- *    Its word clock then runs `trimSamples` early, about 50 ms.
+ *    Its words are then `trimSamples` later in the file than the database
+ *    says, so the repository delays them by [verseClipHeadMs].
  *  - The surah file's total size must be what the range was measured on
  *    (`Content-Range`); a re-encoded upstream file would shift every range, so
  *    the shim fails instead of serving the wrong words.
  */
 
 import { VERSE_CLIP_HOST } from '../data/models'
+import { AUDIO_CACHE, AUDIO_KEEP_CACHE } from './audioPrefetch'
 
 export { VERSE_CLIP_HOST }
 
@@ -172,4 +174,66 @@ export function installVerseClipFetch(lookup: VerseClipLookup, target: typeof gl
 /** For tests: forget that the shim was installed. */
 export function resetVerseClipFetchForTests(): void {
   installed = false
+}
+
+/** How much later than its word times a verse is heard in the browser's copy: the silenced head. */
+export function verseClipHeadMs(clip: VerseClip): number {
+  return (clip.trimSamples * 1000) / SAMPLE_RATE
+}
+
+/**
+ * How the browser's copy is cut from a row. Bump when [fetchVerseClip] serves
+ * other bytes for the same rows, so cached copies of the old cut are dropped.
+ */
+export const VERSE_CLIP_FORMAT = 1
+
+/** A fingerprint of one reciter's verse ranges (cyrb53 over every row, in book order). */
+export function verseClipFingerprint(rows: readonly (readonly [string, VerseClip])[]): string {
+  let h1 = 0xdeadbeef
+  let h2 = 0x41c6ce57
+  const text = [...rows]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([key, c]) =>
+      [VERSE_CLIP_FORMAT, key, c.sourceUrl, c.sourceBytes, c.startByte, c.endByte, c.leadBytes, c.trimSamples].join(':'),
+    )
+    .join('\n')
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i)
+    h1 = Math.imul(h1 ^ ch, 2654435761)
+    h2 = Math.imul(h2 ^ ch, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16)
+}
+
+const STAMP_KEY = (slug: string) => `verse-clip-stamp:${slug}`
+
+/**
+ * Caches key a verse by its URL alone, which says nothing about which bytes
+ * were cut. When a reciter's ranges change, the copies an earlier deploy cached
+ * or downloaded would keep playing the old cut against the new word times, so
+ * they go (Android: `RecitationCache.dropStaleVerseClips`). Never throws.
+ */
+export async function dropStaleVerseClips(
+  fingerprints: ReadonlyMap<string, string>,
+  store: Pick<Storage, 'getItem' | 'setItem'> | undefined = globalThis.localStorage,
+  cacheStorage: CacheStorage | undefined = globalThis.caches,
+): Promise<void> {
+  if (!store || !cacheStorage) return
+  for (const [slug, fingerprint] of fingerprints) {
+    try {
+      if (store.getItem(STAMP_KEY(slug)) === fingerprint) continue
+      const prefix = `https://${VERSE_CLIP_HOST}/data/${slug}/`
+      for (const name of [AUDIO_CACHE, AUDIO_KEEP_CACHE]) {
+        const cache = await cacheStorage.open(name)
+        for (const request of await cache.keys()) {
+          if (request.url.startsWith(prefix)) await cache.delete(request)
+        }
+      }
+      store.setItem(STAMP_KEY(slug), fingerprint)
+    } catch {
+      // Quota, private mode or a closed cache: try again on the next start.
+    }
+  }
 }
