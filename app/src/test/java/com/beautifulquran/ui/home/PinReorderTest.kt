@@ -63,8 +63,9 @@ class PinReorderTest {
     fun reorderingIsOfferedOnlyWhenThereIsAnOrderToChange() {
         assertFalse(showReorderControl(0))
         assertFalse(showReorderControl(1))
-        assertTrue(showReorderControl(2))
-        assertTrue(showReorderControl(9))
+        // Hidden while pin order only orders the band (PinReorderOffered).
+        assertEquals(PinReorderOffered, showReorderControl(2))
+        assertEquals(PinReorderOffered, showReorderControl(9))
     }
 
     @Test

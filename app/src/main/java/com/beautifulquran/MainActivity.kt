@@ -984,26 +984,54 @@ private fun PaperStackApp(
         onAssistantActionConsumed()
     }
 
-    // Autoplay: a chapter that has played out hands on to the next pin in
-    // pin order, then to the book where the finished chapter sits.
+    // Autoplay: a chapter that has played out hands on to the next chapter in
+    // book order.
+    //
+    // A scroll reader that is on screen showing the finished chapter takes the
+    // hand-off itself: the NEXT footer's header flies up, the new chapter
+    // lands, and only then does it start. Everything else — mushaf (which
+    // turns its own page), a reader that is closed, an app in the
+    // background where no frame would ever run the animation — loads at once.
+    var chapterHandOffNext by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    fun handOffByLoad(next: Int) {
+        readerViewModel.load(next, startPlaybackAtAyah = 1, keepContent = true)
+        if (selectedSurahId != 0) {
+            selectedSurahId = next
+            selectedStartAyah = 0
+            selectedStartPlayback = false
+            selectedStartWord = -1
+            selectedStartWords = emptyList()
+            selectedSearchText = null
+        }
+    }
     LaunchedEffect(Unit) {
         app.player.state.map { it.finishedSurahId }.distinctUntilChanged().filterNotNull()
             .collect { finished ->
                 val prefs = app.settings.settings.value
                 if (!prefs.autoplayNextChapter) return@collect
-                val next = chapterAfter(
-                    finished, app.repository.surahs().map { it.id }, prefs.pinnedSurahIds,
-                ) ?: return@collect
-                readerViewModel.load(next, startPlaybackAtAyah = 1, keepContent = true)
-                if (selectedSurahId != 0) {
-                    selectedSurahId = next
-                    selectedStartAyah = 0
-                    selectedStartPlayback = false
-                    selectedStartWord = -1
-                    selectedStartWords = emptyList()
-                    selectedSearchText = null
-                }
+                val next = chapterAfter(finished, app.repository.surahs().map { it.id })
+                    ?: return@collect
+                // Only a reader that is the layer on screen runs the transition:
+                // under Settings or the cover it would play out unseen and hold
+                // the next chapter's start behind it.
+                val readerOnFinished = selectedSurahId == finished &&
+                    kotlin.math.abs(stackPosition.value - AYAH_LAYER) < 0.01f &&
+                    prefs.readingLayout == ReadingLayout.SCROLL &&
+                    lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                if (readerOnFinished) chapterHandOffNext = next else handOffByLoad(next)
             }
+    }
+    // The reader answers in a frame or two (it claims the hand-off, or
+    // declines it); a reader that is not composed answers never, and the
+    // chapter must not wait on it.
+    LaunchedEffect(chapterHandOffNext) {
+        val next = chapterHandOffNext.takeIf { it != 0 } ?: return@LaunchedEffect
+        delay(1_000)
+        if (chapterHandOffNext == next) {
+            chapterHandOffNext = 0
+            handOffByLoad(next)
+        }
     }
 
     fun onWordLongPress(surahId: Int, ayah: Int, wordPosition: Int) {
@@ -1395,6 +1423,14 @@ private fun PaperStackApp(
                         viewModel = readerViewModel,
                         onBack = { animateTo(COVER_LAYER) },
                         onOpenSettings = { animateTo(SETTINGS_LAYER) },
+                        chapterHandOffNext = chapterHandOffNext,
+                        onChapterHandOffClaimed = { chapterHandOffNext = 0 },
+                        // Also after a claim: a transition that fails part-way
+                        // still owes the chapter its start.
+                        onChapterHandOffDeclined = { nextId ->
+                            chapterHandOffNext = 0
+                            handOffByLoad(nextId)
+                        },
                         onOpenNextChapter = { nextId ->
                             // Content is already installed by the reader's
                             // continuous-scroll advance — only sync the sheet id.

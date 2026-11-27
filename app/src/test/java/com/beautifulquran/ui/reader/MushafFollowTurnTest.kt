@@ -367,6 +367,20 @@ class MushafFollowTurnTest {
     }
 
     @Test
+    fun `a chapter handed on to while following turns the page, not jumps`() {
+        // Al-Fatihah ends on leaf 0; al-Baqarah opens on leaf 1.
+        assertTrue(mushafChapterHandOffTurns(0, 1, followingVoice = true))
+        assertTrue(mushafChapterHandOffTurns(300, 298, followingVoice = true))
+    }
+
+    @Test
+    fun `a chapter hand-off keeps the jump when it is far, the same leaf, or unfollowed`() {
+        assertFalse(mushafChapterHandOffTurns(603, 0, followingVoice = true))
+        assertFalse(mushafChapterHandOffTurns(5, 5, followingVoice = true))
+        assertFalse(mushafChapterHandOffTurns(0, 1, followingVoice = false))
+    }
+
+    @Test
     fun `a delayed turn cannot be inherited by another word or seek`() {
         val expected = ActiveWord(
             ayah = 77,

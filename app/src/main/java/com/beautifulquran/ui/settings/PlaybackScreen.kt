@@ -94,7 +94,7 @@ internal fun PlaybackPage(
                 checkParams = checkParams,
                 checkPaintToken = checkPaintToken,
             )
-            Caption("Pins play in your order, then the book carries on.")
+            Caption("When a chapter ends, the next one in the book begins.")
 
             Spacer(Modifier.height(36.dp))
             ToggleRow(
