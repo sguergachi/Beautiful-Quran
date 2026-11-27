@@ -43,10 +43,19 @@ internal fun seatAt(center: Float, seats: List<PinSeat>): Int? {
 }
 
 /**
+ * Reordering the band is hidden. Pin order used to be the Play-on queue; it
+ * now only orders the band, so the control that set it is put away rather
+ * than deleted (the rules, grips and drag all remain and are tested). Turn
+ * this on to bring the band's reorder button and grips back.
+ */
+internal const val PinReorderOffered = false
+
+/**
  * Whether the band's head offers reordering: the grips stay out of sight
  * until they are asked for, and one pinned chapter has no order to change.
  */
-internal fun showReorderControl(pinnedCount: Int): Boolean = pinnedCount >= 2
+internal fun showReorderControl(pinnedCount: Int): Boolean =
+    PinReorderOffered && pinnedCount >= 2
 
 /**
  * A pin order the list may adopt: only a rearrangement of the pins already

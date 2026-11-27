@@ -7,29 +7,17 @@ the same reciter.
 
 ## Which chapter is next
 
-The pinned chapters are a playlist first: **a pinned chapter hands to the
-next pin in pin order**. Pins are stored in pin order
-(`Settings.pinnedSurahIds` is a list) and the green band shows them in that
-order, so the order is never hidden. A new pin lands at the foot of the
-band. Installs from before pins had an order keep book order.
+The next chapter **in book order**, always. Pinning does not change it. (Pins
+once formed a playlist — a pinned chapter handed to the next pin — but the
+chapter that played next stopped matching the one the reader's NEXT footer and
+the book named, and it was taken out.) The book's own end is the end:
+playback stops after chapter 114.
 
-- The last pinned chapter hands on to **the book where it sits**: the next
-  chapter in book order after it, skipping anything pinned (the band plays
-  those in its own turn). A pinned chapter is never replayed from the list.
-- The book's own end is the end: playback stops as it always did — unless
-  the final chapter (114) is pinned, in which case it wraps to the top of
-  the book.
-- Search does not change the queue; it follows the full page, not a filter.
+The reader's NEXT footer and the page turn past a chapter's end follow the
+same rule.
 
 Pure rule: `chapterAfter` in `playback/ChapterOrder.kt` (tested in
 `ChapterOrderTest`).
-
-The reader's NEXT footer (and the page turn past a chapter's end) follows
-the same queue for a pinned chapter: its NEXT is the next pin, then the book
-where the last pin sits (`readerNextChapter`). An unpinned chapter's NEXT
-stays the book's next chapter, so reading straight through the book never
-skips a chapter. Play-on from an unpinned chapter skips pinned ones instead;
-the two differ only there.
 
 ## How it fires
 
@@ -48,14 +36,20 @@ range or single-ayah loop (those never reach `STATE_ENDED`), a playback error.
 - Autoplay is driven from the activity's view model. If Android destroys the
   activity while audio is still playing (swiped away from recents), the chapter
   finishes and playback stops there.
-- The hand-off swaps the chapter in place (outgoing text stays on the glass
-  until the new one is ready). It does not yet reuse the NEXT footer's flying
-  chapter header.
+- In the **scroll** reader, with the app in the foreground on the finished
+  chapter, the hand-off runs the NEXT footer's own transition (the list's end
+  scrolls into view, the next chapter's header flies up, the verses rise in)
+  and the next chapter starts only once it has landed. If the reader cannot
+  take it (closed, backgrounded, another chapter on screen, no answer within
+  a second) the chapter simply loads at once.
+- In the **mushaf**, the hand-off turns the page (`chapterTurnLeaf`) when the
+  next chapter opens within two leaves of the reader's, instead of jumping, and
+  keeps follow on.
 - Android only. The web port does not have the setting yet.
 
 ## Keeping the pins (hold to pin, grip to carry)
 
-Because pin order is the queue, pins are managed on Home (`ui/home/PinReorder.kt`
+Pin order only orders the green band now (it no longer sets what plays next). Pins are managed on Home (`ui/home/PinReorder.kt`
 holds the rules, `holdToPin` and `ReorderHandle` in `HomeScreen.kt` the hands).
 Swiping a row to pin it was tried and dropped: horizontal swipes belong to
 moving between screens.
@@ -65,7 +59,8 @@ moving between screens.
 - **Hold the Continue pill** to pin (or unpin) the chapter it names, without
   scrolling to its row. Same gesture and ink; a tap still continues listening.
   Android only for now.
-- **Reorder from the band's head.** The grips stick out, so they stay put
+- **Reorder from the band's head** *(hidden for now — `PinReorderOffered = false`
+  in `PinReorder.kt`, since pin order no longer sets what plays next)*. The grips stick out, so they stay put
   away: the PINNED flag carries an icon-only button (up and down arrows,
   on the quiet ink rung secondary buttons use) at its right end, shown
   once two chapters are pinned. Tapping it brings every pinned row's grip

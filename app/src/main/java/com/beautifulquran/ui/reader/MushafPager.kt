@@ -248,6 +248,13 @@ internal fun MushafPager(
     /** A transport command starts its swipe before Media3 reports the new word. */
     transportTarget: ReaderInteraction.MushafPlayTarget? = null,
     onTransportTargetShown: (ReaderInteraction.MushafPlayTarget) -> Unit = {},
+    /**
+     * 0-based leaf a chapter hand-off turns to: the next chapter's opening,
+     * reached by the same turn playback makes inside a chapter rather than a
+     * jump. Taken as the pager's own move so follow stays on across it.
+     */
+    chapterTurnLeaf: Int? = null,
+    onChapterTurnShown: (Int) -> Unit = {},
     flashAyah: Int?,
     flashWordPosition: Int?,
     flashWordPositions: Set<Int>,
@@ -386,6 +393,19 @@ internal fun MushafPager(
             pagerState.animateScrollToPage(index, animationSpec = MushafFollowTurnSpec)
         } finally {
             onTransportTargetShown(target)
+        }
+    }
+    LaunchedEffect(chapterTurnLeaf) {
+        val index = chapterTurnLeaf ?: return@LaunchedEffect
+        // The turn is follow's own: followPage is set before the paper moves,
+        // so the settle watcher below does not read it as the reader turning
+        // away and switch follow off for the whole of the next chapter.
+        followPage = index
+        waitingPage = index + 1
+        try {
+            pagerState.animateScrollToPage(index, animationSpec = MushafFollowTurnSpec)
+        } finally {
+            onChapterTurnShown(index)
         }
     }
     // heldPage is read, not keyed: keying it restarted this collector on

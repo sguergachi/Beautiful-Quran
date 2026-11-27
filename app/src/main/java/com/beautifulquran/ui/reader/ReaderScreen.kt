@@ -165,6 +165,9 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -255,6 +258,14 @@ fun ReaderScreen(
     viewModel: ReaderViewModel,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
+    /**
+     * The chapter autoplay is handing on to, or 0. The reader answers with
+     * [onChapterHandOffClaimed] when it runs the NEXT-footer transition itself,
+     * or [onChapterHandOffDeclined] when it cannot (the caller then just loads).
+     */
+    chapterHandOffNext: Int = 0,
+    onChapterHandOffClaimed: () -> Unit = {},
+    onChapterHandOffDeclined: (nextId: Int) -> Unit = {},
     /** Opens the following chapter from the end-of-chapter footer. */
     onOpenNextChapter: (surahId: Int) -> Unit = {},
     /** Opens the previous chapter from a top-of-chapter overscroll pull. */
@@ -514,18 +525,6 @@ fun ReaderScreen(
     // and then fades in, which read as the whole screen flashing out and
     // back when play loaded another chapter.
     val activityContext = LocalContext.current
-    LaunchedEffect(mushafOpeningPage) {
-        val page = mushafOpeningPage ?: return@LaunchedEffect
-        if (mushafPagerState.currentPage == page) return@LaunchedEffect
-        val catalog = mushafCatalog ?: return@LaunchedEffect
-        withContext(Dispatchers.Default) {
-            MushafQcfFonts.preload(
-                activityContext,
-                mushafFontPreloadPages(page, catalog.pageCount),
-            )
-        }
-        mushafPagerState.scrollToPage(page)
-    }
     val bookmarkedAyahs by viewModel.bookmarkedAyahs.collectAsStateWithLifecycle()
     // Like bookmarkedAyahs: read per-ayah so a note change recomposes only
     // that one block.
@@ -1287,6 +1286,56 @@ fun ReaderScreen(
     val labFocusEnabled = InkEngine.focusEngineEnabled
     val followPlayback =
         ReaderInteraction.shouldFollowPlayback(interaction) && labFocusEnabled
+    // The chapter the voice is leaving, read before the content swaps: a
+    // chapter that plays out hands on to the next while the reader follows it,
+    // and that arrival is a page turn, not a jump.
+    val leavingSurahId = rememberUpdatedState(renderedSurahId)
+    // A chapter that has played out has no now-playing at all (the player
+    // clears it on STATE_ENDED), so the voice that was following is named by
+    // the chapter that just finished, remembered until the hand-off uses it.
+    var finishedSurahSeen by remember { mutableIntStateOf(0) }
+    LaunchedEffect(playerState.finishedSurahId, playerState.nowPlaying?.surahId) {
+        val finished = playerState.finishedSurahId
+        val playing = playerState.nowPlaying?.surahId
+        when {
+            // Only a hand-off turns for a finished voice; with Play on off a
+            // finished chapter is just a chapter, and nothing is following it.
+            finished != null && settings.autoplayNextChapter -> finishedSurahSeen = finished
+            // New playback has begun: the finished voice is history.
+            playing != null && playing != finishedSurahSeen -> finishedSurahSeen = 0
+        }
+    }
+    val followingVoiceNow = rememberUpdatedState(
+        followPlayback && (
+            playerState.nowPlaying?.surahId.let { it == renderedSurahId || it == surahId } ||
+                finishedSurahSeen == renderedSurahId
+            ),
+    )
+    var mushafChapterTurnLeaf by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(mushafOpeningPage) {
+        val page = mushafOpeningPage ?: return@LaunchedEffect
+        if (mushafPagerState.currentPage == page) return@LaunchedEffect
+        val catalog = mushafCatalog ?: return@LaunchedEffect
+        // Whether this is a chapter change under a following reader is read
+        // before the content can swap; whether the turn is still wanted is
+        // asked again after the font wait, below.
+        val chapterChanged = mushafMode && leavingSurahId.value != surahId
+        withContext(Dispatchers.Default) {
+            MushafQcfFonts.preload(
+                activityContext,
+                mushafFontPreloadPages(page, catalog.pageCount),
+            )
+        }
+        val handOff = chapterChanged &&
+            mushafPagerState.currentPage != page &&
+            mushafChapterHandOffTurns(
+                currentLeafIndex = mushafPagerState.currentPage,
+                targetLeafIndex = page,
+                followingVoice = followingVoiceNow.value,
+            )
+        finishedSurahSeen = 0
+        if (handOff) mushafChapterTurnLeaf = page else mushafPagerState.scrollToPage(page)
+    }
     // Each layout hands the other the location under the reader. Without this,
     // switching to the mushaf reopened the route's original leaf, while
     // switching back exposed the hidden list's stale position.
@@ -2306,12 +2355,23 @@ fun ReaderScreen(
             }
         }
 
-        fun advanceToNextChapter(nextId: Int) {
-            if (chapterAdvancing) return
-            val next = uiState.nextSurah?.takeIf { it.id == nextId } ?: return
+        fun advanceToNextChapter(nextId: Int, playOnArrival: Boolean = false) {
+            if (chapterAdvancing) {
+                if (playOnArrival) onChapterHandOffDeclined(nextId)
+                return
+            }
+            val next = uiState.nextSurah?.takeIf { it.id == nextId } ?: run {
+                if (playOnArrival) onChapterHandOffDeclined(nextId)
+                return
+            }
             // Pointer release and pre-fling may arrive before the next frame.
             chapterAdvancing = true
             scope.launch {
+                // Autoplay's hand-off owes the next chapter its start; if this
+                // coroutine ends before it has been given (the reader closed
+                // mid-flight), the caller loads it instead.
+                var handedOn = false
+                try {
                 // Pin the top-nav title while we still have the previous surah
                 // (user is usually past the header at the chapter end).
                 val prev = uiState.content?.surah
@@ -2346,6 +2406,7 @@ fun ReaderScreen(
                     nextChapterPull = 0f
                     headerMorph.snapTo(0f)
                     chapterAdvancing = false
+                    if (playOnArrival) { handedOn = true; onChapterHandOffDeclined(nextId) }
                     return@launch
                 }
 
@@ -2411,6 +2472,13 @@ fun ReaderScreen(
                 chapterAdvancing = false
                 // Top-nav pin has finished fading (or was never set).
                 pinnedTopNavTitle = null
+                // Autoplay's hand-off: the chapter has arrived, so it starts —
+                // with its basmalah, following the voice from the first word.
+                if (playOnArrival) {
+                    handedOn = true
+                    dispatch(ReaderInteractionEvent.EnableFollow)
+                    viewModel.playFromAyahWord(1, null)
+                }
 
                 // Verses fade and rise in as soon as the header has landed.
                 if (verseRevealForSurah != nextId) return@launch
@@ -2423,6 +2491,49 @@ fun ReaderScreen(
                 )
                 if (verseRevealForSurah == nextId) {
                     verseRevealForSurah = 0
+                }
+                } finally {
+                    if (playOnArrival && !handedOn) {
+                        chapterAdvancing = false
+                        onChapterHandOffDeclined(nextId)
+                    }
+                }
+            }
+        }
+
+        // Autoplay reached the end of this chapter: take the same transition
+        // a pull takes, and start the next chapter once it has landed.
+        LaunchedEffect(chapterHandOffNext) {
+            val nextId = chapterHandOffNext.takeIf { it != 0 } ?: return@LaunchedEffect
+            if (content.surah.id == nextId || uiState.nextSurah?.id != nextId || chapterAdvancing) {
+                onChapterHandOffDeclined(nextId)
+                return@LaunchedEffect
+            }
+            // Claiming clears the request, which is this effect's own key and
+            // cancels it: the transition runs in the screen's scope instead.
+            onChapterHandOffClaimed()
+            scope.launch {
+                // Once claimed, the chapter is owed its start however this
+                // ends: a hand that stops the scroll must not strand playback,
+                // and neither may the reader leaving before the flight begins.
+                var started = false
+                try {
+                    // The footer's opening is what the header flies up from, so
+                    // it has to be on the glass: bring the list's end into view.
+                    if (listState.canScrollForward) {
+                        try {
+                            listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                        } catch (e: CancellationException) {
+                            // A touch took the list; only the scope ending stops us.
+                            coroutineContext.ensureActive()
+                        }
+                        withFrameNanos { }
+                        withFrameNanos { }
+                    }
+                    started = true
+                    advanceToNextChapter(nextId, playOnArrival = true)
+                } finally {
+                    if (!started) onChapterHandOffDeclined(nextId)
                 }
             }
         }
@@ -3107,6 +3218,10 @@ fun ReaderScreen(
                         searchFocusActive = searchFocusActive,
                         heldPage = mushafTappedPage,
                         onTappedLeaf = { mushafTappedPage = it },
+                        chapterTurnLeaf = mushafChapterTurnLeaf,
+                        onChapterTurnShown = { shown ->
+                            if (mushafChapterTurnLeaf == shown) mushafChapterTurnLeaf = null
+                        },
                         transportTarget = mushafTransportTarget,
                         onTransportTargetShown = { target ->
                             if (mushafTransportTarget == target) mushafTransportTarget = null

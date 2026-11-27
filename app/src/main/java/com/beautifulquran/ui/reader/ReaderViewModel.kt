@@ -48,7 +48,7 @@ import com.beautifulquran.domain.surahOpensWithBasmalahPreface
 import com.beautifulquran.playback.NowPlaying
 import com.beautifulquran.playback.PlayerController
 import com.beautifulquran.playback.PlayerUiState
-import com.beautifulquran.playback.readerNextChapter
+import com.beautifulquran.playback.chapterAfter
 import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -1028,11 +1028,8 @@ class ReaderViewModel(
         val loadedTimings = timingsWithBasmalahLeadIn(reciter.id, surahId)
         val content = repository.surahContent(surahId)
         val surahs = repository.surahs()
-        // A pinned chapter's NEXT is the next pin (chapterAfter's queue);
-        // any other chapter keeps the book's next.
-        val nextId = readerNextChapter(
-            surahId, surahs.map { it.id }, settings.settings.value.pinnedSurahIds,
-        )
+        // NEXT is the book's next chapter, the same one Play on hands to.
+        val nextId = chapterAfter(surahId, surahs.map { it.id })
         val nextSurah = surahs.firstOrNull { it.id == nextId }
         val previousSurah = surahs.firstOrNull { it.id == surahId - 1 }
         return freshenPreparedTimings(PreparedSurah(

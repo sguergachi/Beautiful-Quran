@@ -411,6 +411,27 @@ internal fun mushafLeadTurnHoldsPager(
     visiblePage == waitingPage &&
     voicePage == waitingPage - 1
 
+/** Leaves a chapter hand-off will turn across; further is a jump, not a turn. */
+internal const val MushafHandOffTurnReach = 2
+
+/**
+ * Whether the reader opening another chapter turns the paper to it (true) or
+ * jumps there (false). A chapter that plays out hands on to the next one while
+ * the reader is following the voice: the reader is looking at the last leaf of
+ * the chapter just finished and the next chapter opens a leaf or two on, so the
+ * paper turns exactly as it does inside a chapter. Anything further — a pin
+ * playlist's far chapter, the book wrapping round — is a different place, and
+ * turning across hundreds of leaves would be a long flicker, not a page.
+ * [followingVoice] is false for a reader who has turned away by hand: their
+ * paper is theirs and a chapter change under them is a jump as ever.
+ */
+internal fun mushafChapterHandOffTurns(
+    currentLeafIndex: Int,
+    targetLeafIndex: Int,
+    followingVoice: Boolean,
+): Boolean = followingVoice &&
+    kotlin.math.abs(targetLeafIndex - currentLeafIndex) in 1..MushafHandOffTurnReach
+
 /**
  * Follow may pull the paper only while the leaf in view is the one it last
  * aimed at. A swipe lands on a different leaf; catching up to the voice from
