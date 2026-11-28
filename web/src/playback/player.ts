@@ -37,6 +37,7 @@ import { PlaybackStallWatchdog } from './playbackStallWatchdog'
 import { peekPlaylistNextIndex } from './playlistNext'
 import { MediaSessionBridge, browserMediaSession } from './mediaSessionBridge'
 import { wantsGapless5Transport } from './gaplessPolicy'
+import { isVerseClipUrl } from './verseClips'
 import { buildPlaylist, type PlaylistItem } from './playlistPlan'
 import { PLAYBACK_MESSAGES, describePlaybackError } from './playbackErrors'
 import { verseGapFollows } from './verseGap'
@@ -336,7 +337,8 @@ export class PlayerController {
 
   private async applyGapless5TransportLocked(): Promise<void> {
     // Re-evaluate after waiting in the queue — a later setSpeed may have run.
-    const enabled = wantsGapless5Transport(
+    // Gapless-5 loads remote HTTPS URLs itself; a range-sourced verse only exists as a fetched blob.
+    const enabled = !this.reciter?.rangeSourced && wantsGapless5Transport(
       this.gapless5Preferred,
       this.state.speed,
       this.verseGapMs,
@@ -790,9 +792,16 @@ export class PlayerController {
     startAyah = 1,
     opts: { warm?: boolean; quiet?: boolean } = {},
   ) {
+    const sourcingChanged = Boolean(this.reciter?.rangeSourced) !== Boolean(reciter.rangeSourced)
     this.content = content
     this.reciter = reciter
     this.surahId = content.surah.id
+    // Gapless-5 fetches its URLs itself; a range-sourced verse exists only through the fetch shim.
+    if (reciter.rangeSourced && this.gapless5Enabled) {
+      this.gapless5?.dispose()
+      this.gapless5 = null
+      this.gapless5Enabled = false
+    }
     this.playlist = buildPlaylist(content, reciter, startAyah)
     this.index = 0
     this.basmalahHeard = false
@@ -805,6 +814,8 @@ export class PlayerController {
     this.prefetcher.readAhead(urls, -1) // include index 0 as "next" from -1
     void this.playIndex(0, /*autoplay*/ false, { quiet: opts.quiet === true })
     if (!opts.quiet) this.updateMediaSession()
+    // Back on a reciter Gapless-5 can load: let the preference take effect again.
+    if (sourcingChanged && !reciter.rangeSourced) void this.applyGapless5Transport()
   }
 
   /** Start (or resume) from a specific ayah; optionally skip basmalah. */
@@ -966,7 +977,8 @@ export class PlayerController {
       this.setBuffering(true)
     }
     // Quiet open: prefer the resolved source immediately; warm in background.
-    const warmedSrc = quiet
+    // A range-sourced verse has no playable remote URL: it must be fetched (and cut) first.
+    const warmedSrc = quiet && !isVerseClipUrl(item.url)
       ? this.prefetcher.resolveSrc(item.url)
       : (await this.prefetcher.ensure(item.url)) ?? this.prefetcher.resolveSrc(item.url)
     if (token !== this.playToken) return
@@ -980,7 +992,7 @@ export class PlayerController {
     // iOS gets one persistent media element and an ordinary HTTPS source.
     // The read-ahead fetch above warms the browser HTTP cache, while avoiding
     // WebKit's fragile blob-media and multi-element playback paths.
-    const src = this.transport.singleElement ? item.url : warmedSrc
+    const src = this.transport.singleElement && !isVerseClipUrl(item.url) ? item.url : warmedSrc
 
     // Only suppress the pause→isPlaying:false sync when we intend to keep
     // playing after the src swap. Quiet loads (openSurah) must still clear it.

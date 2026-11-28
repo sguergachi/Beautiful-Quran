@@ -79,7 +79,9 @@ step and froze the clock through short word 1 (both words lit when settle ended
 on word 2). Neither lag nor lead is baked into `HighlightEngine`.
 
 **Reciter calibration.** `ReciterSync` adds a 200 ms word-only lead for Yasser
-Al-Dosari, whose source-aligned wash was ear-verified that far behind the voice.
+Al-Dosari, whose source-aligned wash was ear-verified that far behind the voice,
+and 100 ms for Tawfeek As-Sawaigh, whose self-aligned wash was heard that far behind
+(CTC marks a letter's surest frame, a little inside its sound).
 It uses the same opening ramp as the Ink Lab lead, so short first words remain
 visible instead of being skipped. Timing rows, ayah handoff, basmalah wash, and
 every other reciter stay on their existing clocks. Android and web share the

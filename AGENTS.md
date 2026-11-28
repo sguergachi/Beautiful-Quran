@@ -82,6 +82,8 @@ tools/timing_overrides/ Local timing-report scratch; CI rejects committed JSON
 tools/timing_patch_cases/ Unit tests for systematic cleaner / span-protect fixes
 tools/timing_repairs/   CTC auto-repairs rebased onto current source timing
 tools/audio_onsets/     Generated leading-silence evidence from everyayah audio
+tools/reciter_align/    Generic CTC word alignment of whole-surah audio (any reciter); see its README
+tools/build_tawfeek_verse_index.py  Cuts Tawfeek's surah MP3s into per-verse byte ranges (audio_clips)
 tools/detect_audio_onsets.py  Opening-range scanner that regenerates that evidence
 scripts/                Linux emulator setup / run helpers
 docs/                   Architecture, design language, performance, timings docs

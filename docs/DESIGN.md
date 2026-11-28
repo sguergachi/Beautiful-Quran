@@ -1979,7 +1979,7 @@ leaves in the physical paper stack. Their rows turn to the requested detail leaf
 the back chevron or a rightward swipe returns to main Settings while leaving
 that detail underneath for a forward swipe to reopen. Main Settings
 shows only favorite voices, unselected ones on the `secondary` ink rung (live
-choices, never a disabled-looking fade), then a "Show all 13 reciters" link in
+choices, never a disabled-looking fade), then a "Show all N reciters" link in
 Home search's "Show N more" voice (sans labelLarge) in quiet `muted` ink —
 green text would compete with the selected voice's nuqta — started in the
 names' column and followed directly by the page rows' chevron (not at the right

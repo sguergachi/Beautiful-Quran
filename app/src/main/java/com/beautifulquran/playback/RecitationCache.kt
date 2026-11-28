@@ -12,6 +12,7 @@ import androidx.media3.datasource.cache.ContentMetadata
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.NoOpCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
+import com.beautifulquran.data.verseClipKeys
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -35,6 +36,9 @@ internal object RecitationCache {
     const val MAX_BYTES = 1024L * 1024 * 1024
 
     private val trimStarted = AtomicBoolean(false)
+
+    /** Opens once [prepare]'s stale verse-clip check has run (see [awaitVerseClipCheck]). */
+    private val verseClipsChecked = java.util.concurrent.CountDownLatch(1)
     private val relocated = AtomicBoolean(false)
     private val lock = Any()
     private var db: StandaloneDatabaseProvider? = null
@@ -195,11 +199,55 @@ internal object RecitationCache {
         if (!trimStarted.compareAndSet(false, true)) return
         val app = context.applicationContext
         Thread({
+            try {
+                dropStaleVerseClips(app)
+            } finally {
+                verseClipsChecked.countDown()
+            }
             dropListenCopiesLocked(app)
             trim(listen(app))
         }, "recitation-cache").apply {
             isDaemon = true
             start()
+        }
+    }
+
+    /**
+     * Blocks a download until stale verse clips are gone. Otherwise a chapter
+     * resumed at start-up could write verses, lose the early ones to the drop,
+     * and still be marked downloaded. A no-op before [prepare]; never waits
+     * more than a few seconds.
+     */
+    fun awaitVerseClipCheck() {
+        if (trimStarted.get()) verseClipsChecked.await(5, java.util.concurrent.TimeUnit.SECONDS)
+    }
+
+    /**
+     * Verses of a range-sourced reciter are cached under their URL, which says
+     * nothing about which bytes were cut. When the ranges change (a better seam,
+     * a re-measured recording) or were never recorded, the copies cached by an
+     * earlier build would keep playing the old cut, so they go, with the marks
+     * that claimed them downloaded. Fresh copies stream from the recording.
+     */
+    private fun dropStaleVerseClips(app: Context) {
+        try {
+            val repository = (app as com.beautifulquran.QuranApp).repository
+            val dir = File(app.noBackupFilesDir, "verse-clip-stamps").also { it.mkdirs() }
+            for (stamp in repository.verseClipStamps()) {
+                val file = File(dir, stamp.slug)
+                if (file.takeIf { it.isFile }?.readText() == stamp.fingerprint) continue
+                synchronized(lock) {
+                    val listen = listen(app)
+                    val keep = keep(app)
+                    for (key in verseClipKeys(listen.keys, stamp.slug)) listen.removeResource(key)
+                    val kept = verseClipKeys(keep.keys, stamp.slug)
+                    for (key in kept) keep.removeResource(key)
+                    if (kept.isNotEmpty()) unmarkKeptReciter(app, stamp.reciterId)
+                }
+                file.writeText(stamp.fingerprint)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("RecitationCache", "Could not check cached verse clips", e)
         }
     }
 

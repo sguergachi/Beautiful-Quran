@@ -119,6 +119,11 @@ QCF_V2_FIRST_CODEPOINT = 0xFC41
 # id, everyayah slug (audio dir + timing file key), display name, style
 YASSER_RECITER_ID = 9
 YASSER_SLUG = "Yasser_Ad-Dussary_128kbps"
+# Tawfeek As-Sawaigh is not on EveryAyah. The app streams each verse as a byte range of
+# his public whole-surah MP3 (tools/build_tawfeek_verse_index.py), and his word times
+# come from our own alignment of those recordings (tools/reciter_align).
+TAWFEEK_RECITER_ID = 20
+TAWFEEK_SLUG = "Tawfeek_As-Sawaigh_128kbps"
 RECITERS = [
     (1, "Alafasy_128kbps", "Mishary Rashid Alafasy", "Murattal"),
     (2, "Husary_64kbps", "Mahmoud Khalil Al-Husary", "Murattal"),
@@ -133,6 +138,7 @@ RECITERS = [
     (17, "Husary_Muallim_128kbps", "Mahmoud Khalil Al-Husary", "Muallim"),
     (18, "Minshawy_Mujawwad_192kbps", "Mohamed Siddiq El-Minshawi", "Mujawwad"),
     (19, "Mohammad_al_Tablaway_128kbps", "Mohammad Mahmoud Al-Tablawi", "Mujawwad"),
+    (TAWFEEK_RECITER_ID, TAWFEEK_SLUG, "Tawfeek As-Sawaigh", "Murattal"),
 ]
 
 QURAN_ALIGN_ADDITIONS = {14, 16, 17, 18, 19}
@@ -143,6 +149,12 @@ YASSER_QUA_URL = (
 YASSER_QUA_SHA256 = "02d269a409cb1cb2ddf5c1cdd0f5e8919cafb3e8f1386679aabb3acf27c0880a"
 YASSER_CLOCK_FILE = (
     Path(__file__).resolve().parent / "timing_sources" / "yasser-everyayah-clock.json"
+)
+TAWFEEK_ALIGNMENT_FILE = (
+    Path(__file__).resolve().parent / "timing_sources" / "tawfeek-alignment.json.gz"
+)
+TAWFEEK_INDEX_FILE = (
+    Path(__file__).resolve().parent / "timing_sources" / "tawfeek-verse-index.json"
 )
 YASSER_SUPPLEMENTS = {
     (1, 1): [[1, 282, 764], [2, 764, 1428], [3, 1428, 2353], [4, 2353, 3017]],
@@ -1915,6 +1927,112 @@ def load_qua_timings(zip_path, word_counts, word_text, audio_durations):
     return rows
 
 
+def load_tawfeek_index(path=TAWFEEK_INDEX_FILE):
+    """Load how each Tawfeek verse is cut from his surah recording.
+
+    Every verse is a byte range of one public surah MP3 (see
+    tools/build_tawfeek_verse_index.py): `originSamples` and `durationSamples` are
+    where the heard verse begins in the recording and how long it is (its word
+    times' clock), `leadBytes` is the reservoir-only prefix the player silences,
+    and `trimSamples` how much decoded audio precedes the verse, which the
+    player drops so verses join sample-exact.
+    """
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        clips = {
+            tuple(map(int, key.split(":"))): {
+                name: int(clip[name])
+                for name in (
+                    "surah", "startByte", "endByte", "originSamples",
+                    "durationSamples", "leadBytes", "trimSamples",
+                )
+            }
+            for key, clip in payload["clips"].items()
+        }
+        sources = {int(k): v for k, v in payload["sources"].items()}
+        template = payload["sourceUrlTemplate"]
+    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+        raise SystemExit(f"invalid Tawfeek verse index: {e}") from e
+    if (payload.get("schema") != 3 or payload.get("reciterSlug") != TAWFEEK_SLUG
+            or payload.get("sampleRateHz") != 44_100
+            or payload.get("samplesPerFrame") != 1_152
+            or len(clips) != 6_236 or len(sources) != 114):
+        raise SystemExit("unsupported Tawfeek verse index")
+    if payload.get("alignment", {}).get("sha256") != hashlib.sha256(
+            TAWFEEK_ALIGNMENT_FILE.read_bytes()).hexdigest():
+        raise SystemExit("Tawfeek verse index was cut from a different alignment; rebuild it")
+    for key, clip in clips.items():
+        source = sources[key[0]]
+        if (clip["surah"] != key[0] or not 0 <= clip["leadBytes"] < clip["endByte"] - clip["startByte"]
+                or clip["endByte"] > source["audioBytes"]
+                or not 1_152 <= clip["trimSamples"] <= 4_095 or clip["trimSamples"] % 1_152):
+            raise SystemExit(f"Tawfeek verse {key} falls outside its source recording")
+    return clips, sources, template
+
+
+def tawfeek_audio_clip_rows(path=TAWFEEK_INDEX_FILE):
+    """audio_clips rows: where the app streams each Tawfeek verse from."""
+    clips, sources, template = load_tawfeek_index(path)
+    return [
+        (
+            TAWFEEK_RECITER_ID, surah, ayah, template.format(surah=surah),
+            sources[surah]["bytes"], clip["startByte"], clip["endByte"], clip["leadBytes"],
+            clip["trimSamples"],
+        )
+        for (surah, ayah), clip in sorted(clips.items())
+    ]
+
+
+def load_tawfeek_timings(word_counts, path=TAWFEEK_ALIGNMENT_FILE):
+    """Word times for every Tawfeek verse clip, from our own alignment of his recordings.
+
+    The alignment (tools/reciter_align) gives each word's time in the whole-surah
+    recording. A slice's clock is a pure function of the cut (the verse index
+    records where every slice begins in the recording), so each time lands at
+    `time - origin` with no audio matching. Every occurrence of the verse inside
+    the clip stays, in the order spoken: a re-recited phrase is a second pass over
+    the same positions. A verse that does not cover all its words fails the
+    build rather than shipping a partial row.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from reciter_align import artifact as alignment
+
+    aligned = alignment.load(path)
+    if aligned["reciter"] != TAWFEEK_SLUG:
+        raise SystemExit(f"{path.name} aligns {aligned['reciter']}, not {TAWFEEK_SLUG}")
+    clock, sources, _ = load_tawfeek_index()
+    for surah, source in sources.items():
+        pinned = aligned["sources"][str(surah)]
+        if (pinned["sha256"], pinned["bytes"]) != (source["sha256"], source["bytes"]):
+            raise SystemExit(f"Tawfeek alignment of surah {surah} is for a different recording")
+    if set(clock) != set(word_counts):
+        raise SystemExit("Tawfeek verse index does not cover every verse")
+    runs = {}
+    for surah_text, record in aligned["surahs"].items():
+        for run in record["runs"]:
+            runs.setdefault((int(surah_text), run["ayah"]), []).append((record, run))
+    rows, bad = {}, []
+    for key, n_words in word_counts.items():
+        origin = round(clock[key]["originSamples"] * 1000 / 44_100)
+        duration = clock[key]["durationSamples"] * 1000 // 44_100
+        selected, last_start = [], -1
+        for record, run in sorted(runs.get(key, []), key=lambda item: item[1]["first"]):
+            words = record["words"][run["first"]:run["last"] + 1]
+            for i, (_ayah, pos, start, _end, _score) in enumerate(words):
+                start = max(start - origin, last_start + 1)  # starts strictly increase
+                last_start = start
+                after = words[i + 1][2] - origin if i + 1 < len(words) else run["offsetMs"] - origin
+                selected.append([pos, start, min(duration, max(start + 1, after))])
+        segments = sanitize_timing_row(trim_to_next_start(selected)) if selected else None
+        if segments and _covers_all_words(segments, n_words):
+            rows[key] = segments
+        else:
+            bad.append(key)
+    if bad:
+        raise SystemExit(f"incomplete Tawfeek alignment: {bad[:5]} ({len(bad)})")
+    return rows
+
+
 def append_new_reciter_timings(
     timing_rows,
     word_counts,
@@ -1925,8 +2043,12 @@ def append_new_reciter_timings(
     """Complete source-locked corpora, optionally rebuilding Yasser from QUA."""
     # Yasser's source is deterministic and inexpensive to rebase, so rebuild
     # it even when an earlier source-clock import exists in the preserved DB.
+    # Tawfeek's alignment is committed in this repo and rebuilt the same way.
     if include_yasser_qua:
-        timing_rows = [row for row in timing_rows if row[0] != YASSER_RECITER_ID]
+        timing_rows = [
+            row for row in timing_rows
+            if row[0] not in (YASSER_RECITER_ID, TAWFEEK_RECITER_ID)
+        ]
     expected = set(word_counts)
     existing = {}
     for rid, surah, ayah, _segments in timing_rows:
@@ -1941,11 +2063,13 @@ def append_new_reciter_timings(
         verify_source(alignment_zip, ALIGN_ZIP_SHA256, "quran-align release")
 
     for rid, slug, _name, _style in RECITERS:
-        if rid == YASSER_RECITER_ID and not include_yasser_qua:
+        if rid in (YASSER_RECITER_ID, TAWFEEK_RECITER_ID) and not include_yasser_qua:
             continue
-        if rid not in wanted_align and rid != YASSER_RECITER_ID:
+        if rid not in wanted_align and rid not in (YASSER_RECITER_ID, TAWFEEK_RECITER_ID):
             continue
-        if rid == YASSER_RECITER_ID:
+        if rid == TAWFEEK_RECITER_ID:
+            rows = load_tawfeek_timings(word_counts)
+        elif rid == YASSER_RECITER_ID:
             source = fetch(YASSER_QUA_URL, "yasser-al-dosari-qua-v3.zip")
             verify_source(source, YASSER_QUA_SHA256, "Yasser QUA v3 corpus")
             rows = load_qua_timings(
@@ -3036,6 +3160,18 @@ CREATE TABLE reciters (
   style TEXT NOT NULL,
   has_timings INTEGER NOT NULL
 );
+CREATE TABLE audio_clips (
+  reciter_id INTEGER NOT NULL,
+  surah_id INTEGER NOT NULL,
+  ayah_number INTEGER NOT NULL,
+  source_url TEXT NOT NULL,
+  source_bytes INTEGER NOT NULL,
+  start_byte INTEGER NOT NULL,
+  end_byte INTEGER NOT NULL,
+  lead_bytes INTEGER NOT NULL,
+  trim_samples INTEGER NOT NULL,
+  PRIMARY KEY (reciter_id, surah_id, ayah_number)
+) WITHOUT ROWID;
 CREATE TABLE timings (
   reciter_id INTEGER NOT NULL,
   surah_id INTEGER NOT NULL,
@@ -3795,6 +3931,9 @@ def main(argv=None):
     )
     db.executemany("INSERT INTO words VALUES (?,?,?,?,?,?,?,?,?,?)", words)
     db.executemany("INSERT INTO reciters VALUES (?,?,?,?,?)", reciter_rows)
+    db.executemany(
+        "INSERT INTO audio_clips VALUES (?,?,?,?,?,?,?,?,?)", tawfeek_audio_clip_rows()
+    )
     db.executemany(
         "INSERT INTO timings VALUES (?,?,?,?,?)",
         [

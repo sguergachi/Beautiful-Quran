@@ -55,6 +55,7 @@ class PlaybackService : MediaLibraryService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var mediaSession: MediaLibrarySession? = null
     private var prefetcher: AudioPrefetcher? = null
+    private var seamProcessor: VerseSeamAudioProcessor? = null
     private var assistantAudioResume: AssistantAudioResume? = null
     private val hizbStarts = mutableMapOf<String, Long>()
 
@@ -63,11 +64,14 @@ class PlaybackService : MediaLibraryService() {
         super.onCreate()
 
         RecitationCache.prepare(this)
-        val upstream = DefaultHttpDataSource.Factory()
-            .setUserAgent("BeautifulQuran/1.0")
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(15_000)
-            .setAllowCrossProtocolRedirects(true)
+        val upstream = VerseClipDataSource.Factory(
+            DefaultHttpDataSource.Factory()
+                .setUserAgent("BeautifulQuran/1.0")
+                .setConnectTimeoutMs(15_000)
+                .setReadTimeoutMs(15_000)
+                .setAllowCrossProtocolRedirects(true),
+            (application as QuranApp).repository.verseClips,
+        )
         val playerDataSource = RecitationCache.playbackDataSourceFactory(this, upstream)
 
         val prefetcher = AudioPrefetcher(
@@ -108,6 +112,8 @@ class PlaybackService : MediaLibraryService() {
             }
 
         player.addListener(PrefetchListener(player, prefetcher))
+        val seamListener = SeamBridgeListener(player) { seamProcessor?.sampleExactSeams = it }
+        player.addListener(seamListener)
         // Observe the actual service player only during an explicit log capture.
         // The reader's MediaController samples and these samples share nanoTime.
         serviceScope.launch {
@@ -161,6 +167,7 @@ class PlaybackService : MediaLibraryService() {
         serviceScope.launch {
             app.settings.settings.map { it.verseGapSeconds }.distinctUntilChanged().collect { seconds ->
                 player.pauseAtEndOfMediaItems = seconds > 0
+                seamListener.update()
             }
         }
         val sessionPlayer = VerseGapPlayer(
@@ -198,11 +205,15 @@ class PlaybackService : MediaLibraryService() {
                 enableAudioTrackPlaybackParams: Boolean,
             ): AudioSink {
                 val tap = VoiceTapAudioProcessor()
+                val clips = (application as QuranApp).repository.verseClips
+                val seams = VerseSeamAudioProcessor(seekTrimFrames = { uri ->
+                    com.beautifulquran.data.parseVerseClipUrl(uri)?.let(clips::lookup)?.let(::verseClipEncoderDelay) ?: 0
+                }).also { seamProcessor = it }
                 val routes = (application as QuranApp).outputRoutes
                 val sink = DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                    .setAudioProcessors(arrayOf(VerseSeamAudioProcessor(), tap))
+                    .setAudioProcessors(arrayOf(seams, tap))
                     .setAudioTrackProvider(object : DefaultAudioSink.AudioTrackProvider {
                         override fun getAudioTrack(config: AudioSink.AudioTrackConfig, attributes: AudioAttributes,
                             audioSessionId: Int, context: Context?): AudioTrack =
@@ -213,6 +224,36 @@ class PlaybackService : MediaLibraryService() {
                 return tap.attach(sink)
             }
         }
+
+    /**
+     * Tells the seam processor whether the seam at the end of the verse now
+     * playing continues the recording sample-exact ([sampleExactSeam]). The
+     * processor reads it at that verse's end of stream, which comes after this
+     * transition into it unless the verse is shorter than the sink's buffer.
+     */
+    private class SeamBridgeListener(
+        private val player: ExoPlayer,
+        private val setSampleExact: (Boolean) -> Unit,
+    ) : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = update()
+
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) = update()
+
+        override fun onRepeatModeChanged(repeatMode: Int) = update()
+
+        fun update() {
+            val next = player.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }
+                ?.let { player.getMediaItemAt(it) }
+            setSampleExact(
+                sampleExactSeam(
+                    current = player.currentMediaItem?.localConfiguration?.uri?.toString(),
+                    next = next?.localConfiguration?.uri?.toString(),
+                    repeatOne = player.repeatMode == Player.REPEAT_MODE_ONE,
+                    pausesAtEnd = player.pauseAtEndOfMediaItems,
+                ),
+            )
+        }
+    }
 
     /**
      * Turns playback events into cache-warming hints. Reads the player (main

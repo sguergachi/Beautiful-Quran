@@ -27,6 +27,14 @@ import {
   type SearchConcept,
 } from '../domain/WordSearch'
 import { assetUrl } from '../assetUrl'
+import {
+  dropStaleVerseClips,
+  installVerseClipFetch,
+  verseClipFingerprint,
+  verseClipHeadMs,
+  type VerseClip,
+  type VerseClipRef,
+} from '../playback/verseClips'
 
 let surahsCache: Surah[] | null = null
 let recitersCache: Reciter[] | null = null
@@ -53,7 +61,14 @@ export async function ensureReady(
   onProgress?: (p: LoadProgress) => void,
 ): Promise<void> {
   await openDatabase(undefined, onProgress)
+  installVerseClipFetch(verseClip)
+  rangeSourcedSlugs = new Map(reciters().filter((r) => r.rangeSourced).map((r) => [r.id, r.slug]))
+  // Before playback or a download can read a stale cut (or write a fresh one only to lose it).
+  await dropStaleVerseClips(verseClipFingerprints())
 }
+
+/** Range-sourced reciters by id, known once [ensureReady] has opened the database. */
+let rangeSourcedSlugs = new Map<number, string>()
 
 export function surahs(): Surah[] {
   if (surahsCache) return surahsCache
@@ -75,7 +90,9 @@ export function surahs(): Surah[] {
 export function reciters(): Reciter[] {
   if (recitersCache) return recitersCache
   recitersCache = queryAll(
-    'SELECT id, slug, name, style, has_timings FROM reciters ORDER BY id',
+    `SELECT id, slug, name, style, has_timings,
+            EXISTS (SELECT 1 FROM audio_clips WHERE reciter_id = reciters.id) AS range_sourced
+     FROM reciters ORDER BY id`,
     [],
     (r) => ({
       id: Number(r.id),
@@ -83,9 +100,55 @@ export function reciters(): Reciter[] {
       name: String(r.name),
       style: String(r.style),
       hasTimings: Number(r.has_timings) === 1,
+      rangeSourced: Number(r.range_sourced) === 1,
     }),
   )
   return recitersCache
+}
+
+let verseClipsCache: Map<string, VerseClip> | null = null
+
+/** Where a range-sourced reciter's verse lives in its surah recording, if it is one. */
+export function verseClip(ref: VerseClipRef): VerseClip | undefined {
+  return verseClips().get(`${ref.slug}/${ref.surah}:${ref.ayah}`)
+}
+
+/** One fingerprint per range-sourced reciter slug over all its verse ranges. */
+function verseClipFingerprints(): Map<string, string> {
+  const bySlug = new Map<string, [string, VerseClip][]>()
+  for (const [key, clip] of verseClips()) {
+    const slug = key.slice(0, key.indexOf('/'))
+    let rows = bySlug.get(slug)
+    if (!rows) bySlug.set(slug, (rows = []))
+    rows.push([key, clip])
+  }
+  return new Map([...bySlug].map(([slug, rows]) => [slug, verseClipFingerprint(rows)]))
+}
+
+function verseClips(): Map<string, VerseClip> {
+  if (!verseClipsCache) {
+    verseClipsCache = new Map()
+    for (const [key, clip] of queryAll(
+      `SELECT r.slug, c.surah_id, c.ayah_number, c.source_url, c.source_bytes,
+              c.start_byte, c.end_byte, c.lead_bytes, c.trim_samples
+       FROM audio_clips c JOIN reciters r ON r.id = c.reciter_id`,
+      [],
+      (r): [string, VerseClip] => [
+        `${String(r.slug)}/${Number(r.surah_id)}:${Number(r.ayah_number)}`,
+        {
+          sourceUrl: String(r.source_url),
+          sourceBytes: Number(r.source_bytes),
+          startByte: Number(r.start_byte),
+          endByte: Number(r.end_byte),
+          leadBytes: Number(r.lead_bytes),
+          trimSamples: Number(r.trim_samples),
+        },
+      ],
+    )) {
+      verseClipsCache.set(key, clip)
+    }
+  }
+  return verseClipsCache
 }
 
 export function surahContent(surahId: number): SurahContent {
@@ -228,8 +291,14 @@ export function timings(reciterId: number, surahId: number): Map<number, Segment
     ? Object.fromEntries((runtimeTimingsCache.resource(reciterId)?.rows ?? [])
       .filter((row) => row[0] === surahId).map((row) => [row[1], row[2]]))
     : timingCorpora.get(reciterId)?.[String(surahId)] ?? {}
+  const slug = rangeSourcedSlugs.get(reciterId)
   for (const [ayah, segments] of Object.entries(rows)) {
-    map.set(Number(ayah), mapSegments(segments))
+    const mapped = mapSegments(segments)
+    // The browser hears a range-sourced verse after its silenced head (verseClips.ts).
+    const clip = slug ? verseClip({ slug, surah: surahId, ayah: Number(ayah) }) : undefined
+    const headMs = clip ? verseClipHeadMs(clip) : 0
+    map.set(Number(ayah), headMs === 0 ? mapped
+      : mapped.map((s) => ({ ...s, startMs: s.startMs + headMs, endMs: s.endMs + headMs })))
   }
   timingsCache.set(key, map)
   return map

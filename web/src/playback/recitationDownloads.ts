@@ -46,7 +46,7 @@ export const chapterEmpty = (row: ChapterDownload) => row.cached <= 0 && row.byt
 export const reciterBytes = (row: ReciterDownloads) =>
   row.chapters.reduce((sum, chapter) => sum + chapter.bytes, 0)
 
-const EVERYAYAH_URL = /everyayah\.com\/data\/([^/]+)\/(\d{3})(\d{3})\.mp3/
+const EVERYAYAH_URL = /(?:everyayah\.com|verse-clips\.invalid)\/data\/([^/]+)\/(\d{3})(\d{3})\.mp3/
 
 export function parseEveryayahUrl(url: string): EveryayahRef | null {
   const match = EVERYAYAH_URL.exec(url)

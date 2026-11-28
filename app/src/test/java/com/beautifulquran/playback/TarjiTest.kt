@@ -27,6 +27,17 @@ import org.junit.Test
 class TarjiTest {
 
     @Test
+    fun `supplied Tawfeek tuning is the exported one and still pulses on its capture`() {
+        val tuned = TarjiLabCodec.decode(javaClass.getResourceAsStream("/tarji/tawfeek_114_2_w2_tuned.json")!!
+            .bufferedReader().use { it.readText() })
+        assertEquals(20, tuned.reciterId)
+        assertEquals(tuned.knobs, com.beautifulquran.tarjilab.TAWFEEK_TUNING)
+        val trace = com.beautifulquran.tarjilab.analyzeTarjiCapture(TarjiLabCodec.toCapture(tuned),
+            com.beautifulquran.tarjilab.TAWFEEK_TUNING, TarjiDetectorMode.Recording, reciterId = 20)
+        assertTrue("ٱلنَّاسِ's held note must pulse", trace.reverberating.count { it } >= 30)
+    }
+
+    @Test
     fun `supplied Hani tuning reaches a bright crest through the live word gate`() {
         // The tuning shipped for Hani is the one exported with 2:14 w16; it
         // must still carry the 1:7 capture it replaced the tuning of.

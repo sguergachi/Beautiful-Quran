@@ -194,7 +194,7 @@ only when its word timings match the exact EveryAyah recording the app streams.
 The 2026 expansion therefore keeps Yasser Al-Dosari, Abu Bakr Al-Shatri,
 Mohammad Al-Tablawi, and the available Mujawwad / Muallim performances while
 excluding popular voices whose complete timing corpus uses a different audio
-clock. The result is 13 recitations, all with word highlighting. New corpora
+clock. The result is 14 recitations, all with word highlighting. New corpora
 are pinned by source SHA-256 and by one hash over all 6,236 output rows; later
 edits to any shipped row still require the ordinary per-row acoustic verdict.
 
@@ -203,6 +203,49 @@ EveryAyah files. `tools/timing_sources/yasser-everyayah-clock.json` records the
 exact source-frame origin of 6,231 clips and retains every full or partial
 occurrence physically inside each clip. Five clips that cannot be byte-matched
 use committed two-model forced-alignment evidence instead.
+
+**Tawfeek As-Sawaigh** is on no per-verse source. His public whole-surah MP3s
+(mp3quran.net) are never re-hosted or re-encoded: each verse is a byte range of
+the one source file, listed in the `audio_clips` table (`start_byte`, `end_byte`,
+`lead_bytes`, `trim_samples`; `reciters.rangeSourced`). `tools/build_tawfeek_verse_index.py`
+cuts only at MP3 frame boundaries, in silence where the recording has any. The
+player asks the CDN for that range (`VerseClipDataSource` on Android,
+`installVerseClipFetch` on web). Each range starts with the frames that seed the
+bit reservoir, silenced on the fly (`Mp3LeadSilencer`; `silenceLead` on web), and
+one warm-up frame decoded for real, so the verse's first frame decodes exactly
+as in the surah file. On Android the stream is prefixed with an ID3 `iTunSMPB`
+tag (`gaplessHeaderFor`): Media3 trims the decoded lead and the platform
+decoder's 529-sample padding, and verses played back to back are the recording,
+sample for sample, so a seam inside connected recitation cannot be heard. A seam
+from one verse into the next of the same surah (`sampleExactSeam`) skips
+`VerseSeamAudioProcessor`'s fade and bridge, which exist for separately recorded
+EveryAyah files; every other seam keeps them (the basmalah into a chapter, a
+repeated verse, a wrap, the pause between verses), since those end on a cut.
+Media3 applies the trim only when a file starts, so after a seek inside a verse
+the processor trims the same encoder delay itself (`seekTrimFrames`), or the
+recording would run 40–80 ms behind the words. The web has no such trim and
+silences the whole head instead, so it delays that reciter's word times by the
+head (`verseClipHeadMs`). The URL pinned for each surah carries its byte size,
+and playback refuses a source that has changed. `tools/verify_tawfeek_slices.py`
+proves the exactness for all 6,236 slices, and `VerseClipSeamCaptureTest` with
+`tools/check_verse_seams.py` (back to back) and `tools/check_verse_seek.py`
+(a seek inside Āyat al-Kursī) prove it for the real player and decoder on a
+device. Cached verses are keyed by URL, so a change to the ranges or their source
+(or to `VERSE_CLIP_FORMAT`) drops the cached and downloaded copies on next
+launch, before a download may resume (Android `dropStaleVerseClips`; web
+`dropStaleVerseClips` in `verseClips.ts`).
+
+His word times are our own: `tools/reciter_align` (see its README) aligns the same
+recordings to the canonical text with MMS-300m CTC, finds the istiadha and basmala
+he says at section breaks and the phrases he repeats, audits every verse with a
+second model (XLSR-53 Arabic), and commits one hash-pinned artifact,
+`tools/timing_sources/tawfeek-alignment.json.gz`. No third-party timing data is
+involved, so the result ships in the public repo, the APK and the web build.
+Audio is from mp3quran.net, credited in-app. Run on quran.com's own whole-surah
+files for three of our other reciters, it matches their word starts to a median
+of 30-40 ms with no constant bias. The one systematic miss it had was idgham: the
+word a tanween or nun merges into started after its ghunna, up to 0.8 s late. That
+is fixed in its text form (see the aligner README).
 
 The **canonical word segmentation** is the space-split of the Uthmani text.
 The other two sources are mapped onto it by position:

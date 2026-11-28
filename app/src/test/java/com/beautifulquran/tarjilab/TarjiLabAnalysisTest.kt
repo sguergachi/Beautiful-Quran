@@ -13,19 +13,15 @@ class TarjiLabAnalysisTest {
     )
 
     @Test
-    fun `mode changes clear decisions and reference without interrupting preview`() {
+    fun `mode changes clear decisions without interrupting preview`() {
         val knobs = TarjiLabKnobs()
         val trace = analyzeTarjiCapture(capture, knobs)
         val before = TarjiLabViewModel.TarjiLabUiState(
             capture = capture, trace = trace, mode = TarjiDetectorMode.Current, knobs = knobs,
-            reference = TarjiLabReference(knobs, trace), showingReference = true,
             previewPlaying = true, previewPositionMs = 47f,
         )
         val pending = before.forMode(TarjiDetectorMode.Recording)
         assertNull(pending.trace)
-        assertNull(pending.reference)
-        assertNull(pending.displayTrace)
-        assertFalse(pending.showingReference)
         assertTrue(pending.analyzing)
         assertSame(capture, pending.capture)
         assertEquals(knobs, pending.knobs)
@@ -53,7 +49,7 @@ class TarjiLabAnalysisTest {
         val pending = TarjiLabViewModel.TarjiLabUiState(mode = TarjiDetectorMode.Current)
             .forMode(TarjiDetectorMode.Cycles)
         assertFalse(pending.analyzing)
-        assertNull(pending.displayTrace)
+        assertNull(pending.trace)
     }
 
     @Test

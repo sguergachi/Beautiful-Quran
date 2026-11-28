@@ -271,6 +271,23 @@ describe('PlayerController event sequences', () => {
     await vi.waitFor(() => expect(player.isGapless5Enabled()).toBe(false))
   })
 
+  it('leaves Gapless-5 when a range-sourced reciter loads', async () => {
+    const audio = new FakeAudio()
+    const player = new PlayerController(instantPrefetcher(), true, null, () =>
+      audio.asAudio(),
+    )
+    const internal = player as unknown as {
+      gapless5Enabled: boolean
+      gapless5: { dispose: ReturnType<typeof vi.fn>; clear: ReturnType<typeof vi.fn> } | null
+    }
+    const backend = { dispose: vi.fn(), clear: vi.fn() }
+    internal.gapless5Enabled = true
+    internal.gapless5 = backend
+    player.loadSurah(content, { ...reciter, id: 20, slug: 'Tawfeek_As-Sawaigh_128kbps', rangeSourced: true })
+    expect(player.isGapless5Enabled()).toBe(false)
+    expect(backend.dispose).toHaveBeenCalled()
+  })
+
   it('keeps a saved non-1× rate after the first loadActive (not only after cycling)', async () => {
     const audio = new FakeAudio()
     // Browser-like: load() re-seeds playbackRate from defaultPlaybackRate.

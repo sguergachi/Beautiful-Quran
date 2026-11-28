@@ -6,6 +6,10 @@ describe('ReciterSync', () => {
     expect(highlightAdvanceMs(9)).toBe(200)
   })
 
+  it('runs Tawfeek highlight 100 ms ahead', () => {
+    expect(highlightAdvanceMs(20)).toBe(100)
+  })
+
   it('leaves other reciters on their source clock', () => {
     expect(highlightAdvanceMs(1)).toBe(0)
     expect(highlightAdvanceMs(19)).toBe(0)

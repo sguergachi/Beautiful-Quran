@@ -11,12 +11,14 @@ crest, slightly dimmer in each trough, hue unchanged. The pulse it and the graph
 
 ## Comparing detector experiments
 
-The **Detector** row chooses **Current / Cycles / Spectrum / Recording**.
-It shares the reader Ink Lab's **Tarjīʿ** tab choice: three mutually exclusive
-experiment toggles, all off for Current. **Replay the held word after each
-switch** to compare fresh evidence. The global choice lasts for this developer
-session; it is not saved per reciter, added to profiles/exports, or restored
-by import. Turning developer mode off returns to Current.
+The **Detector** row, under **Fine tuning**, chooses **Recording / Current /
+Cycles / Spectrum**. Recording is the reader's default
+(`TarjiDetectorMode.DEFAULT`) and leads the row. It shares the reader Ink Lab's
+**Tarjīʿ** tab choice: three mutually exclusive experiment toggles, all off
+for Current. **Replay the held word after each switch** to compare fresh
+evidence. The global choice lasts for this developer session; it is not saved
+per reciter, added to profiles/exports, or restored by import. Turning
+developer mode off returns to Recording.
 
 Cycles checks successive peaks/troughs; Spectrum fits a periodic curve against
 a trend and compares its two halves. Both share the existing extractor and a
@@ -31,8 +33,7 @@ Experimental amplitude evidence is blurred 20 ms log-RMS; pitch is fresh,
 valid-only blurred cents F0, never carried estimates. Measured minimum depth
 is 3.5% AM or 10 cents FM, so sensitivity differs from Current. The waveform
 and preview always follow measured PCM through the existing clock, with no
-fitted oscillator. A switch clears old analysis, pending preview and comparison
-reference; it does not seek, reset capture time, or alter the audible clock.
+fitted oscillator. A switch clears old analysis and pending preview; it does not seek, reset capture time, or alter the audible clock.
 Results publish only for the current capture/knobs/mode. These tools compare
 acoustic hypotheses; a green trace alone does not establish accuracy or reader
 admission. See the [research report](tarji-detection/methods.md) and
@@ -74,24 +75,18 @@ admission. See the [research report](tarji-detection/methods.md) and
    its nudges move by 2 percentage points.
    Changes save automatically for this reciter. Graph and glow update while
    dragging; audio continues on the same clock.
-6. **Compare** switches the graph, glow, and displayed knob values between
-   live tuning and one **Reference**, without changing audio, position, or
-   saved settings. The initial reference is the first completed analysis for
-   this capture; the ribbon-shaped **Set ref** icon replaces it with the current
-   completed tuning and confirms **Reference saved**. It glows gold when the
-   live settings match the saved reference. This is a comparison checkpoint
-   for the current capture, not a reader bookmark.
-   Reference mode disables knob edits; tap Compare to return. Reference and
-   history clear on a new word/import, so captures cannot be compared across
-   different timelines.
+6. **Share** sends the word and its tuning as a JSON sample through the
+   Android share sheet (KDE Connect, chat, mail), named like
+   `tarji_20_109_2_w1.json`. It is the same file Export saves, and it is how a
+   reciter's tuning reaches the developer to be shipped as his default.
 7. **Undo / Redo** reverse tuning edits without restarting playback. One full
    slider drag is one undo step; each nudge is another. History retains 32 edits
    for the current word. **Reset** restores shipped defaults and is undoable.
-   **Fine tuning** reveals note slides, fade-in, and gap
+   **Fine tuning** reveals the detector method, note slides, fade-in, and gap
    bridging, with sample import/export and optional notes below.
 
 The normal layout has two 48 dp rows below the graph: transport, then clock /
-pulse status alongside Compare, Set reference, Undo, and Redo. Familiar controls
+pulse status alongside Share, Undo, and Redo. Familiar controls
 use icons with accessible names instead of stacked captions. There is no
 permanent legend, gesture caption, time-ruler row, or duplicate Fit action.
 Capture errors and sample messages take a row only when present and wrap
@@ -113,18 +108,30 @@ Applying a profile enables the same full-depth pulse shown in the lab, while
 preserving the wash settings. Live acoustic eligibility remains independent
 of the visual tajweed-pacing toggle, including in English reading modes.
 
-The supplied `tarji_7_1_7_w9.json` tuning is installed once for **Hani Ar-Rifai**
-(app reciter id 7): 200% brightness, 1.6–8 Hz, 656.6863 ms minimum hold,
-0.13819668 minimum depth, 0.38481894 periodicity, 0.3 pitch drift, 50 ms
-attack, and 1095.3691 ms release. This replaces any older Hani profile once;
-later lab edits persist normally. Other stored reciter profiles are preserved.
+Shipped tunings (`SHIPPED_TARJI_TUNINGS` in `ReciterTarjiProfiles.kt`) are
+the exact knobs of a sample the user shared from the lab. Each is installed
+once per device, under its own flag, over any older profile for that reciter;
+later lab edits persist normally and other reciters' profiles are untouched.
+
+- **Hani Ar-Rifai** (id 7), from `tarji_7_2_14_w16.json`: 200% brightness,
+  2.7–8.3 Hz, 1,200 ms minimum hold, 0.123 minimum depth, 0.15 periodicity,
+  0.3 pitch drift, 50 ms attack, 100 ms release.
+- **Tawfeek As-Sawaigh** (id 20), from `tarji_20_114_2_w2.json` (ٱلنَّاسِ,
+  tuned under Recording): 200% brightness, 2.7–8.2 Hz, 1,155 ms minimum hold,
+  0.046 minimum depth, 0.15 periodicity, 1% quietest voice, 36% drama, 0.3
+  pitch drift, 50 ms attack, 100 ms release.
+
+Each sample is kept in `app/src/test/resources/tarji/`, and `TarjiTest` holds
+the shipped knobs equal to it and checks that its capture still pulses.
+To ship a new one: the user taps **Share** in the lab, the JSON joins those
+fixtures, and its knobs join `SHIPPED_TARJI_TUNINGS` with a new flag.
 
 - **Glint brightness** scales the tint and halo together from 0–200%.
   0% removes the sheen, 100% preserves the shipped look, and 200% brightens it
   up to the renderer’s opacity limit and scales the crest's blend toward white.
   It affects the lab glow and reader glint
   (including the repeat glimmer). It leaves the green trace, detection, pulse
-  timing, wash, and halo size unchanged. Compare, undo/redo, reset, and sample
+  timing, wash, and halo size unchanged. Undo/redo, reset, share and sample
   export include brightness. Old samples/profiles default to 100%.
 
 - **Sensitivity** reverses the modulation-depth threshold: 0% = depth 0.25,
@@ -178,7 +185,7 @@ original capture, knobs and mode.
 During a drag, one worker coalesces edits into the latest replay instead of
 restarting a 120 ms trailing debounce on every pointer event. Completed intermediate replays update the curve during a drag; it stays
 marked Updating until the worker catches the current knobs. A single ordered
-worker cannot replace a newer result with an older one. Reference creation is disabled while analysis is pending.
+worker cannot replace a newer result with an older one.
 A loop replays the captured detector history, including its lead-in, so every
 pass compares the same acoustic evidence rather than warming up at the loop
 boundary. This is tuning feedback, not synthesis or waveform authoring.
@@ -267,7 +274,6 @@ read; a late result or failure cannot change tuning, the target, or playback.
 The JSON includes reciter, ayah, word, decimated PCM (16-bit LE Base64), the
 detector lead-in PCM, hop duration, media origin, loop range, displayed
 detector parameters, and notes.
-Export in Compare mode saves the reference settings you are viewing without changing the live profile.
 Imported captures retain their source reciter metadata when exported again.
 
 Schema 2 and 3 samples still import. Their hold window becomes the loop range;
@@ -293,7 +299,7 @@ labels and device listening/visual comparison remain separate work.
 
 On device, check cold Settings entry, repeated word changes during capture,
 loop/whole-capture playback, paused seeking, all three speeds, knob edits while
-playing, Match on a loop and on the whole word, undo after Match, Compare/Set ref, undo/redo after a drag and after Reset, import, and
+playing, Match on a loop and on the whole word, undo after Match, Share, undo/redo after a drag and after Reset, import, and
 exit/background during capture and preview. Device verification remains
 pending where the emulator System UI fails before the app can be inspected.
 

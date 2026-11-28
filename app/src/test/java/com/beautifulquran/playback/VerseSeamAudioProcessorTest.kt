@@ -68,8 +68,50 @@ class VerseSeamAudioProcessorTest {
         assertTrue(out.all { it.toInt() == 0 })
     }
 
-    private fun playThenSilence(gapless: Boolean): ByteArray {
-        val processor = VerseSeamAudioProcessor()
+    @Test
+    fun `verses cut from a surah recording are never bridged`() {
+        // Their opening silence is the cut's lead, not a hole in the recording:
+        // filling it replays the previous verse's last word, reversed.
+        val out = playThenSilence(gapless = true, sampleExact = true)
+        assertTrue(out.all { it.toInt() == 0 })
+    }
+
+    @Test
+    fun `a sample-exact seam hands the ending on unfaded`() {
+        val processor = VerseSeamAudioProcessor().also { it.sampleExactSeams = true }
+        val format = AudioProcessor.AudioFormat(1_000, 1, C.ENCODING_PCM_16BIT)
+        processor.configure(format)
+        processor.flush(AudioProcessor.StreamMetadata.DEFAULT)
+        processor.queueInput(ByteBuffer.wrap(pcm16(18, 8_000)))
+        copy(processor.getOutput())
+        processor.configure(format)
+        processor.queueEndOfStream()
+        val tail = copy(processor.getOutput())
+        assertEquals(8, tail.size / 2)
+        assertTrue((0 until 8).all { sampleAt(tail, it) == 8_000 })
+    }
+
+    @Test
+    fun `only the next verse of the same surah recording joins sample-exact`() {
+        fun clip(surah: Int, ayah: Int, slug: String = "Tawfeek_As-Sawaigh_128kbps") =
+            "https://verse-clips.invalid/data/$slug/%03d%03d.mp3".format(surah, ayah)
+        fun exact(a: String?, b: String?, repeatOne: Boolean = false, pausesAtEnd: Boolean = false) =
+            sampleExactSeam(a, b, repeatOne, pausesAtEnd)
+        assertTrue(exact(clip(109, 2), clip(109, 3)))
+        assertTrue("Al-Fatiha's own basmalah is its first verse", exact(clip(1, 1), clip(1, 2)))
+        assertFalse("the basmalah lead-in is cut from Al-Fatiha's recording", exact(clip(1, 1), clip(2, 1)))
+        assertFalse("a wrap to the first verse", exact(clip(109, 6), clip(109, 1)))
+        assertFalse("a verse skipped", exact(clip(109, 2), clip(109, 4)))
+        assertFalse("another reciter", exact(clip(109, 2), clip(109, 3, slug = "Other_128kbps")))
+        assertFalse("one verse repeated", exact(clip(109, 2), clip(109, 3), repeatOne = true))
+        assertFalse("a pause between verses", exact(clip(109, 2), clip(109, 3), pausesAtEnd = true))
+        assertFalse("the end of the queue", exact(clip(109, 6), null))
+        assertFalse("separately recorded verses",
+            exact("https://everyayah.com/data/Alafasy_128kbps/109002.mp3", "https://everyayah.com/data/Alafasy_128kbps/109003.mp3"))
+    }
+
+    private fun playThenSilence(gapless: Boolean, sampleExact: Boolean = false): ByteArray {
+        val processor = VerseSeamAudioProcessor().also { it.sampleExactSeams = sampleExact }
         val format = AudioProcessor.AudioFormat(1_000, 1, C.ENCODING_PCM_16BIT)
         processor.configure(format)
         processor.flush(AudioProcessor.StreamMetadata.DEFAULT)

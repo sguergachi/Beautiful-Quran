@@ -24,3 +24,11 @@ and use the two-model evidence in `yasser-1-1-dual-model.json` and
 Regenerate the clock artifact only from locally downloaded source chapters and
 8 KiB EveryAyah prefixes with `tools/build_yasser_clock_map.py`; its two corpus
 hashes bind all 114 source files and all 6,236 clip prefixes used by the map.
+
+Tawfeek As-Sawaigh has no per-verse source at all: the app streams each verse as a
+byte range of his public surah recording (`tawfeek-verse-index.json`). His word times
+are our own, from `tools/reciter_align` (`tawfeek-alignment.json.gz`, pinned to the
+SHA-256 of all 114 recordings). Every inserted opening or repeat is supported by two
+acoustic models; a word two models place more than half a second apart is decided by a
+third, and kept for review when all three differ. Regenerate with `python -m
+reciter_align align` then `pack`, then `build_tawfeek_verse_index.py`.

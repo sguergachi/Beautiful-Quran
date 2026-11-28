@@ -15,15 +15,19 @@ def corpus_digest(rows):
     return hashlib.sha256(json.dumps(values, separators=(",", ":")).encode()).hexdigest()
 
 
-def verify_asset_transition(before, after, manifest):
-    """Exclude only the exact removed corpora, then leave the normal delta gate intact."""
+def verify_asset_transition(before, after, manifest, check_retained=True):
+    """Exclude only the exact removed corpora, then leave the normal delta gate intact.
+
+    `check_retained=False` is for a baseline older than the manifest (a branch that predates the
+    latest added reciter): only the removed corpora are pinned then.
+    """
     if (manifest.get("schemaVersion") != 1 or manifest.get("runtimeReciters") != [1, 2, 3, 4, 5, 7] or
             manifest.get("delivery") != RUNTIME_DELIVERY):
         raise ValueError("Invalid authenticated timing delivery manifest")
     if any(key[0] in QF_TIMING_SLUGS for key in after):
         raise ValueError("QF-derived timings remain in the public database asset")
-    if (len(after) != manifest["retainedTimingRows"] or
-            corpus_digest(after) != manifest["retainedTimingsSha256"]):
+    if check_retained and (len(after) != manifest["retainedTimingRows"] or
+                           corpus_digest(after) != manifest["retainedTimingsSha256"]):
         raise ValueError("Public independent timing corpus does not match its delivery manifest")
     removed = {key: value for key, value in before.items() if key[0] in QF_TIMING_SLUGS}
     if removed and (len(removed) != manifest["removedTimingRows"] or

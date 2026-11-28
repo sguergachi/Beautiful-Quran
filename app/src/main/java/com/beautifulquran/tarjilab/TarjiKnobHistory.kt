@@ -41,6 +41,3 @@ internal class TarjiKnobHistory {
         editing = false
     }
 }
-
-/** One capture's comparison checkpoint; switching it never changes persisted tuning. */
-data class TarjiLabReference(val knobs: TarjiLabKnobs, val trace: TarjiLabTrace)

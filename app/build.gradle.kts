@@ -76,6 +76,7 @@ android {
         targetSdk = 37
         versionCode = 14
         versionName = "0.13"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "QF_CONTENT_BASE_URL", "\"$qfContentBaseUrl\"")
         buildConfigField("String", "CAPTURE_SOURCE_REVISION", "\"${captureSourceRevision.get()}\"")
         buildConfigField("boolean", "CAPTURE_SOURCE_DIRTY", captureSourceDirty.get().toString())
@@ -359,5 +360,7 @@ dependencies {
     baselineProfile(project(":baselineprofile"))
 
     testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

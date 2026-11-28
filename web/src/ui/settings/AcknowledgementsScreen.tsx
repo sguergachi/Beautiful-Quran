@@ -28,12 +28,16 @@ export const ACKNOWLEDGEMENTS: Acknowledgement[] = [
     body: 'Word timings from Qur’anic Universal Audio, CC-BY 4.0.',
   },
   {
+    title: 'Tawfeek As-Sawaigh timings',
+    body: 'Aligned for this app from his recordings against the canonical text, with open speech models: MMS (Meta, CC-BY-NC 4.0) and XLSR-53 Arabic (Apache 2.0).',
+  },
+  {
     title: 'Repeat-aware timings',
     body: 'Quran Foundation authenticated Content Sync, normalized and reviewed against the recitation audio. Kept in a maintained offline cache.',
   },
   {
     title: 'Recitation audio',
-    body: 'Streamed from everyayah.com. Free; all rights to the recitations belong to the respective reciters.',
+    body: 'Streamed from everyayah.com, and for Tawfeek As-Sawaigh from mp3quran.net. Free; all rights to the recitations belong to the respective reciters.',
   },
   {
     title: 'English typeface',
