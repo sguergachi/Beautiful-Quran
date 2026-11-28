@@ -11,6 +11,11 @@ class ReciterSyncTest {
     }
 
     @Test
+    fun `Tawfeek highlight runs 100 ms ahead`() {
+        assertEquals(100L, ReciterSync.highlightAdvanceMs(20))
+    }
+
+    @Test
     fun `Alafasy keeps the presentation clock and ordered highlights at every reader speed`() {
         val segments = listOf(
             Segment(position = 1, startMs = 210, endMs = 490),
