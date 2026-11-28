@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 
 from . import crosscheck
 from .acoustics import Energy
 from .backends import decode_audio
 from .route import RouteConfig, block_gain, inserted_blocks, resolve_route
-from .text import DEFAULT_DB, surah_words
+from .text import DEFAULT_DB, starts_merged, surah_words
 from .windowed import AlignConfig, align_route
 
 WEAK_SCORE = -2.5  # a word matched this poorly is listed for review
@@ -27,8 +29,13 @@ def align_surah(surah, audio_path, primary, check=None, third=None, db_path=DEFA
     stride = primary.stride_s
     if emissions is None:
         emissions = primary.emissions(audio)
+    # What was said (openings, repeats) is decided on bare letters; only then are the words
+    # placed in their spoken idgham forms (text.spoken). The forms move where a merged word
+    # starts, and fed to the route search or the support test below they also tip close
+    # calls between explanations of the same audio (a repeated verse read as a basmala, a
+    # repeat across two verses that no verse slice can hold).
     route, placements, report = resolve_route(
-        emissions, primary, surah_words(surah, db_path), stride, align_cfg, route_cfg, log
+        emissions, primary, surah_words(surah, db_path, merged=False), stride, align_cfg, route_cfg, log
     )
 
     # An insertion both models do not support (each must explain the audio better with it than
@@ -49,6 +56,11 @@ def align_surah(surah, audio_path, primary, check=None, third=None, db_path=DEFA
         route = [w for i, w in enumerate(route) if i not in drop]
         placements = align_route(emissions, primary.blank, primary.star,
                                  [primary.tokens(w.text) for w in route], stride, align_cfg)
+
+    forms = {(w.ayah, w.pos): w.text for w in surah_words(surah, db_path)}
+    route = [replace(w, text=forms[(w.ayah, w.pos)]) if w.ayah and w.kind == "verse" else w for w in route]
+    placements = align_route(emissions, primary.blank, primary.star,
+                             [primary.tokens(w.text) for w in route], stride, align_cfg)
 
     # Words with no tokens (rare) take the position of their predecessor.
     spans, previous = [], 0
@@ -134,6 +146,10 @@ def align_surah(surah, audio_path, primary, check=None, third=None, db_path=DEFA
             for i, d in sorted(big.items()):
                 if i not in third_starts or i == runs_of[i]:
                     continue  # a run's first word is its verse's edge: left to review
+                if starts_merged(route[i].text):
+                    # All three models hear an idgham word start where its ghunna ends; the
+                    # primary, given the doubled letter, is the one that reaches its onset.
+                    continue
                 primary_s = spans[i][0] / 1000
                 verdict = crosscheck.arbitrate(primary_s, primary_s + d, third_starts[i])
                 if verdict and verdict[0] == "check":

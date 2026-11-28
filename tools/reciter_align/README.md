@@ -78,4 +78,15 @@ run `offsetMs` for audio edges.
 * Accuracy on word starts is a CTC spike, typically 20-30 ms from a second model; ~1-2 % of words
   disagree by over 200 ms, mostly where one word ends in the letter the next
   begins with.
+* Measured against quran.com's segments for Hani Ar-Rifai, Alafasy and Husary
+  (10 surahs, ~4,000 words, their own whole-surah files): word starts inside a
+  verse agree to a median of 30-40 ms, ~80 % within 100 ms, with no constant
+  bias. Verse starts sit on the acoustic onset; quran.com's begin in the pause
+  before. Most larger differences are quran.com tiling a pause into the next word.
+* Idgham into a following word is said as one merged sound. The letter models
+  give it one consonant, so `text.py` passes the shadda on a word's first letter
+  as a doubled letter and drops the bare nun before it. Without that the word
+  started after its ghunna, up to 0.8 s late. The check and arbiter models hear
+  it late too, so the arbiter never moves such a word's start. Idgham into ي/و
+  (no shadda written) is unchanged.
 * Only Arabic through `ara` uroman (MMS) and Arabic letters (XLSR).

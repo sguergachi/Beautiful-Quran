@@ -241,7 +241,11 @@ he says at section breaks and the phrases he repeats, audits every verse with a
 second model (XLSR-53 Arabic), and commits one hash-pinned artifact,
 `tools/timing_sources/tawfeek-alignment.json.gz`. No third-party timing data is
 involved, so the result ships in the public repo, the APK and the web build.
-Audio is from mp3quran.net, credited in-app.
+Audio is from mp3quran.net, credited in-app. Run on quran.com's own whole-surah
+files for three of our other reciters, it matches their word starts to a median
+of 30-40 ms with no constant bias. The one systematic miss it had was idgham: the
+word a tanween or nun merges into started after its ghunna, up to 0.8 s late. That
+is fixed in its text form (see the aligner README).
 
 The **canonical word segmentation** is the space-split of the Uthmani text.
 The other two sources are mapped onto it by position:

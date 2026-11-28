@@ -66,6 +66,24 @@ def test_letters_fold_marks_and_hamza():
     assert letters("۝١") == ""
 
 
+def test_letters_double_a_merged_first_letter():
+    # Idgham writes the merged tanween/nun as a shadda on the next word's first letter;
+    # that sound (and its ghunna) is the word's own start.
+    assert letters("مُّبِينٞ") == "ممبين"
+    assert letters("لِّلۡمُتَّقِينَ") == "لللمتقين"
+    # A shadda further in is an ordinary doubled consonant inside the word.
+    assert letters("إِنَّ") == "ان"
+    assert letters("رَبِّ") == "رب"
+
+
+def test_spoken_forms_follow_the_verse():
+    from reciter_align.text import spoken, unmerged
+    assert letters(spoken("مِن", "نُّطۡفَةٖ")) == "م"  # the nun is the next word's merged letter
+    assert spoken("مِنۡ", "نُّطۡفَةٖ") == "مِنۡ"  # a written sukun: said, not merged
+    assert spoken("إِن", "يُرِدۡنِ") == "إِن"  # nothing doubled to merge into
+    assert letters(unmerged("مَّآ")) == "ما"  # a verse's first word is begun after a stop
+
+
 def test_forced_align_places_tokens_on_their_frames():
     em = np.full((12, 4), np.log(0.02), dtype=np.float32)
     em[:, 0] = np.log(0.94)

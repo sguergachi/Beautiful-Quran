@@ -20,8 +20,8 @@
  * it on every update silently deleted the reader's downloads and forced a
  * reload of every open tab. It is kept, and never counts as stale.
  */
-const CACHE = 'beautiful-quran-web-v16'
-const OFFLINE_SHELL = 'beautiful-quran-offline-shell-v16'
+const CACHE = 'beautiful-quran-web-v17'
+const OFFLINE_SHELL = 'beautiful-quran-offline-shell-v17'
 const BASE = self.registration.scope
 /** Caches this worker never deletes: reader audio, not app shell. */
 const AUDIO_CACHE_PREFIX = 'beautiful-quran-audio-'
